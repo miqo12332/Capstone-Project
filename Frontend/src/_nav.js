@@ -1,6 +1,8 @@
 import React from 'react'
-import CIcon from '@coreui/icons-react'
 import {
+  CIcon,
+  CNavItem,
+  CNavTitle,
   cilSpeedometer,
   cilPlus,
   cilList,
@@ -20,8 +22,7 @@ import {
   cilLockLocked,
   cilAccountLogout,
   cilUserPlus,
-} from '@coreui/icons'
-import { CNavItem, CNavTitle } from '@coreui/react'
+} from "./views/Stephabit"
 
 const _nav = [
   {
@@ -58,7 +59,7 @@ const _nav = [
     name: 'Daily Challenge',
     to: '/dailychallenge',
     icon: <CIcon icon={cilLightbulb} customClassName="nav-icon" />,
-  },
+  },  
   {
     component: CNavItem,
     name: 'Smart Scheduler',

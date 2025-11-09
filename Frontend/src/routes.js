@@ -14,6 +14,9 @@ const ProgressTracker = React.lazy(() => import("./views/dashboard/ProgressTrack
 const ReportsAnalytics = React.lazy(() => import("./views/dashboard/ReportsAnalytics"));
 const Schedules = React.lazy(() => import("./views/dashboard/schedules"));
 
+// ===== My Routine =====
+const MyRoutine = React.lazy(() => import("./views/pages/MyRoutine"));
+
 // ===== Profile =====
 const UserProfile = React.lazy(() => import("./views/profile/UserProfile"));
 const Preferences = React.lazy(() => import("./views/profile/Preferences"));
@@ -31,8 +34,7 @@ const FitnessSync = React.lazy(() => import("./views/sync/FitnessSync"));
 const Contact = React.lazy(() => import("./views/support/Contact"));
 const HelpCenter = React.lazy(() => import("./views/support/HelpCenter"));
 
-// ===== Misc =====
-
+// ===== Routes Array =====
 const routes = [
   // ===== Dashboard =====
   { path: "/", name: "Home", element: Dashboard },
@@ -42,6 +44,9 @@ const routes = [
   { path: "/progress-tracker", name: "Progress Tracker", element: ProgressTracker },
   { path: "/reportsanalytics", name: "Reports & Analytics", element: ReportsAnalytics },
   { path: "/schedules", name: "Schedules", element: Schedules },
+
+  // ===== My Routine =====
+  { path: "/myroutine", name: "My Routine", element: MyRoutine },
 
   // ===== Profile =====
   { path: "/profile", name: "User Profile", element: UserProfile },
@@ -60,7 +65,6 @@ const routes = [
   { path: "/contact", name: "Contact", element: Contact },
   { path: "/help", name: "Help Center", element: HelpCenter },
 
-  
   // ===== Auth =====
   { path: "/login", name: "Login", element: Login },
   { path: "/register", name: "Register", element: Register },
