@@ -13,6 +13,7 @@ import UserAchievement from "./UserAchievement.js";
 import Friend from "./Friend.js";
 import GroupChallenge from "./GroupChallenge.js";
 import UserGroupChallenge from "./UserGroupChallenge.js";
+import UserSetting from "./UserSetting.js";
 
 // === Habit scheduling ===
 User.hasMany(Habit, { foreignKey: "user_id", as: "habits" });
@@ -66,6 +67,10 @@ GroupChallenge.belongsToMany(User, {
 User.hasMany(Notification, { foreignKey: "user_id", as: "notifications" });
 Notification.belongsTo(User, { foreignKey: "user_id", as: "user" });
 
+// === User settings ===
+User.hasOne(UserSetting, { foreignKey: "user_id", as: "settings" });
+UserSetting.belongsTo(User, { foreignKey: "user_id", as: "user" });
+
 export {
   User,
   Habit,
@@ -77,4 +82,5 @@ export {
   Friend,
   GroupChallenge,
   UserGroupChallenge,
+  UserSetting,
 };

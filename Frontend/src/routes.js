@@ -22,6 +22,7 @@ const MyRoutine = React.lazy(() => import("./views/pages/MyRoutine"));
 // ===== Profile =====
 const UserProfile = React.lazy(() => import("./views/profile/UserProfile"));
 const Preferences = React.lazy(() => import("./views/profile/Preferences"));
+const Settings = React.lazy(() => import("./views/profile/Settings"));
 
 // ===== Community =====
 const Friends = React.lazy(() => import("./views/community/Friends"));
@@ -54,6 +55,7 @@ const routes = [
 
   // ===== Profile =====
   { path: "/profile", name: "User Profile", element: UserProfile },
+  { path: "/settings", name: "Settings", element: Settings },
   { path: "/preferences", name: "Preferences", element: Preferences },
 
   // ===== Community =====
