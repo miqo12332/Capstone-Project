@@ -15,6 +15,8 @@ import achievementRoutes from "./routes/achievementRoutes.js";
 import friendRoutes from "./routes/friendRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import avatarRoutes from "./routes/avatarRoutes.js"; // ✅ new route
+import dailyChallengeRoutes from "./routes/dailyChallengeRoutes.js";
+import smartSchedulerRoutes from "./routes/smartSchedulerRoutes.js";
 
 // === Node path handling for ES modules ===
 import path from "path";
@@ -50,6 +52,8 @@ app.use("/api/achievements", achievementRoutes);
 app.use("/api/friends", friendRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/avatar", avatarRoutes); // ✅ avatar upload route
+app.use("/api/daily-challenge", dailyChallengeRoutes);
+app.use("/api/smart-scheduler", smartSchedulerRoutes);
 
 // === Global Error Handler ===
 app.use((err, req, res, next) => {
