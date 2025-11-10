@@ -10,11 +10,19 @@ import {
   CFormInput,
   CFormSelect,
   CButton,
+  CButtonGroup,
   CListGroup,
   CListGroupItem,
   CAlert,
   CSpinner,
+  CInputGroup,
+  CInputGroupText,
+  CFormText,
+  CFormTextarea,
+  CBadge,
 } from "@coreui/react"
+import CIcon from "@coreui/icons-react"
+import { cilClock, cilCalendar, cilLoopCircular, cilPlus, cilNotes } from "@coreui/icons"
 
 const MySchedule = () => {
   const user = JSON.parse(localStorage.getItem("user"))
@@ -77,19 +85,31 @@ const MySchedule = () => {
       if (!newSchedule.day || !newSchedule.starttime)
         return setError("Please fill required fields (day and start time)")
 
+      if (
+        newSchedule.type === "custom" &&
+        (!newSchedule.custom_title || !newSchedule.custom_title.trim())
+      ) {
+        return setError("Please provide a title for your custom event")
+      }
+
       const payload = {
         userid: user.id,
-        habit_id: newSchedule.type === "habit" ? newSchedule.habit_id || null : null,
+        type: newSchedule.type,
+        habit_id:
+          newSchedule.type === "habit" && newSchedule.habit_id
+            ? Number(newSchedule.habit_id)
+            : null,
+        custom_title:
+          newSchedule.type === "custom"
+            ? newSchedule.custom_title.trim()
+            : null,
         day: newSchedule.day,
         starttime: newSchedule.starttime,
         endtime: newSchedule.endtime || null,
         enddate: newSchedule.enddate || null,
         repeat: newSchedule.repeat,
-        customdays: newSchedule.customdays || null,
-        notes:
-          newSchedule.type === "custom"
-            ? `${newSchedule.custom_title}${newSchedule.notes ? " — " + newSchedule.notes : ""}`
-            : newSchedule.notes,
+        customdays: newSchedule.repeat === "custom" ? newSchedule.customdays || null : null,
+        notes: newSchedule.notes || null,
       }
 
       const res = await fetch("http://localhost:5001/api/schedules", {
@@ -119,6 +139,23 @@ const MySchedule = () => {
     }
   }
 
+  const repeatOptions = [
+    { value: "daily", label: "Daily" },
+    { value: "weekly", label: "Weekly" },
+    { value: "every3days", label: "Every 3 Days" },
+    { value: "custom", label: "Custom" },
+  ]
+
+  const repeatLabels = repeatOptions.reduce(
+    (acc, option) => ({ ...acc, [option.value]: option.label }),
+    {}
+  )
+
+  const selectedHabit =
+    newSchedule.type === "habit" && newSchedule.habit_id
+      ? habits.find((h) => String(h.id) === String(newSchedule.habit_id))
+      : null
+
   // ✅ Delete schedule
   const handleDelete = async (id) => {
     try {
@@ -132,28 +169,58 @@ const MySchedule = () => {
   }
 
   return (
-    <CRow className="mt-4">
-      <CCol xs={12} md={8} className="mx-auto">
-        <CCard>
-          <CCardHeader>📅 My Schedule</CCardHeader>
+    <CRow className="mt-4 g-4">
+      <CCol xs={12}>{error && <CAlert color="danger">{error}</CAlert>}</CCol>
+
+      <CCol lg={5}>
+        <CCard className="shadow-sm border-0 h-100">
+          <CCardHeader className="bg-primary text-white d-flex align-items-center">
+            <CIcon icon={cilCalendar} className="me-2" />
+            Plan a New Schedule
+          </CCardHeader>
           <CCardBody>
-            {error && <CAlert color="danger">{error}</CAlert>}
+            <CForm className="d-flex flex-column gap-3">
+              <div>
+                <CFormLabel className="text-uppercase text-muted fw-semibold small">
+                  What do you want to plan?
+                </CFormLabel>
+                <CButtonGroup className="w-100">
+                  <CButton
+                    type="button"
+                    color={newSchedule.type === "habit" ? "primary" : "outline-primary"}
+                    className="d-flex align-items-center justify-content-center"
+                    onClick={() =>
+                      setNewSchedule({
+                        ...newSchedule,
+                        type: "habit",
+                        custom_title: "",
+                      })
+                    }
+                  >
+                    Habit
+                  </CButton>
+                  <CButton
+                    type="button"
+                    color={newSchedule.type === "custom" ? "primary" : "outline-primary"}
+                    className="d-flex align-items-center justify-content-center"
+                    onClick={() =>
+                      setNewSchedule({
+                        ...newSchedule,
+                        type: "custom",
+                        habit_id: "",
+                      })
+                    }
+                  >
+                    Custom Event
+                  </CButton>
+                </CButtonGroup>
+              </div>
 
-            {/* ✅ Add Schedule Form */}
-            <CForm>
-              <CFormLabel>Type</CFormLabel>
-              <CFormSelect
-                value={newSchedule.type}
-                onChange={(e) => setNewSchedule({ ...newSchedule, type: e.target.value })}
-              >
-                <option value="habit">Habit</option>
-                <option value="custom">Custom Event</option>
-              </CFormSelect>
-
-              {/* Habit selection */}
               {newSchedule.type === "habit" && (
-                <>
-                  <CFormLabel className="mt-2">Habit</CFormLabel>
+                <div>
+                  <CFormLabel className="text-uppercase text-muted fw-semibold small">
+                    Choose a habit
+                  </CFormLabel>
                   <CFormSelect
                     value={newSchedule.habit_id}
                     onChange={(e) =>
@@ -167,13 +234,15 @@ const MySchedule = () => {
                       </option>
                     ))}
                   </CFormSelect>
-                </>
+                  <CFormText>Select an existing habit to keep everything in sync.</CFormText>
+                </div>
               )}
 
-              {/* Custom event title */}
               {newSchedule.type === "custom" && (
-                <>
-                  <CFormLabel className="mt-2">Custom Event Title</CFormLabel>
+                <div>
+                  <CFormLabel className="text-uppercase text-muted fw-semibold small">
+                    Give it a title
+                  </CFormLabel>
                   <CFormInput
                     placeholder="e.g. Doctor Appointment, Gym Session"
                     value={newSchedule.custom_title}
@@ -181,105 +250,195 @@ const MySchedule = () => {
                       setNewSchedule({ ...newSchedule, custom_title: e.target.value })
                     }
                   />
-                </>
+                  <CFormText>Keep it short and recognizable.</CFormText>
+                </div>
               )}
 
-              {/* Common fields */}
-              <CFormLabel className="mt-2">Day</CFormLabel>
-              <CFormInput
-                type="date"
-                value={newSchedule.day}
-                onChange={(e) => setNewSchedule({ ...newSchedule, day: e.target.value })}
-              />
+              <div>
+                <CFormLabel className="text-uppercase text-muted fw-semibold small">
+                  Schedule details
+                </CFormLabel>
+                <CRow className="g-3">
+                  <CCol sm={6}>
+                    <CInputGroup>
+                      <CInputGroupText>
+                        <CIcon icon={cilCalendar} />
+                      </CInputGroupText>
+                      <CFormInput
+                        type="date"
+                        value={newSchedule.day}
+                        onChange={(e) =>
+                          setNewSchedule({ ...newSchedule, day: e.target.value })
+                        }
+                      />
+                    </CInputGroup>
+                  </CCol>
+                  <CCol sm={6}>
+                    <CInputGroup>
+                      <CInputGroupText>
+                        <CIcon icon={cilCalendar} />
+                      </CInputGroupText>
+                      <CFormInput
+                        type="date"
+                        placeholder="End date"
+                        value={newSchedule.enddate}
+                        onChange={(e) =>
+                          setNewSchedule({ ...newSchedule, enddate: e.target.value })
+                        }
+                      />
+                    </CInputGroup>
+                  </CCol>
+                  <CCol sm={6}>
+                    <CInputGroup>
+                      <CInputGroupText>
+                        <CIcon icon={cilClock} />
+                      </CInputGroupText>
+                      <CFormInput
+                        type="time"
+                        value={newSchedule.starttime}
+                        onChange={(e) =>
+                          setNewSchedule({ ...newSchedule, starttime: e.target.value })
+                        }
+                      />
+                    </CInputGroup>
+                  </CCol>
+                  <CCol sm={6}>
+                    <CInputGroup>
+                      <CInputGroupText>
+                        <CIcon icon={cilClock} />
+                      </CInputGroupText>
+                      <CFormInput
+                        type="time"
+                        value={newSchedule.endtime}
+                        onChange={(e) =>
+                          setNewSchedule({ ...newSchedule, endtime: e.target.value })
+                        }
+                      />
+                    </CInputGroup>
+                  </CCol>
+                </CRow>
+                <CFormText>Specify the day and time range for this schedule.</CFormText>
+              </div>
 
-              <CFormLabel className="mt-2">Start Time</CFormLabel>
-              <CFormInput
-                type="time"
-                value={newSchedule.starttime}
-                onChange={(e) => setNewSchedule({ ...newSchedule, starttime: e.target.value })}
-              />
-
-              <CFormLabel className="mt-2">End Time</CFormLabel>
-              <CFormInput
-                type="time"
-                value={newSchedule.endtime}
-                onChange={(e) => setNewSchedule({ ...newSchedule, endtime: e.target.value })}
-              />
-
-              <CFormLabel className="mt-2">End Date (optional)</CFormLabel>
-              <CFormInput
-                type="date"
-                value={newSchedule.enddate}
-                onChange={(e) => setNewSchedule({ ...newSchedule, enddate: e.target.value })}
-              />
-
-              <CFormLabel className="mt-2">Repeat</CFormLabel>
-              <CFormSelect
-                value={newSchedule.repeat}
-                onChange={(e) => setNewSchedule({ ...newSchedule, repeat: e.target.value })}
-              >
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="every3days">Every 3 Days</option>
-                <option value="custom">Custom</option>
-              </CFormSelect>
-
-              {newSchedule.repeat === "custom" && (
-                <>
-                  <CFormLabel className="mt-2">Custom Days</CFormLabel>
+              <div>
+                <CFormLabel className="text-uppercase text-muted fw-semibold small">
+                  Repeat pattern
+                </CFormLabel>
+                <CInputGroup>
+                  <CInputGroupText>
+                    <CIcon icon={cilLoopCircular} />
+                  </CInputGroupText>
+                  <CFormSelect
+                    value={newSchedule.repeat}
+                    onChange={(e) => setNewSchedule({ ...newSchedule, repeat: e.target.value })}
+                  >
+                    {repeatOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </CFormSelect>
+                </CInputGroup>
+                {newSchedule.repeat === "custom" && (
                   <CFormInput
+                    className="mt-2"
                     placeholder="e.g. Mon, Wed, Fri"
                     value={newSchedule.customdays}
                     onChange={(e) =>
                       setNewSchedule({ ...newSchedule, customdays: e.target.value })
                     }
                   />
-                </>
-              )}
+                )}
+              </div>
 
-              <CFormLabel className="mt-2">Notes</CFormLabel>
-              <CFormInput
-                placeholder="Add notes..."
-                value={newSchedule.notes}
-                onChange={(e) => setNewSchedule({ ...newSchedule, notes: e.target.value })}
-              />
+              <div>
+                <CFormLabel className="text-uppercase text-muted fw-semibold small">
+                  Notes
+                </CFormLabel>
+                <CInputGroup>
+                  <CInputGroupText>
+                    <CIcon icon={cilNotes} />
+                  </CInputGroupText>
+                  <CFormTextarea
+                    rows={2}
+                    placeholder="Add context, reminders or preparation steps"
+                    value={newSchedule.notes}
+                    onChange={(e) => setNewSchedule({ ...newSchedule, notes: e.target.value })}
+                  />
+                </CInputGroup>
+              </div>
 
-              <CButton color="primary" className="mt-3" onClick={handleAdd}>
-                Add Schedule
+              <CButton color="primary" className="mt-2" onClick={handleAdd}>
+                <CIcon icon={cilPlus} className="me-2" /> Add Schedule
               </CButton>
             </CForm>
 
-            <hr />
+            <CCard className="border-0 bg-light mt-4">
+              <CCardBody>
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <span className="fw-semibold">Preview</span>
+                  <CBadge color="info" shape="rounded-pill">
+                    {repeatLabels[newSchedule.repeat] || "One-time"}
+                  </CBadge>
+                </div>
+                <div className="text-muted small">
+                  <div className="mb-1">
+                    <strong>
+                      {selectedHabit?.title || newSchedule.custom_title || "Untitled schedule"}
+                    </strong>
+                  </div>
+                  <div>{newSchedule.day || "Pick a day"}</div>
+                  <div>
+                    {newSchedule.starttime || "Start time"} – {newSchedule.endtime || "End time"}
+                  </div>
+                  {newSchedule.notes && <div className="mt-1">{newSchedule.notes}</div>}
+                </div>
+              </CCardBody>
+            </CCard>
+          </CCardBody>
+        </CCard>
+      </CCol>
 
-            {/* ✅ Schedule List */}
+      <CCol lg={7}>
+        <CCard className="shadow-sm border-0 h-100">
+          <CCardHeader className="bg-white fw-semibold">Upcoming Schedules</CCardHeader>
+          <CCardBody className="p-0">
             {loading ? (
               <div className="d-flex justify-content-center my-4">
                 <CSpinner color="primary" />
               </div>
+            ) : schedules.length === 0 ? (
+              <div className="text-center text-muted py-5">
+                Start planning to see your routine populate here.
+              </div>
             ) : (
-              <CListGroup>
-                {schedules.length === 0 && (
-                  <CListGroupItem>No schedules yet</CListGroupItem>
-                )}
+              <CListGroup flush>
                 {schedules.map((s) => (
-                  <CListGroupItem key={s.id}>
-                    <strong>
-                      {s.habit?.title || s.notes?.split("—")[0] || "Custom Event"}
-                    </strong>{" "}
-                    — {s.day} ({s.starttime} - {s.endtime || "—"}) [{s.repeat}]
-                    {s.notes && (
-                      <div className="text-muted small mt-1">
-                        {s.notes.includes("—") ? s.notes.split("—")[1] : s.notes}
+                  <CListGroupItem key={s.id} className="py-3">
+                    <div className="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                      <div>
+                        <div className="fw-semibold">
+                          {s.habit?.title || s.custom_title || s.notes || "Custom Event"}
+                        </div>
+                        <div className="text-muted small">
+                          {s.day} • {s.starttime} – {s.endtime || "—"}
+                        </div>
+                        {s.notes && <div className="text-muted small mt-1">{s.notes}</div>}
                       </div>
-                    )}
-                    <CButton
-                      color="danger"
-                      size="sm"
-                      className="float-end"
-                      onClick={() => handleDelete(s.id)}
-                    >
-                      Delete
-                    </CButton>
+                      <div className="d-flex align-items-center gap-2">
+                        <CBadge color="secondary" shape="rounded-pill">
+                          {repeatLabels[s.repeat] || s.repeat}
+                        </CBadge>
+                        <CButton
+                          color="danger"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(s.id)}
+                        >
+                          Delete
+                        </CButton>
+                      </div>
+                    </div>
                   </CListGroupItem>
                 ))}
               </CListGroup>
