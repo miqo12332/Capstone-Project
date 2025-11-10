@@ -47,6 +47,8 @@ const serializeUser = (user) => ({
   gender: user.gender,
   bio: user.bio,
   avatar: user.avatar || "/uploads/default-avatar.png",
+  createdAt: user.createdAt,
+  updatedAt: user.updatedAt,
   settings: formatSettings(user.settings),
 });
 
