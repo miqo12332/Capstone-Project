@@ -17,7 +17,16 @@ const Profile = React.lazy(() => import("./views/pages/Profile"));
 
 
 const PrivateRoute = ({ children }) => {
-  const { user } = useContext(AuthContext);
+  const { user, isInitializing } = useContext(AuthContext);
+
+  if (isInitializing) {
+    return (
+      <div className="pt-3 text-center">
+        <CSpinner color="primary" variant="grow" />
+      </div>
+    );
+  }
+
   return user ? children : <Navigate to="/login" />;
 };
 

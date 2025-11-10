@@ -11,6 +11,7 @@ const User = sequelize.define(
     age: { type: DataTypes.INTEGER, allowNull: true },
     gender: { type: DataTypes.STRING(20), allowNull: true },
     bio: { type: DataTypes.TEXT, allowNull: true },
+    avatar: { type: DataTypes.STRING(255), allowNull: true },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,
