@@ -294,7 +294,6 @@ const MySchedule = () => {
                 {schedules.map((s) => (
                   <CListGroupItem key={s.id}>
                     <strong>{s.habit?.title || s.notes || "Custom Event"}</strong>{" "}
-                    <strong>{s.habit?.title || "Custom Event"}</strong>{" "}
                     — {s.day} ({s.starttime} - {s.endtime || "—"}) [{s.repeat}]
                     {s.notes && (
                       <div className="text-muted small mt-1">{s.notes}</div>
