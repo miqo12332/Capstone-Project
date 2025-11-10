@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import sequelize from "./sequelize.js";
+import "./models/index.js";
 
 // === Import Routes ===
 import userRoutes from "./routes/userRoutes.js";
@@ -56,20 +57,13 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
-// === Sync DB ===
-sequelize
-  .sync()
-  .then(() => console.log("✅ Database connected"))
-  .catch((err) => console.error("❌ DB connection error:", err));
-
 // === Connect Database and Start Server ===
-const connectDB = async () => {
+const startServer = async () => {
   try {
     await sequelize.authenticate();
     console.log("✅ Database connection established successfully.");
 
-    // Optional: sync without dropping tables
-    await sequelize.sync({ alter: false });
+    await sequelize.sync();
 
     app.listen(PORT, () =>
       console.log(`🚀 Server running on http://localhost:${PORT}`)
@@ -80,4 +74,5 @@ const connectDB = async () => {
   }
 };
 
-connectDB();
+startServer();
+

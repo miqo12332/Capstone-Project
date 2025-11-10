@@ -12,7 +12,7 @@ const AddHabit = React.lazy(() => import("./views/dashboard/AddHabit"));
 const HabitLibrary = React.lazy(() => import("./views/dashboard/HabitLibrary"));
 const ProgressTracker = React.lazy(() => import("./views/dashboard/ProgressTracker"));
 const ReportsAnalytics = React.lazy(() => import("./views/dashboard/ReportsAnalytics"));
-const Schedules = React.lazy(() => import("./views/dashboard/schedules"));
+const Schedules = React.lazy(() => import("./views/dashboard/Schedules"));
 
 // ===== My Routine =====
 const MyRoutine = React.lazy(() => import("./views/pages/MyRoutine"));

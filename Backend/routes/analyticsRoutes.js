@@ -1,6 +1,5 @@
 // backend/routes/analyticsRoutes.js
 import express from "express";
-import sequelize from "../sequelize.js";
 import { Habit, Progress } from "../models/index.js";
 
 const router = express.Router();
@@ -21,7 +20,7 @@ router.get("/progress", async (req, res) => {
     // Pull all rows for this user with the habit name
     const rows = await Progress.findAll({
       where: { user_id: userId },
-      include: [{ model: Habit, as: "habit", attributes: ["id", "name"] }],
+      include: [{ model: Habit, as: "habit", attributes: ["id", "title"] }],
       order: [["progress_date", "ASC"], ["id", "ASC"]],
     });
 
@@ -30,7 +29,7 @@ router.get("/progress", async (req, res) => {
     for (const r of rows) {
       const hid = r.habit_id;
       const date = r.progress_date; // already YYYY-MM-DD
-      const habitName = r.habit?.name || `Habit ${hid}`;
+      const habitName = r.habit?.title || `Habit ${hid}`;
       if (!perHabit[hid]) perHabit[hid] = { habitName, byDate: {} };
 
       const delta = r.status === "done" ? 1 : r.status === "missed" ? -1 : 0;
