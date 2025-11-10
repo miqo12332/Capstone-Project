@@ -45,6 +45,9 @@ const MyRoutine = () => {
     (r) => new Date(r.day).toDateString() === selectedDate.toDateString()
   );
 
+  const resolveScheduleTitle = (entry) =>
+    entry?.habit?.title || entry.notes || "Custom Event";
+
   const formatDate = (date) =>
     date.toLocaleDateString("en-US", {
       weekday: "long",
@@ -120,7 +123,7 @@ const MyRoutine = () => {
                       }}
                     >
                       <div style={{ fontWeight: "600", marginBottom: "0.3rem", color: "black" }}>
-                        {item.notes || "Unnamed Activity"}
+                        {resolveScheduleTitle(item)}
                       </div>
                       <div style={{ fontSize: "0.85rem", color: "#555" }}>
                         🕒 {item.starttime} — {item.endtime || "—"}

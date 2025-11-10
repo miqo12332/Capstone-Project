@@ -14,7 +14,11 @@ import {
   CListGroupItem,
   CAlert,
   CSpinner,
+  CInputGroup,
+  CInputGroupText,
 } from "@coreui/react"
+import CIcon from "@coreui/icons-react"
+import { cilClock } from "@coreui/icons"
 
 const MySchedule = () => {
   const user = JSON.parse(localStorage.getItem("user"))
@@ -205,18 +209,32 @@ const MySchedule = () => {
               />
 
               <CFormLabel className="mt-2">Start Time</CFormLabel>
-              <CFormInput
-                type="time"
-                value={newSchedule.starttime}
-                onChange={(e) => setNewSchedule({ ...newSchedule, starttime: e.target.value })}
-              />
+              <CInputGroup>
+                <CInputGroupText>
+                  <CIcon icon={cilClock} />
+                </CInputGroupText>
+                <CFormInput
+                  type="time"
+                  value={newSchedule.starttime}
+                  onChange={(e) =>
+                    setNewSchedule({ ...newSchedule, starttime: e.target.value })
+                  }
+                />
+              </CInputGroup>
 
               <CFormLabel className="mt-2">End Time</CFormLabel>
-              <CFormInput
-                type="time"
-                value={newSchedule.endtime}
-                onChange={(e) => setNewSchedule({ ...newSchedule, endtime: e.target.value })}
-              />
+              <CInputGroup>
+                <CInputGroupText>
+                  <CIcon icon={cilClock} />
+                </CInputGroupText>
+                <CFormInput
+                  type="time"
+                  value={newSchedule.endtime}
+                  onChange={(e) =>
+                    setNewSchedule({ ...newSchedule, endtime: e.target.value })
+                  }
+                />
+              </CInputGroup>
 
               <CFormLabel className="mt-2">End Date (optional)</CFormLabel>
               <CFormInput
@@ -275,6 +293,7 @@ const MySchedule = () => {
                 )}
                 {schedules.map((s) => (
                   <CListGroupItem key={s.id}>
+                    <strong>{s.habit?.title || s.notes || "Custom Event"}</strong>{" "}
                     <strong>{s.habit?.title || "Custom Event"}</strong>{" "}
                     — {s.day} ({s.starttime} - {s.endtime || "—"}) [{s.repeat}]
                     {s.notes && (
