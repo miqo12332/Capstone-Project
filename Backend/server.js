@@ -67,7 +67,11 @@ const startServer = async () => {
     await sequelize.authenticate();
     console.log("✅ Database connection established successfully.");
 
-    await sequelize.sync();
+    // Ensure any new columns or tables introduced in the models are available
+    // without requiring a manual migration step. This keeps features such as
+    // user profile preferences in sync across environments where the schema
+    // might have been created before these fields existed.
+    await sequelize.sync({ alter: true });
 
     app.listen(PORT, () =>
       console.log(`🚀 Server running on http://localhost:${PORT}`)
