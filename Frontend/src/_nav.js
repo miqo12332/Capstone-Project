@@ -68,6 +68,12 @@ const _nav = [
   },
   {
     component: CNavItem,
+    name: 'AI Companion',
+    to: '/ai-companion',
+    icon: <CIcon icon={cilChatBubble} customClassName="nav-icon" />,
+  },
+  {
+    component: CNavItem,
     name: 'Reports & Analytics',
     to: '/reportsanalytics',
     icon: <CIcon icon={cilGraph} customClassName="nav-icon" />,

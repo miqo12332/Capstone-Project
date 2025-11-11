@@ -21,6 +21,7 @@ import {
   cilLockLocked,
   cilAccountLogout,
   cilUserPlus,
+  cilChatBubble,
 } from '@coreui/icons'
 import { CNavItem, CNavTitle } from '@coreui/react'
 
@@ -48,4 +49,5 @@ export {
   cilLockLocked,
   cilAccountLogout,
   cilUserPlus,
+  cilChatBubble,
 }
