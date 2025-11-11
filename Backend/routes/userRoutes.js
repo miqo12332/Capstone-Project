@@ -14,6 +14,12 @@ const defaultSettings = {
   theme: "light",
 };
 
+const sanitizeString = (value) => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
+};
+
 const formatSettings = (settingsInstance) => {
   if (!settingsInstance) {
     return {
@@ -47,6 +53,12 @@ const serializeUser = (user) => ({
   gender: user.gender,
   bio: user.bio,
   avatar: user.avatar || "/uploads/default-avatar.png",
+  primaryGoal: user.primary_goal,
+  focusArea: user.focus_area,
+  experienceLevel: user.experience_level,
+  dailyCommitment: user.daily_commitment,
+  supportPreference: user.support_preference,
+  motivation: user.motivation_statement,
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
   settings: formatSettings(user.settings),
@@ -65,14 +77,33 @@ const router = express.Router();
 // Register
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, onboarding = {} } = req.body;
     if (!name || !email || !password) return res.status(400).json({ error: "All fields required" });
 
     const existing = await User.findOne({ where: { email } });
     if (existing) return res.status(400).json({ error: "Email already exists" });
 
     const hashed = await bcrypt.hash(password, 10);
-    const newUser = await User.create({ name, email, password: hashed });
+    const onboardingPayload = {
+      primaryGoal: onboarding.primaryGoal ?? req.body.primaryGoal ?? null,
+      focusArea: onboarding.focusArea ?? req.body.focusArea ?? null,
+      experienceLevel: onboarding.experienceLevel ?? req.body.experienceLevel ?? null,
+      dailyCommitment: onboarding.dailyCommitment ?? req.body.dailyCommitment ?? null,
+      supportPreference: onboarding.supportPreference ?? req.body.supportPreference ?? null,
+      motivation: onboarding.motivation ?? req.body.motivation ?? null,
+    };
+
+    const newUser = await User.create({
+      name,
+      email,
+      password: hashed,
+      primary_goal: sanitizeString(onboardingPayload.primaryGoal),
+      focus_area: sanitizeString(onboardingPayload.focusArea),
+      experience_level: sanitizeString(onboardingPayload.experienceLevel),
+      daily_commitment: sanitizeString(onboardingPayload.dailyCommitment),
+      support_preference: sanitizeString(onboardingPayload.supportPreference),
+      motivation_statement: sanitizeString(onboardingPayload.motivation),
+    });
     await UserSetting.findOrCreate({
       where: { user_id: newUser.id },
       defaults: { ...defaultSettings, user_id: newUser.id },
@@ -161,6 +192,25 @@ router.put("/profile/:id", async (req, res) => {
 
     if (typeof gender !== "undefined") user.gender = gender || null;
     if (typeof bio !== "undefined") user.bio = bio || null;
+
+    if (typeof req.body.primaryGoal !== "undefined") {
+      user.primary_goal = sanitizeString(req.body.primaryGoal);
+    }
+    if (typeof req.body.focusArea !== "undefined") {
+      user.focus_area = sanitizeString(req.body.focusArea);
+    }
+    if (typeof req.body.experienceLevel !== "undefined") {
+      user.experience_level = sanitizeString(req.body.experienceLevel);
+    }
+    if (typeof req.body.dailyCommitment !== "undefined") {
+      user.daily_commitment = sanitizeString(req.body.dailyCommitment);
+    }
+    if (typeof req.body.supportPreference !== "undefined") {
+      user.support_preference = sanitizeString(req.body.supportPreference);
+    }
+    if (typeof req.body.motivation !== "undefined") {
+      user.motivation_statement = sanitizeString(req.body.motivation);
+    }
 
     await user.save();
 

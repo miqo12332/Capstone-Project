@@ -25,15 +25,20 @@ import CIcon from "@coreui/icons-react";
 import {
   cilBell,
   cilCalendar,
+  cilClock,
   cilCloudUpload,
+  cilCompass,
   cilEnvelopeOpen,
+  cilFlagAlt,
+  cilHeart,
   cilListRich,
   cilPen,
+  cilPeople,
   cilSettings,
-  cilTask,
-  cilUser,
   cilSpeedometer,
   cilStar,
+  cilTask,
+  cilUser,
 } from "@coreui/icons";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../context/AuthContext";
@@ -49,6 +54,46 @@ const genderOptions = [
   { label: "Male", value: "male" },
   { label: "Non-binary", value: "non-binary" },
   { label: "Prefer not to say", value: "prefer_not_to_say" },
+];
+
+const goalOptions = [
+  { label: "Select a primary goal", value: "" },
+  { label: "Build consistency", value: "Build consistency" },
+  { label: "Boost energy", value: "Boost energy" },
+  { label: "Focus & clarity", value: "Focus & clarity" },
+  { label: "Balance & wellbeing", value: "Balance & wellbeing" },
+];
+
+const focusOptions = [
+  { label: "Select a focus area", value: "" },
+  { label: "Mindfulness", value: "Mindfulness" },
+  { label: "Fitness", value: "Fitness" },
+  { label: "Productivity", value: "Productivity" },
+  { label: "Self-care", value: "Self-care" },
+];
+
+const experienceOptions = [
+  { label: "Select experience level", value: "" },
+  { label: "Just getting started", value: "Just getting started" },
+  { label: "Finding my rhythm", value: "Finding my rhythm" },
+  { label: "Leveling up", value: "Leveling up" },
+  { label: "Habit pro", value: "Habit pro" },
+];
+
+const commitmentOptions = [
+  { label: "Select daily commitment", value: "" },
+  { label: "5 minutes", value: "5 minutes" },
+  { label: "15 minutes", value: "15 minutes" },
+  { label: "30 minutes", value: "30 minutes" },
+  { label: "Flexible", value: "Flexible" },
+];
+
+const supportOptions = [
+  { label: "Select support preference", value: "" },
+  { label: "Gentle nudges", value: "Gentle nudges" },
+  { label: "Focused reminders", value: "Focused reminders" },
+  { label: "Deep insights", value: "Deep insights" },
+  { label: "Celebrate my wins", value: "Celebrate my wins" },
 ];
 
 const formatDate = (value) => {
@@ -78,6 +123,12 @@ const UserProfile = () => {
     age: "",
     gender: "",
     bio: "",
+    primaryGoal: "",
+    focusArea: "",
+    experienceLevel: "",
+    dailyCommitment: "",
+    supportPreference: "",
+    motivation: "",
   });
   const [settingsSnapshot, setSettingsSnapshot] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState("/uploads/default-avatar.png");
@@ -115,6 +166,12 @@ const UserProfile = () => {
           age: payload.age ?? "",
           gender: payload.gender || "",
           bio: payload.bio || "",
+          primaryGoal: payload.primaryGoal || "",
+          focusArea: payload.focusArea || "",
+          experienceLevel: payload.experienceLevel || "",
+          dailyCommitment: payload.dailyCommitment || "",
+          supportPreference: payload.supportPreference || "",
+          motivation: payload.motivation || "",
         });
         setSettingsSnapshot(payload.settings || {});
         setAvatarUrl(
@@ -164,6 +221,12 @@ const UserProfile = () => {
       form.bio,
       form.age,
       form.gender,
+      form.primaryGoal,
+      form.focusArea,
+      form.dailyCommitment,
+      form.experienceLevel,
+      form.supportPreference,
+      form.motivation,
       settingsSnapshot?.timezone,
       settingsSnapshot?.dailyReminderTime,
       settingsSnapshot?.theme,
@@ -220,6 +283,44 @@ const UserProfile = () => {
       },
     ];
   }, [settingsSnapshot]);
+
+  const journeyHighlights = useMemo(
+    () => [
+      {
+        icon: cilFlagAlt,
+        label: "Primary goal",
+        value: form.primaryGoal || "Set a guiding goal to personalise your recommendations.",
+      },
+      {
+        icon: cilCompass,
+        label: "Focus area",
+        value: form.focusArea || "Choose where you’d like to focus first.",
+      },
+      {
+        icon: cilClock,
+        label: "Daily commitment",
+        value: form.dailyCommitment || "Decide how much time you can give each day.",
+      },
+      {
+        icon: cilSpeedometer,
+        label: "Experience level",
+        value: form.experienceLevel || "Share how established your habits feel today.",
+      },
+      {
+        icon: cilPeople,
+        label: "Support style",
+        value: form.supportPreference || "Tell us how you’d like encouragement to show up.",
+      },
+      {
+        icon: cilHeart,
+        label: "Motivation",
+        value: form.motivation
+          ? `“${form.motivation}”`
+          : "Add a spark of motivation to revisit on quiet days.",
+      },
+    ],
+    [form]
+  );
 
   const topHabits = useMemo(() => habits.slice(0, 5), [habits]);
 
@@ -302,6 +403,12 @@ const UserProfile = () => {
         age: payload.age ?? "",
         gender: payload.gender || "",
         bio: payload.bio || "",
+        primaryGoal: payload.primaryGoal || "",
+        focusArea: payload.focusArea || "",
+        experienceLevel: payload.experienceLevel || "",
+        dailyCommitment: payload.dailyCommitment || "",
+        supportPreference: payload.supportPreference || "",
+        motivation: payload.motivation || "",
       });
       setSettingsSnapshot(payload.settings || settingsSnapshot);
       setAvatarUrl(
@@ -468,6 +575,26 @@ const UserProfile = () => {
               </CListGroup>
             </CCardBody>
           </CCard>
+
+          <CCard className="mt-4">
+            <CCardHeader>Your journey focus</CCardHeader>
+            <CCardBody>
+              <CListGroup flush>
+                {journeyHighlights.map((item) => (
+                  <CListGroupItem
+                    key={item.label}
+                    className="d-flex align-items-start justify-content-between gap-3"
+                  >
+                    <span className="d-flex align-items-center gap-2">
+                      <CIcon icon={item.icon} className="text-primary" />
+                      {item.label}
+                    </span>
+                    <span className="fw-semibold text-end text-wrap text-break">{item.value}</span>
+                  </CListGroupItem>
+                ))}
+              </CListGroup>
+            </CCardBody>
+          </CCard>
         </CCol>
 
         <CCol xl={8} lg={7}>
@@ -529,6 +656,61 @@ const UserProfile = () => {
                       value={form.bio}
                       onChange={handleInputChange}
                       placeholder="Share what keeps you motivated, your goals, or anything your friends should know."
+                    />
+                  </CCol>
+                  <CCol md={6}>
+                    <CFormLabel htmlFor="primaryGoal">Primary goal</CFormLabel>
+                    <CFormSelect
+                      id="primaryGoal"
+                      value={form.primaryGoal}
+                      onChange={handleInputChange}
+                      options={goalOptions}
+                    />
+                  </CCol>
+                  <CCol md={6}>
+                    <CFormLabel htmlFor="focusArea">Focus area</CFormLabel>
+                    <CFormSelect
+                      id="focusArea"
+                      value={form.focusArea}
+                      onChange={handleInputChange}
+                      options={focusOptions}
+                    />
+                  </CCol>
+                  <CCol md={6}>
+                    <CFormLabel htmlFor="dailyCommitment">Daily commitment</CFormLabel>
+                    <CFormSelect
+                      id="dailyCommitment"
+                      value={form.dailyCommitment}
+                      onChange={handleInputChange}
+                      options={commitmentOptions}
+                    />
+                  </CCol>
+                  <CCol md={6}>
+                    <CFormLabel htmlFor="experienceLevel">Experience level</CFormLabel>
+                    <CFormSelect
+                      id="experienceLevel"
+                      value={form.experienceLevel}
+                      onChange={handleInputChange}
+                      options={experienceOptions}
+                    />
+                  </CCol>
+                  <CCol md={6}>
+                    <CFormLabel htmlFor="supportPreference">Support style</CFormLabel>
+                    <CFormSelect
+                      id="supportPreference"
+                      value={form.supportPreference}
+                      onChange={handleInputChange}
+                      options={supportOptions}
+                    />
+                  </CCol>
+                  <CCol xs={12}>
+                    <CFormLabel htmlFor="motivation">Motivation mantra</CFormLabel>
+                    <CFormTextarea
+                      id="motivation"
+                      rows={3}
+                      value={form.motivation}
+                      onChange={handleInputChange}
+                      placeholder="Write a short message to future you for days when energy dips."
                     />
                   </CCol>
                 </CRow>
