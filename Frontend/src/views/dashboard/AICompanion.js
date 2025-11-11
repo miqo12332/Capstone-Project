@@ -96,6 +96,7 @@ const AICompanion = () => {
   const { user } = useContext(AuthContext);
   const [history, setHistory] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [agent, setAgent] = useState(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -110,6 +111,7 @@ const AICompanion = () => {
       const data = await fetchAssistantHistory(user.id);
       setHistory(data.history || []);
       setSummary(data.summary || null);
+      setAgent(data.agent || null);
     } catch (err) {
       console.error("Failed to load assistant history", err);
       setError("Unable to load your AI companion right now. Please retry.");
@@ -173,6 +175,7 @@ const AICompanion = () => {
       const data = await sendAssistantMessage(user.id, message.trim());
       setHistory(data.history || []);
       setSummary(data.summary || null);
+      setAgent(data.agent || null);
     } catch (err) {
       console.error("Assistant reply failed", err);
       setError("I couldn't reach the assistant. Try again in a moment.");
@@ -254,6 +257,23 @@ const AICompanion = () => {
             {initialLoading && <CSpinner size="sm" color="primary" />}
           </CCardHeader>
           <CCardBody className="d-flex flex-column">
+            {agent && (
+              <CAlert
+                color={agent.ready ? "primary" : "warning"}
+                className="mb-3"
+              >
+                {agent.ready ? (
+                  <>
+                    Powered by {agent.provider || "our AI"}
+                    {agent.model ? ` (${agent.model})` : ""}. I analyse your
+                    journey before every reply.
+                  </>
+                ) : (
+                  agent.reason ||
+                  "Advanced AI mode is offline. You're seeing our smart fallback coaching."
+                )}
+              </CAlert>
+            )}
             {error && (
               <CAlert color="danger" className="mb-3">
                 {error}

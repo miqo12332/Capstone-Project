@@ -8,6 +8,7 @@ import {
   UserSetting,
   AssistantMemory,
 } from "../models/index.js";
+import { getAgentStatus, runReasoningAgent } from "../services/assistantAgent.js";
 
 const router = express.Router();
 
@@ -285,52 +286,126 @@ const updateInsightMemory = async (userId, snapshot, keywordCounts) => {
   };
 };
 
-const craftAssistantReply = (message, snapshot, keywordInsight) => {
+const selectRandom = (choices, fallback) => {
+  if (!Array.isArray(choices) || choices.length === 0) {
+    return fallback;
+  }
+  return choices[Math.floor(Math.random() * choices.length)] || fallback;
+};
+
+const craftAssistantReply = ({ message, snapshot, keywordInsight = [], messageKeywords }) => {
   const firstName = snapshot.user.name?.split(" ")[0] || snapshot.user.name || "friend";
   const completionLine = snapshot.progress.total
     ? `You've completed ${snapshot.progress.completed} of ${snapshot.progress.total} recent check-ins (${snapshot.progress.completionRate}% success).`
     : "Let's start logging your first habit wins together!";
 
-  const topHabit = snapshot.progress.habitSummaries[0];
+  const sortedMessageKeywords = Object.entries(messageKeywords || {})
+    .sort((a, b) => b[1] - a[1])
+    .map(([keyword]) => keyword);
+
+  const focusKeyword = sortedMessageKeywords[0];
+  const supportingKeyword = sortedMessageKeywords[1];
+
+  const messageReflection = focusKeyword
+    ? `It sounds like ${focusKeyword} has been on your mind${
+        supportingKeyword ? `, along with ${supportingKeyword}` : ""
+      }. Let's lean into that today.`
+    : selectRandom(
+        [
+          "Thanks for sharing what's happening—I'm here to help you keep momentum.",
+          "I appreciate you checking in. Let's shape this into a win.",
+          "I'm glad you reached out; let's create a plan you feel good about.",
+        ],
+        "Thanks for the update—I'm ready to support you."
+      );
+
   const needsAttention = snapshot.progress.habitSummaries
     .filter((habit) => habit.completionRate < 60)
     .slice(0, 2);
-  const upcoming = snapshot.schedules.upcoming[0];
+  const thrivingHabit = snapshot.progress.habitSummaries
+    .filter((habit) => habit.completionRate >= 70)
+    .slice(0, 1);
+  const upcoming = snapshot.schedules.upcoming.slice(0, 2);
 
   const encouragement = needsAttention.length
-    ? `Let's put a little extra focus on ${needsAttention
-        .map((habit) => habit.title)
-        .join(" and ")}. We'll build a small win around your next session.`
-    : "Your habits are trending positively—keep nurturing that momentum!";
+    ? `We'll put extra focus on ${needsAttention
+        .map((habit) => `**${habit.title}** (${habit.completionRate}% success)`) 
+        .join(" and ")}. We'll shape your next session to feel lighter and more doable.`
+    : thrivingHabit.length
+    ? `I love how consistent you are with ${thrivingHabit
+        .map((habit) => `**${habit.title}**`) 
+        .join(", ")}. Let's use that energy as proof you can handle the tougher days.`
+    : "Every log you make is a new data point we can build on—let's keep that streak growing.";
 
   const keywordNudge = keywordInsight.length
-    ? `I hear you asking about ${keywordInsight
+    ? `I'll keep weaving in ideas around ${keywordInsight
         .slice(0, 3)
         .map((item) => item.keyword)
-        .join(", ")}. I'll keep tailoring tips around those themes.`
-    : "Keep sharing what's on your mind so I can personalise every suggestion.";
+        .join(", ")}. Feel free to tell me if you want to pivot.`
+    : "Share any specific habit, obstacle, or schedule tweak you're curious about and I'll tailor the guidance.";
 
-  const scheduleLine = upcoming
-    ? `Next on your schedule is **${upcoming.habitTitle}** on ${upcoming.day} at ${upcoming.starttime}. Do you want to adjust the plan or add a reminder?`
-    : "Your calendar looks flexible—consider blocking a fresh window for a habit you want to prioritise.";
+  const scheduleLines = upcoming.length
+    ? upcoming.map((item) => `• **${item.habitTitle}** on ${item.day} at ${item.starttime}${
+        item.endtime ? ` → ${item.endtime}` : ""
+      }`).join("\n")
+    : "• Your calendar looks flexible—want me to suggest a time block for a key habit?";
 
   const focusReminder = snapshot.user.primary_goal
-    ? `Everything we do is steering you toward _${snapshot.user.primary_goal}_.`
-    : "Set a primary goal in your profile so I can anchor recommendations around it.";
+    ? `Everything we're mapping out connects back to _${snapshot.user.primary_goal}_.`
+    : "Consider setting a primary goal in your profile so I can anchor recommendations around it.";
 
   const supportStyle = snapshot.user.support_preference
-    ? `Since you prefer ${snapshot.user.support_preference.toLowerCase()} support, I'll keep the coaching in that tone.`
-    : "Tell me your favourite support style and I'll adapt my coaching voice.";
+    ? `I'll keep the tone ${snapshot.user.support_preference.toLowerCase()} just like you prefer.`
+    : "Tell me how you like to be coached—gentle nudges, accountability, brainstorms—and I'll adapt instantly.";
+
+  const closingPrompt = selectRandom(
+    [
+      "What tiny win would feel amazing by the end of today?",
+      "Want to walk through a quick plan together or explore motivation techniques?",
+      "What feels like the next best step we can commit to right now?",
+      "Shall we review your progress logs to see what patterns we can use to your advantage?",
+    ],
+    "What should we tackle together next?"
+  );
+
+  const actionableIdeas = [];
+
+  if (needsAttention.length) {
+    actionableIdeas.push(
+      `Try a 5-minute starter for ${needsAttention[0].title} and log how it felt—small reps build confidence.`
+    );
+  }
+
+  if (thrivingHabit.length) {
+    actionableIdeas.push(
+      `Celebrate your wins with ${thrivingHabit[0].title}; reinforcing success keeps motivation high.`
+    );
+  }
+
+  if (!needsAttention.length && !thrivingHabit.length) {
+    actionableIdeas.push("Pick one habit today and visualise finishing it—then set a reminder so it actually happens.");
+  }
+
+  if (upcoming.length) {
+    actionableIdeas.push(
+      `Preview your next session${upcoming.length > 1 ? "s" : ""} above and decide what would make it feel easier.`
+    );
+  }
 
   return [
     `Hey ${firstName}! ${completionLine}`,
+    messageReflection,
     encouragement,
-    scheduleLine,
     keywordNudge,
+    "Here's what your upcoming plan looks like:\n" + scheduleLines,
     focusReminder,
     supportStyle,
-    "Ask me for ideas, quick reflections, or schedule help whenever you need a boost.",
-  ].join("\n\n");
+    "Try one of these ideas next:",
+    actionableIdeas.map((idea) => `• ${idea}`).join("\n"),
+    closingPrompt,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 };
 
 const mapHistory = (records) =>
@@ -389,6 +464,7 @@ router.get("/history", async (req, res) => {
         habits: snapshot.habits,
         insightText: insightRecord?.content || null,
       },
+      agent: getAgentStatus(),
     });
   } catch (error) {
     console.error("Failed to load assistant history", error);
@@ -411,17 +487,70 @@ router.post("/chat", async (req, res) => {
       user_id: userId,
       role: "user",
       content: message,
-      keywords: { keywords: Object.keys(counts) },
+      keywords: { keywords: Object.keys(counts), counts },
     });
 
-    const insight = await updateInsightMemory(userId, snapshot, counts);
-    const reply = craftAssistantReply(message, snapshot, insight.topKeywords);
+    const [insight, recentHistoryRecords] = await Promise.all([
+      updateInsightMemory(userId, snapshot, counts),
+      AssistantMemory.findAll({
+        where: {
+          user_id: userId,
+          role: { [Op.in]: ["user", "assistant"] },
+        },
+        order: [["created_at", "DESC"]],
+        limit: 20,
+      }),
+    ]);
+
+    const recentHistory = recentHistoryRecords
+      .map((record) => record.get({ plain: true }))
+      .reverse();
+
+    let reply;
+    let agentMeta = getAgentStatus();
+
+    if (agentMeta.ready) {
+      try {
+        const agentResult = await runReasoningAgent({
+          snapshot,
+          insightText: insight.summaryText,
+          history: recentHistory,
+        });
+        reply = agentResult.reply;
+        agentMeta = { ...agentMeta, ...agentResult.meta };
+      } catch (agentError) {
+        console.error("Reasoning agent failed, using fallback", agentError);
+        reply = craftAssistantReply({
+          message,
+          snapshot,
+          keywordInsight: insight.topKeywords,
+          messageKeywords: counts,
+        });
+        agentMeta = {
+          ...agentMeta,
+          ready: false,
+          reason:
+            "The AI provider could not be reached. Generated a smart fallback response instead.",
+        };
+      }
+    } else {
+      reply = craftAssistantReply({
+        message,
+        snapshot,
+        keywordInsight: insight.topKeywords,
+        messageKeywords: counts,
+      });
+    }
 
     await AssistantMemory.create({
       user_id: userId,
       role: "assistant",
       content: reply,
-      keywords: { keywords: insight.topKeywords },
+      keywords: {
+        keywords: insight.topKeywords,
+        messageKeywords: counts,
+        agent: agentMeta,
+      },
     });
 
     const historyRecords = await AssistantMemory.findAll({
@@ -449,6 +578,7 @@ router.post("/chat", async (req, res) => {
         habits: snapshot.habits,
         insightText: insight.summaryText,
       },
+      agent: agentMeta,
     });
   } catch (error) {
     console.error("Assistant chat failed", error);
