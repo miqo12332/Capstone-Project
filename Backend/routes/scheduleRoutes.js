@@ -31,26 +31,71 @@ router.get("/user/:userId", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const {
-      habit_id, userid, day, starttime, endtime, enddate, repeat, customdays, notes,
+      habit_id,
+      userid,
+      day,
+      starttime,
+      endtime,
+      enddate,
+      repeat,
+      customdays,
+      notes,
+      type,
+      custom_title,
     } = req.body;
 
     if (!userid || !day || !starttime) {
       return res.status(400).json({ error: "userid, day and starttime are required" });
     }
 
+    let resolvedHabitId = habit_id ? Number(habit_id) : null;
+
+    if (!resolvedHabitId) {
+      if (type === "custom") {
+        const title = (custom_title || "").trim();
+        if (!title) {
+          return res
+            .status(400)
+            .json({ error: "custom_title is required when creating a custom schedule" });
+        }
+
+        const [habit] = await Habit.findOrCreate({
+          where: { user_id: userid, title },
+          defaults: {
+            description: notes || null,
+            category: "custom",
+          },
+        });
+
+        resolvedHabitId = habit.id;
+      } else {
+        return res.status(400).json({ error: "habit_id is required for habit schedules" });
+      }
+    }
+
     const created = await Schedule.create({
-      habit_id: habit_id || null,
+      habit_id: resolvedHabitId,
       userid,
       day,
       starttime,
       endtime: endtime || null,
       enddate: enddate || null,
       repeat: repeat || "daily",
-      customdays: customdays || null,
+      customdays: repeat === "custom" ? customdays || null : null,
       notes: notes || null,
     });
 
-    res.status(201).json(created);
+    const scheduleWithHabit = await Schedule.findByPk(created.id, {
+      include: [
+        {
+          model: Habit,
+          as: "habit",
+          attributes: ["id", "title"],
+        },
+      ],
+    });
+
+    res.status(201).json(scheduleWithHabit || created);
   } catch (err) {
     console.error("❌ Error creating schedule:", err);
     res.status(500).json({ error: "Failed to add schedule", "err": err });

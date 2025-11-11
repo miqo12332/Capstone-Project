@@ -11,6 +11,13 @@ const User = sequelize.define(
     age: { type: DataTypes.INTEGER, allowNull: true },
     gender: { type: DataTypes.STRING(20), allowNull: true },
     bio: { type: DataTypes.TEXT, allowNull: true },
+    avatar: { type: DataTypes.STRING(255), allowNull: true },
+    primary_goal: { type: DataTypes.STRING(150), allowNull: true },
+    focus_area: { type: DataTypes.STRING(120), allowNull: true },
+    experience_level: { type: DataTypes.STRING(60), allowNull: true },
+    daily_commitment: { type: DataTypes.STRING(60), allowNull: true },
+    support_preference: { type: DataTypes.STRING(120), allowNull: true },
+    motivation_statement: { type: DataTypes.TEXT, allowNull: true },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,
