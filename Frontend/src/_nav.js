@@ -1,28 +1,28 @@
-import React from 'react'
+import React from "react"
+import CIcon from "@coreui/icons-react"
+import { CNavItem, CNavTitle } from "@coreui/react"
 import {
-  CIcon,
-  CNavItem,
-  CNavTitle,
-  cilSpeedometer,
-  cilPlus,
-  cilList,
-  cilLightbulb,
-  cilCalendar,
-  cilGraph,
-  cilStar,
-  cilInfo,
-  cilUser,
-  cilGroup,
-  cilSettings,
-  cilBell,
-  cilLibrary,
-  cilTask,
-  cilContact,
-  cilSync,
-  cilLockLocked,
   cilAccountLogout,
+  cilBell,
+  cilCalendar,
+  cilContact,
+  cilGraph,
+  cilInfo,
+  cilGroup,
+  cilLibrary,
+  cilLightbulb,
+  cilList,
+  cilLockLocked,
+  cilPlus,
+  cilSettings,
+  cilSpeedometer,
+  cilStar,
+  cilSync,
+  cilTask,
+  cilUser,
   cilUserPlus,
-} from "./views/Stephabit"
+  cilChatBubble,
+} from "@coreui/icons"
 
 const _nav = [
   {
@@ -65,6 +65,12 @@ const _nav = [
     name: 'Smart Scheduler',
     to: '/smart-scheduler',
     icon: <CIcon icon={cilCalendar} customClassName="nav-icon" />,
+  },
+  {
+    component: CNavItem,
+    name: 'Habit Coach',
+    to: '/habit-coach',
+    icon: <CIcon icon={cilChatBubble} customClassName="nav-icon" />,
   },
   {
     component: CNavItem,

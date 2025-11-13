@@ -36,6 +36,97 @@ router.post("/:habitId/log", async (req, res) => {
 });
 
 /**
+ * Update the number of logs for a specific status on a given day.
+ * Body: { userId: number, status: "done" | "missed", targetCount: number, date?: string }
+ * The optional date defaults to today (server timezone).
+ */
+router.put("/:habitId/logs", async (req, res) => {
+  try {
+    const { habitId } = req.params;
+    const { userId, status, targetCount, date } = req.body;
+
+    if (!userId || !["done", "missed"].includes(status)) {
+      return res.status(400).json({ error: "userId and valid status required" });
+    }
+
+    const desiredCount = Number.parseInt(targetCount, 10);
+    if (Number.isNaN(desiredCount) || desiredCount < 0) {
+      return res.status(400).json({ error: "targetCount must be a non-negative number" });
+    }
+
+    const habit = await Habit.findByPk(habitId);
+    if (!habit) {
+      return res.status(404).json({ error: "Habit not found" });
+    }
+
+    const targetDate = date ? new Date(date) : new Date();
+    if (Number.isNaN(targetDate.getTime())) {
+      return res.status(400).json({ error: "Invalid date provided" });
+    }
+
+    const isoDate = targetDate.toISOString().split("T")[0];
+
+    const existing = await Progress.findAll({
+      where: {
+        user_id: userId,
+        habit_id: habitId,
+        status,
+        progress_date: isoDate,
+      },
+      order: [
+        ["created_at", "DESC"],
+        ["id", "DESC"],
+      ],
+    });
+
+    if (existing.length < desiredCount) {
+      const missingCount = desiredCount - existing.length;
+      const now = new Date();
+      await Progress.bulkCreate(
+        Array.from({ length: missingCount }).map(() => ({
+          user_id: userId,
+          habit_id: habitId,
+          status,
+          progress_date: isoDate,
+          created_at: now,
+        }))
+      );
+    } else if (existing.length > desiredCount) {
+      const toRemove = existing.slice(0, existing.length - desiredCount);
+      await Promise.all(toRemove.map((row) => row.destroy()));
+    }
+
+    const [doneCount, missedCount] = await Promise.all([
+      Progress.count({
+        where: {
+          user_id: userId,
+          habit_id: habitId,
+          status: "done",
+          progress_date: isoDate,
+        },
+      }),
+      Progress.count({
+        where: {
+          user_id: userId,
+          habit_id: habitId,
+          status: "missed",
+          progress_date: isoDate,
+        },
+      }),
+    ]);
+
+    res.json({
+      message: "Progress updated",
+      counts: { done: doneCount, missed: missedCount },
+      date: isoDate,
+    });
+  } catch (err) {
+    console.error("❌ /logs update error:", err);
+    res.status(500).json({ error: "Failed to update progress" });
+  }
+});
+
+/**
  * Already had this: get today's progress for a user
  * (Dashboard uses this to build charts)
  */
