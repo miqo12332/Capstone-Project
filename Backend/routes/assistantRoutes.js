@@ -8,7 +8,6 @@ import {
   UserSetting,
   AssistantMemory,
 } from "../models/index.js";
-import { getAgentStatus, runReasoningAgent } from "../services/assistantAgent.js";
 
 const router = express.Router();
 
@@ -42,6 +41,14 @@ const STOP_WORDS = new Set([
 ]);
 
 const asPlain = (record) => (record ? record.get({ plain: true }) : null);
+
+const getCoachStatus = () => ({
+  ready: true,
+  provider: "StepHabit Coach",
+  model: "Insight Engine",
+  reason: null,
+  updatedAt: new Date().toISOString(),
+});
 
 const ensureObject = (maybeJSON) => {
   if (!maybeJSON) return {};
@@ -464,7 +471,7 @@ router.get("/history", async (req, res) => {
         habits: snapshot.habits,
         insightText: insightRecord?.content || null,
       },
-      agent: getAgentStatus(),
+      agent: getCoachStatus(),
     });
   } catch (error) {
     console.error("Failed to load assistant history", error);
@@ -490,57 +497,16 @@ router.post("/chat", async (req, res) => {
       keywords: { keywords: Object.keys(counts), counts },
     });
 
-    const [insight, recentHistoryRecords] = await Promise.all([
-      updateInsightMemory(userId, snapshot, counts),
-      AssistantMemory.findAll({
-        where: {
-          user_id: userId,
-          role: { [Op.in]: ["user", "assistant"] },
-        },
-        order: [["created_at", "DESC"]],
-        limit: 20,
-      }),
-    ]);
+    const insight = await updateInsightMemory(userId, snapshot, counts);
 
-    const recentHistory = recentHistoryRecords
-      .map((record) => record.get({ plain: true }))
-      .reverse();
+    const agentMeta = getCoachStatus();
 
-    let reply;
-    let agentMeta = getAgentStatus();
-
-    if (agentMeta.ready) {
-      try {
-        const agentResult = await runReasoningAgent({
-          snapshot,
-          insightText: insight.summaryText,
-          history: recentHistory,
-        });
-        reply = agentResult.reply;
-        agentMeta = { ...agentMeta, ...agentResult.meta };
-      } catch (agentError) {
-        console.error("Reasoning agent failed, using fallback", agentError);
-        reply = craftAssistantReply({
-          message,
-          snapshot,
-          keywordInsight: insight.topKeywords,
-          messageKeywords: counts,
-        });
-        agentMeta = {
-          ...agentMeta,
-          ready: false,
-          reason:
-            "The AI provider could not be reached. Generated a smart fallback response instead.",
-        };
-      }
-    } else {
-      reply = craftAssistantReply({
-        message,
-        snapshot,
-        keywordInsight: insight.topKeywords,
-        messageKeywords: counts,
-      });
-    }
+    const reply = craftAssistantReply({
+      message,
+      snapshot,
+      keywordInsight: insight.topKeywords,
+      messageKeywords: counts,
+    });
 
     await AssistantMemory.create({
       user_id: userId,

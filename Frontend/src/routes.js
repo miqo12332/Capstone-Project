@@ -16,7 +16,7 @@ const ReportsAnalytics = React.lazy(() => import("./views/dashboard/ReportsAnaly
 const Schedules = React.lazy(() => import("./views/dashboard/Schedules"));
 const DailyChallenge = React.lazy(() => import("./views/dashboard/DailyChallenge"));
 const SmartScheduler = React.lazy(() => import("./views/dashboard/SmartScheduler"));
-const AICompanion = React.lazy(() => import("./views/dashboard/AICompanion"));
+const HabitCoach = React.lazy(() => import("./views/dashboard/HabitCoach"));
 
 // ===== My Routine =====
 const MyRoutine = React.lazy(() => import("./views/pages/MyRoutine"));
@@ -52,7 +52,7 @@ const routes = [
   { path: "/schedules", name: "Schedules", element: Schedules },
   { path: "/dailychallenge", name: "Daily Challenge", element: DailyChallenge },
   { path: "/smart-scheduler", name: "Smart Scheduler", element: SmartScheduler },
-  { path: "/ai-companion", name: "AI Companion", element: AICompanion },
+  { path: "/habit-coach", name: "Habit Coach", element: HabitCoach },
 
   // ===== My Routine =====
   { path: "/myroutine", name: "My Routine", element: MyRoutine },
