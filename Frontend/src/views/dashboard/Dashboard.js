@@ -30,12 +30,14 @@ import {
   YAxis,
 } from "recharts";
 import { getHabits } from "../../services/habits";
+import { getSchedules } from "../../services/schedules";
 import {
   getTodayProgressLogs,
   logHabitProgress,
   updateHabitProgressCount,
 } from "../../services/progress";
 import { formatPercent, getProgressAnalytics } from "../../services/analytics";
+import { fetchCalendarOverview } from "../../services/calendar";
 
 const Dashboard = () => {
   const [habits, setHabits] = useState([]);
@@ -43,6 +45,7 @@ const Dashboard = () => {
   const [analytics, setAnalytics] = useState(null);
   const [analyticsError, setAnalyticsError] = useState("");
   const [schedules, setSchedules] = useState([]);
+  const [calendarOverview, setCalendarOverview] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [editingHabitId, setEditingHabitId] = useState(null);
@@ -122,14 +125,14 @@ const Dashboard = () => {
 
     const loadSchedules = async () => {
       try {
-        const res = await fetch(
-          `http://localhost:5001/api/schedules/user/${user.id}`
-        );
-        if (!res.ok) throw new Error("Failed to load schedules");
-        const data = await res.json();
-        setSchedules(Array.isArray(data) ? data : []);
+        const [scheduleData, calendarData] = await Promise.all([
+          getSchedules(user.id),
+          fetchCalendarOverview(user.id, { days: 21 }),
+        ]);
+        setSchedules(Array.isArray(scheduleData) ? scheduleData : []);
+        setCalendarOverview(calendarData || null);
       } catch (err) {
-        console.warn("⚠️ Unable to load schedules", err);
+        console.warn("⚠️ Unable to load schedules or calendar", err);
       }
     };
 
@@ -170,28 +173,53 @@ const Dashboard = () => {
     [analytics]
   );
 
-  const recentSchedules = useMemo(() => {
-    const decorated = schedules
+  const upcomingPlans = useMemo(() => {
+    const schedulePlans = schedules
       .map((schedule) => {
         const startDate = schedule.day
           ? new Date(`${schedule.day}T${schedule.starttime || "00:00"}`)
           : null;
+        const endDate = schedule.day && schedule.endtime
+          ? new Date(`${schedule.day}T${schedule.endtime}`)
+          : null;
         return {
-          ...schedule,
-          startDate,
+          id: `schedule-${schedule.id}`,
           title: schedule.habit?.title || schedule.custom_title || "Untitled",
+          startDate,
+          endDate,
+          repeat: schedule.repeat,
+          notes: schedule.notes,
+          type: "habit",
         };
       })
       .filter(
         (item) =>
           item.startDate instanceof Date &&
           !Number.isNaN(item.startDate?.getTime())
-      )
+      );
+
+    const calendarPlans = (calendarOverview?.events ?? [])
+      .map((event) => ({
+        id: `calendar-${event.id}`,
+        title: event.title,
+        startDate: event.start_time ? new Date(event.start_time) : null,
+        endDate: event.end_time ? new Date(event.end_time) : null,
+        notes: event.description,
+        type: "calendar",
+        provider: event.source,
+        allDay: event.all_day,
+        location: event.location,
+      }))
+      .filter(
+        (item) =>
+          item.startDate instanceof Date &&
+          !Number.isNaN(item.startDate?.getTime())
+      );
+
+    return [...schedulePlans, ...calendarPlans]
       .sort((a, b) => a.startDate - b.startDate)
       .slice(0, 5);
-
-    return decorated;
-  }, [schedules]);
+  }, [schedules, calendarOverview]);
 
   const startEdit = (habitId) => {
     const current = todayCounts[habitId] ?? { done: 0, missed: 0 };
@@ -233,6 +261,7 @@ const Dashboard = () => {
     try {
       await logHabitProgress(habitId, { userId: user.id, status });
       await loadTodayProgress();
+      cancelEdit();
     } catch (err) {
       console.error("❌ Server error logging progress", err);
       alert("Failed to log progress. Please try again.");
@@ -536,28 +565,48 @@ const Dashboard = () => {
                   Upcoming Schedule
                 </CCardHeader>
                 <CCardBody>
-                  {recentSchedules.length === 0 ? (
+                  {upcomingPlans.length === 0 ? (
                     <div className="text-body-secondary">
-                      No plans on the calendar. Add routines from My Schedule to
-                      see them here.
+                      No plans on the calendar. Add routines from My Schedule or
+                      sync a calendar to see them here.
                     </div>
                   ) : (
                     <CListGroup flush>
-                      {recentSchedules.map((schedule) => (
-                        <CListGroupItem key={schedule.id} className="d-flex flex-column gap-1">
-                          <div className="fw-semibold">{schedule.title}</div>
-                          <div className="small text-body-secondary d-flex justify-content-between">
-                            <span>{formatDateTime(schedule.startDate)}</span>
-                            <span className="text-capitalize">
-                              {schedule.repeat?.toLowerCase() || "once"}
-                            </span>
+                      {upcomingPlans.map((plan) => (
+                        <CListGroupItem key={plan.id} className="d-flex flex-column gap-1">
+                          <div className="d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                              <div className="fw-semibold">{plan.title}</div>
+                              <div className="small text-body-secondary">
+                                {formatDateTime(plan.startDate)}
+                                {plan.type === "habit" && plan.repeat
+                                  ? ` · ${plan.repeat.toLowerCase()}`
+                                  : ""}
+                                {plan.type === "calendar" && plan.provider
+                                  ? ` · ${plan.provider}`
+                                  : ""}
+                                {plan.allDay ? " · All day" : ""}
+                              </div>
+                            </div>
+                            <CBadge color={plan.type === "habit" ? "success" : "info"}>
+                              {plan.type === "habit" ? "Habit" : "Calendar"}
+                            </CBadge>
                           </div>
-                          {schedule.notes && (
-                            <div className="small text-body-secondary">{schedule.notes}</div>
+                          {plan.notes && (
+                            <div className="small text-body-secondary">{plan.notes}</div>
+                          )}
+                          {plan.location && (
+                            <div className="small text-body-secondary">{plan.location}</div>
                           )}
                         </CListGroupItem>
                       ))}
                     </CListGroup>
+                  )}
+                  {calendarOverview?.summary?.nextFreeDay && (
+                    <div className="small text-body-secondary mt-3">
+                      Next light day: {" "}
+                      {new Date(calendarOverview.summary.nextFreeDay).toLocaleDateString()}
+                    </div>
                   )}
                 </CCardBody>
               </CCard>

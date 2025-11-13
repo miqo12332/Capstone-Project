@@ -15,6 +15,8 @@ import GroupChallenge from "./GroupChallenge.js";
 import UserGroupChallenge from "./UserGroupChallenge.js";
 import UserSetting from "./UserSetting.js";
 import AssistantMemory from "./AssistantMemory.js";
+import CalendarIntegration from "./CalendarIntegration.js";
+import CalendarEvent from "./CalendarEvent.js";
 
 // === Habit scheduling ===
 User.hasMany(Habit, { foreignKey: "user_id", as: "habits" });
@@ -82,6 +84,34 @@ AssistantMemory.belongsTo(User, {
   as: "owner",
 });
 
+// === Calendar sync ===
+User.hasMany(CalendarIntegration, {
+  foreignKey: "user_id",
+  as: "calendarIntegrations",
+});
+CalendarIntegration.belongsTo(User, {
+  foreignKey: "user_id",
+  as: "user",
+});
+
+CalendarIntegration.hasMany(CalendarEvent, {
+  foreignKey: "integration_id",
+  as: "events",
+});
+CalendarEvent.belongsTo(CalendarIntegration, {
+  foreignKey: "integration_id",
+  as: "integration",
+});
+
+User.hasMany(CalendarEvent, {
+  foreignKey: "user_id",
+  as: "calendarEvents",
+});
+CalendarEvent.belongsTo(User, {
+  foreignKey: "user_id",
+  as: "owner",
+});
+
 export {
   User,
   Habit,
@@ -95,4 +125,6 @@ export {
   UserGroupChallenge,
   UserSetting,
   AssistantMemory,
+  CalendarIntegration,
+  CalendarEvent,
 };
