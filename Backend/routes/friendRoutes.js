@@ -170,7 +170,15 @@ router.post("/:userId", async (req, res, next) => {
           {
             model: Habit,
             as: "habits",
-            attributes: ["id", "title", "category", "description"],
+            attributes: [
+              "id",
+              "title",
+              "category",
+              "description",
+              "is_public",
+            ],
+            where: { is_public: true },
+            required: false,
           },
         ],
       }),
