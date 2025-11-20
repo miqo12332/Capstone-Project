@@ -3,6 +3,7 @@ import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import { Op } from "sequelize";
 import { UserSetting } from "../models/index.js";
+import { sendVerificationEmail } from "../utils/email.js";
 
 const defaultSettings = {
   timezone: "UTC",
@@ -59,6 +60,7 @@ const serializeUser = (user) => ({
   dailyCommitment: user.daily_commitment,
   supportPreference: user.support_preference,
   motivation: user.motivation_statement,
+  isVerified: Boolean(user.is_verified),
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
   settings: formatSettings(user.settings),
@@ -84,6 +86,8 @@ router.post("/register", async (req, res) => {
     if (existing) return res.status(400).json({ error: "Email already exists" });
 
     const hashed = await bcrypt.hash(password, 10);
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationExpires = new Date(Date.now() + 15 * 60 * 1000);
     const onboardingPayload = {
       primaryGoal: onboarding.primaryGoal ?? req.body.primaryGoal ?? null,
       focusArea: onboarding.focusArea ?? req.body.focusArea ?? null,
@@ -103,14 +107,23 @@ router.post("/register", async (req, res) => {
       daily_commitment: sanitizeString(onboardingPayload.dailyCommitment),
       support_preference: sanitizeString(onboardingPayload.supportPreference),
       motivation_statement: sanitizeString(onboardingPayload.motivation),
+      is_verified: false,
+      verification_code: verificationCode,
+      verification_expires: verificationExpires,
     });
     await UserSetting.findOrCreate({
       where: { user_id: newUser.id },
       defaults: { ...defaultSettings, user_id: newUser.id },
     });
 
+    try {
+      await sendVerificationEmail(newUser.email, verificationCode);
+    } catch (emailErr) {
+      console.error("Failed to send verification email", emailErr);
+    }
+
     res.status(201).json({
-      message: "User created",
+      message: "Verification code sent to email. Please verify to activate your account.",
       user: serializeUser({ ...newUser.get({ plain: true }), settings: await ensureUserSettings(newUser.id) }),
     });
   } catch (err) {
@@ -129,6 +142,10 @@ router.post("/login", async (req, res) => {
     });
     if (!user) return res.status(404).json({ error: "User not found" });
 
+    if (!user.is_verified) {
+      return res.status(403).json({ error: "Email not verified" });
+    }
+
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(400).json({ error: "Invalid password" });
 
@@ -138,6 +155,81 @@ router.post("/login", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Verify email
+router.post("/verify-email", async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) {
+      return res.status(400).json({ error: "email and code are required" });
+    }
+
+    const user = await User.findOne({ where: { email }, include: [{ model: UserSetting, as: "settings" }] });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (user.is_verified) {
+      return res.json({ message: "Email already verified", user: serializeUser(user) });
+    }
+
+    if (
+      !user.verification_code ||
+      user.verification_code !== code ||
+      (user.verification_expires && new Date(user.verification_expires) < new Date())
+    ) {
+      return res.status(400).json({ error: "Invalid or expired verification code" });
+    }
+
+    user.is_verified = true;
+    user.verification_code = null;
+    user.verification_expires = null;
+    await user.save();
+
+    await ensureUserSettings(user.id);
+
+    res.json({ message: "Email verified", user: serializeUser(user) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to verify email" });
+  }
+});
+
+// Resend verification code
+router.post("/resend-verification", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: "email is required" });
+    }
+
+    const user = await User.findOne({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (user.is_verified) {
+      return res.status(400).json({ error: "Email already verified" });
+    }
+
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.verification_code = verificationCode;
+    user.verification_expires = new Date(Date.now() + 15 * 60 * 1000);
+    await user.save();
+
+    try {
+      await sendVerificationEmail(user.email, verificationCode);
+    } catch (emailErr) {
+      console.error("Failed to send verification email", emailErr);
+    }
+
+    res.json({ message: "Verification code resent" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to resend verification" });
   }
 });
 

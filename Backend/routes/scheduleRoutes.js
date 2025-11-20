@@ -6,10 +6,15 @@ import Habit from "../models/Habit.js";
 const router = express.Router();
 
 // GET schedules for a user (joins Habit by habit_id)
-router.get("/user/:userId", async (req, res) => {
+router.get("/user/:userId", async (req, res, next) => {
   try {
+    const userId = Number(req.params.userId);
+    if (Number.isNaN(userId)) {
+      return res.status(400).json({ error: "Invalid user id" });
+    }
+
     const schedules = await Schedule.findAll({
-      where: { userid: req.params.userId },
+      where: { userid: userId },
       include: [
         {
           model: Habit,
@@ -18,12 +23,14 @@ router.get("/user/:userId", async (req, res) => {
           required: false,
         },
       ],
-      order: [["day", "ASC"]],
+      order: [
+        ["day", "ASC"],
+        ["starttime", "ASC"],
+      ],
     });
     res.json(schedules);
   } catch (err) {
-    console.error("Error fetching schedules:", err);
-    res.status(500).json({ error: "Failed to fetch schedules", "err": err });
+    next(err);
   }
 });
 

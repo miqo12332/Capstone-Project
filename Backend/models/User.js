@@ -18,6 +18,13 @@ const User = sequelize.define(
     daily_commitment: { type: DataTypes.STRING(60), allowNull: true },
     support_preference: { type: DataTypes.STRING(120), allowNull: true },
     motivation_statement: { type: DataTypes.TEXT, allowNull: true },
+    is_verified: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    verification_code: { type: DataTypes.STRING(10), allowNull: true },
+    verification_expires: { type: DataTypes.DATE, allowNull: true },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,
