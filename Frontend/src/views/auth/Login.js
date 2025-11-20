@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useContext, useState } from "react"
 import {
   CButton,
   CCard,
@@ -15,11 +15,13 @@ import {
 import CIcon from "@coreui/icons-react"
 import { cilUser, cilLockLocked } from "@coreui/icons"
 import { Link, useNavigate } from "react-router-dom"
+import { AuthContext } from "../../context/AuthContext"
 
 const Login = () => {
   const [form, setForm] = useState({ email: "", password: "" })
   const [message, setMessage] = useState("")
   const navigate = useNavigate()
+  const { login } = useContext(AuthContext)
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -43,9 +45,8 @@ const Login = () => {
         return
       }
 
-      // ✅ Save user and redirect
-      localStorage.setItem("user", JSON.stringify(data.user))
-      window.location.href = "/#/dashboard"
+      login(data.user)
+      navigate("/dashboard", { replace: true })
     } catch (err) {
       console.error("Login error:", err)
       setMessage("❌ Error connecting to server")

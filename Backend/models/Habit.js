@@ -9,6 +9,11 @@ const Habit = sequelize.define(
     title: { type: DataTypes.STRING(100), allowNull: false },
     description: { type: DataTypes.TEXT, allowNull: true },
     category: { type: DataTypes.STRING(50), allowNull: true },
+    is_public: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,

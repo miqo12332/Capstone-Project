@@ -33,6 +33,16 @@ export const apiPost = async (url, body) => {
   return res.json();
 };
 
+export const apiPut = async (url, body) => {
+  const res = await fetch(`${API_BASE}${url}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`PUT ${url} failed`);
+  return res.json();
+};
+
 export const apiDelete = async (url) => {   // ✅ this might be missing
   const res = await fetch(`${API_BASE}${url}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`DELETE ${url} failed`);

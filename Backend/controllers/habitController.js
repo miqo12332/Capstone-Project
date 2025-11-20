@@ -1,26 +1,87 @@
-import db from "../models/index.js";
+import Habit from "../models/Habit.js";
 
-const Habit = db.Habit;
+export const getHabitsByUser = async (req, res, next) => {
+  try {
+    const userId = req.params.userId ?? req.query.user_id;
 
-// Get all habits
-export const getHabits = async (req, res) => {
-  const habits = await Habit.findAll();
-  res.json(habits);
+    if (!userId) {
+      return res.status(400).json({ error: "user_id is required" });
+    }
+
+    const habits = await Habit.findAll({
+      where: { user_id: userId },
+      order: [["created_at", "ASC"]],
+    });
+    res.json(habits);
+  } catch (error) {
+    next(error);
+  }
 };
 
-// Add new habit
-export const addHabit = async (req, res) => {
-  const { name, frequency, microStep, startDate, notes } = req.body;
-  const habit = await Habit.create({ name, frequency, microStep, startDate, notes });
-  res.status(201).json(habit);
+export const createHabit = async (req, res, next) => {
+  try {
+    const { title, user_id } = req.body;
+
+    if (!title || !user_id) {
+      return res.status(400).json({ error: "title and user_id are required" });
+    }
+
+    const habit = await Habit.create({
+      ...req.body,
+      is_public: Boolean(req.body.is_public),
+    });
+    res.status(201).json(habit);
+  } catch (error) {
+    next(error);
+  }
 };
 
-// Delete habit
-export const deleteHabit = async (req, res) => {
-  const { id } = req.params;
-  const habit = await Habit.findByPk(id);
-  if (!habit) return res.status(404).json({ message: "Habit not found" });
+export const updateHabit = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const habit = await Habit.findByPk(id);
 
-  await habit.destroy();
-  res.json({ message: "Habit deleted" });
+    if (!habit) {
+      return res.status(404).json({ error: "Habit not found" });
+    }
+
+    const allowedFields = [
+      "title",
+      "description",
+      "category",
+      "target_reps",
+      "is_daily_goal",
+      "is_public",
+    ];
+
+    const updates = {};
+    allowedFields.forEach((field) => {
+      if (field in req.body) {
+        updates[field] =
+          field === "is_public" ? Boolean(req.body[field]) : req.body[field];
+      }
+    });
+
+    await habit.update(updates);
+
+    res.json(habit);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const removeHabit = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const habit = await Habit.findByPk(id);
+
+    if (!habit) {
+      return res.status(404).json({ error: "Habit not found" });
+    }
+
+    await habit.destroy();
+    res.json({ message: "Habit deleted successfully" });
+  } catch (error) {
+    next(error);
+  }
 };

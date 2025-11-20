@@ -18,6 +18,17 @@ export const createHabit = async (habit) => {
   return await res.json();
 };
 
+export const updateHabit = async (id, updates) => {
+  const res = await fetch(`${BASE_URL}/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(updates),
+  });
+
+  if (!res.ok) throw new Error("Failed to update habit");
+  return await res.json();
+};
+
 export const deleteHabit = async (id) => {
   const res = await fetch(`${BASE_URL}/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete habit");
