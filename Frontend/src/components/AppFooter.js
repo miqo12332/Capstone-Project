@@ -3,12 +3,14 @@ import { CFooter } from '@coreui/react'
 
 const AppFooter = () => {
   return (
-    <CFooter className="px-4">
+    <CFooter className="px-4 modern-footer">
       <div>
-        <h6>StepHabit &copy; 2025 Capstone Project</h6>
+        <div className="fw-semibold">StepHabit © 2025</div>
+        <div className="text-muted small">Built to keep your routines calm and clear.</div>
       </div>
-      <div className="ms-auto">
-        <h6>Mikayel Davtyan & Artur Aghamyan</h6>
+      <div className="ms-auto text-end">
+        <div className="fw-semibold">Mikayel Davtyan & Artur Aghamyan</div>
+        <div className="text-muted small">Capstone Project</div>
       </div>
     </CFooter>
   )

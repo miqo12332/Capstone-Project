@@ -7,7 +7,6 @@ import {
   cilCalendar,
   cilContact,
   cilGraph,
-  cilInfo,
   cilGroup,
   cilLibrary,
   cilLightbulb,
@@ -27,20 +26,20 @@ import {
 const _nav = [
   {
     component: CNavItem,
-    name: 'Dashboard',
+    name: 'Home',
     to: '/dashboard',
     icon: <CIcon icon={cilSpeedometer} customClassName="nav-icon" />,
   },
   {
     component: CNavItem,
-    name: 'My Schedule',
+    name: 'Planner',
     to: '/schedules',
     icon: <CIcon icon={cilCalendar} customClassName="nav-icon" />,
   },
 
   {
     component: CNavTitle,
-    name: 'Habit Tools',
+    name: 'Routines',
   },
   {
     component: CNavItem,
@@ -56,10 +55,39 @@ const _nav = [
   },
   {
     component: CNavItem,
+    name: 'Calendar Sync',
+    to: '/calendar-sync',
+    icon: <CIcon icon={cilSync} customClassName="nav-icon" />,
+  },
+
+  {
+    component: CNavTitle,
+    name: 'Insights',
+  },
+  {
+    component: CNavItem,
+    name: 'Progress Tracker',
+    to: '/progress-tracker',
+    icon: <CIcon icon={cilTask} customClassName="nav-icon" />,
+  },
+  {
+    component: CNavItem,
+    name: 'Reports & Analytics',
+    to: '/reportsanalytics',
+    icon: <CIcon icon={cilGraph} customClassName="nav-icon" />,
+  },
+  {
+    component: CNavItem,
+    name: 'Habit Library',
+    to: '/habit-library',
+    icon: <CIcon icon={cilLibrary} customClassName="nav-icon" />,
+  },
+  {
+    component: CNavItem,
     name: 'Daily Challenge',
     to: '/dailychallenge',
     icon: <CIcon icon={cilLightbulb} customClassName="nav-icon" />,
-  },  
+  },
   {
     component: CNavItem,
     name: 'Smart Scheduler',
@@ -74,38 +102,14 @@ const _nav = [
   },
   {
     component: CNavItem,
-    name: 'Reports & Analytics',
-    to: '/reportsanalytics',
-    icon: <CIcon icon={cilGraph} customClassName="nav-icon" />,
-  },
-  {
-    component: CNavItem,
-    name: 'Progress Tracker',
-    to: '/progress-tracker',
-    icon: <CIcon icon={cilTask} customClassName="nav-icon" />,
-  },
-  {
-    component: CNavItem,
-    name: 'Habit Library',
-    to: '/habit-library',
-    icon: <CIcon icon={cilLibrary} customClassName="nav-icon" />,
-  },
-  {
-    component: CNavItem,
     name: 'Notifications',
     to: '/notifications',
     icon: <CIcon icon={cilBell} customClassName="nav-icon" />,
   },
-  {
-    component: CNavItem,
-    name: 'Settings',
-    to: '/settings',
-    icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
-  },
 
   {
     component: CNavTitle,
-    name: 'Community',
+    name: 'Connect',
   },
   {
     component: CNavItem,
@@ -134,7 +138,31 @@ const _nav = [
 
   {
     component: CNavTitle,
-    name: 'Profile & Auth',
+    name: 'Profile & Support',
+  },
+  {
+    component: CNavItem,
+    name: 'User Profile',
+    to: '/profile',
+    icon: <CIcon icon={cilUser} customClassName="nav-icon" />,
+  },
+  {
+    component: CNavItem,
+    name: 'Settings',
+    to: '/settings',
+    icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
+  },
+  {
+    component: CNavItem,
+    name: 'Preferences',
+    to: '/preferences',
+    icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
+  },
+  {
+    component: CNavItem,
+    name: 'Achievements',
+    to: '/achievements',
+    icon: <CIcon icon={cilStar} customClassName="nav-icon" />,
   },
   {
     component: CNavItem,
@@ -153,58 +181,6 @@ const _nav = [
     name: 'Logout',
     to: '/logout',
     icon: <CIcon icon={cilAccountLogout} customClassName="nav-icon" />,
-  },
-  {
-    component: CNavItem,
-    name: 'User Profile',
-    to: '/profile',
-    icon: <CIcon icon={cilUser} customClassName="nav-icon" />,
-  },
-  {
-    component: CNavItem,
-    name: 'Preferences',
-    to: '/preferences',
-    icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
-  },
-
-  {
-    component: CNavTitle,
-    name: 'Sync',
-  },
-  {
-    component: CNavItem,
-    name: 'Calendar Sync',
-    to: '/calendar-sync',
-    icon: <CIcon icon={cilSync} customClassName="nav-icon" />,
-  },
-  {
-    component: CNavItem,
-    name: 'Fitness Sync',
-    to: '/fitness-sync',
-    icon: <CIcon icon={cilSync} customClassName="nav-icon" />,
-  },
-
-  {
-    component: CNavTitle,
-    name: 'Other',
-  },
-  {
-    component: CNavItem,
-    name: 'Achievements',
-    to: '/achievements',
-    icon: <CIcon icon={cilStar} customClassName="nav-icon" />,
-  },
-  {
-    component: CNavItem,
-    name: 'About StepHabit',
-    to: '/about',
-    icon: <CIcon icon={cilInfo} customClassName="nav-icon" />,
-  },
-  {
-    component: CNavItem,
-    name: 'Help Center',
-    to: '/help',
-    icon: <CIcon icon={cilInfo} customClassName="nav-icon" />,
   },
   {
     component: CNavItem,
