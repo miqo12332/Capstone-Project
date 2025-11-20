@@ -261,6 +261,7 @@ const Dashboard = () => {
     try {
       await logHabitProgress(habitId, { userId: user.id, status });
       await loadTodayProgress();
+      cancelEdit();
     } catch (err) {
       console.error("❌ Server error logging progress", err);
       alert("Failed to log progress. Please try again.");
