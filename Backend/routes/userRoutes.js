@@ -91,6 +91,7 @@ const deliverVerification = async (user, code) => {
 };
 
 const router = express.Router();
+const requiresVerification = Boolean(process.env.SMTP_HOST);
 
 router.post(
   "/register",
@@ -105,7 +106,7 @@ router.post(
     if (existing) return res.status(400).json({ error: "Email already exists" });
 
     const hashed = await bcrypt.hash(password, 10);
-    const verification = generateVerification();
+    const verification = requiresVerification ? generateVerification() : null;
     const onboardingPayload = {
       primaryGoal: onboarding.primaryGoal ?? req.body.primaryGoal ?? null,
       focusArea: onboarding.focusArea ?? req.body.focusArea ?? null,
@@ -127,9 +128,9 @@ router.post(
           daily_commitment: sanitizeString(onboardingPayload.dailyCommitment),
           support_preference: sanitizeString(onboardingPayload.supportPreference),
           motivation_statement: sanitizeString(onboardingPayload.motivation),
-          is_verified: false,
-          verification_code: verification.code,
-          verification_expires: verification.expires,
+          is_verified: !requiresVerification,
+          verification_code: verification?.code ?? null,
+          verification_expires: verification?.expires ?? null,
         },
         { transaction }
       );
@@ -138,14 +139,18 @@ router.post(
       return user;
     });
 
-    await deliverVerification(newUser, verification.code);
+    if (requiresVerification) {
+      await deliverVerification(newUser, verification.code);
+    }
 
     const userWithSettings = await User.findByPk(newUser.id, {
       include: [{ model: UserSetting, as: "settings" }],
     });
 
     res.status(201).json({
-      message: "Verification code sent to email. Please verify to activate your account.",
+      message: requiresVerification
+        ? "Verification code sent to email. Please verify to activate your account."
+        : "Account created and verified.",
       user: serializeUser(userWithSettings),
     });
   })
@@ -162,7 +167,24 @@ router.post(
     if (!user) return res.status(404).json({ error: "User not found" });
 
     if (!user.is_verified) {
-      return res.status(403).json({ error: "Email not verified" });
+      if (!requiresVerification) {
+        user.is_verified = true;
+        user.verification_code = null;
+        user.verification_expires = null;
+        await user.save();
+      } else if (!user.verification_code) {
+        const verification = generateVerification();
+        await user.update({
+          verification_code: verification.code,
+          verification_expires: verification.expires,
+        });
+        await deliverVerification(user, verification.code);
+        return res
+          .status(403)
+          .json({ error: "Email not verified. Verification code sent." });
+      } else {
+        return res.status(403).json({ error: "Email not verified" });
+      }
     }
 
     const valid = await bcrypt.compare(password, user.password);
