@@ -18,7 +18,19 @@ const User = sequelize.define(
     daily_commitment: { type: DataTypes.STRING(60), allowNull: true },
     support_preference: { type: DataTypes.STRING(120), allowNull: true },
     motivation_statement: { type: DataTypes.TEXT, allowNull: true },
+    is_verified: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    verification_code: { type: DataTypes.STRING(10), allowNull: true },
+    verification_expires: { type: DataTypes.DATE, allowNull: true },
     created_at: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+    },
+    updated_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
@@ -26,7 +38,10 @@ const User = sequelize.define(
   },
   {
     tableName: "users",
-    timestamps: false, // ✅ prevents Sequelize from looking for createdAt/updatedAt
+    underscored: true,
+    timestamps: true,
+    createdAt: "created_at",
+    updatedAt: "updated_at",
   }
 );
 

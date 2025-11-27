@@ -2,14 +2,26 @@
 import express from "express";
 import Schedule from "../models/Schedule.js";
 import Habit from "../models/Habit.js";
+import User from "../models/User.js";
+import asyncHandler from "../utils/asyncHandler.js";
 
 const router = express.Router();
 
-// GET schedules for a user (joins Habit by habit_id)
-router.get("/user/:userId", async (req, res) => {
-  try {
+router.get(
+  "/user/:userId",
+  asyncHandler(async (req, res) => {
+    const userId = Number(req.params.userId);
+    if (Number.isNaN(userId)) {
+      return res.status(400).json({ error: "Invalid user id" });
+    }
+
+    const user = await User.findByPk(userId, { attributes: ["id"] });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
     const schedules = await Schedule.findAll({
-      where: { userid: req.params.userId },
+      where: { userid: userId },
       include: [
         {
           model: Habit,
@@ -18,18 +30,18 @@ router.get("/user/:userId", async (req, res) => {
           required: false,
         },
       ],
-      order: [["day", "ASC"]],
+      order: [
+        ["day", "ASC"],
+        ["starttime", "ASC"],
+      ],
     });
     res.json(schedules);
-  } catch (err) {
-    console.error("Error fetching schedules:", err);
-    res.status(500).json({ error: "Failed to fetch schedules", "err": err });
-  }
-});
+  })
+);
 
-// POST create schedule (habit_id optional = custom event)
-router.post("/", async (req, res) => {
-  try {
+router.post(
+  "/",
+  asyncHandler(async (req, res) => {
     const {
       habit_id,
       userid,
@@ -46,6 +58,11 @@ router.post("/", async (req, res) => {
 
     if (!userid || !day || !starttime) {
       return res.status(400).json({ error: "userid, day and starttime are required" });
+    }
+
+    const user = await User.findByPk(userid, { attributes: ["id"] });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
     }
 
     let resolvedHabitId = habit_id ? Number(habit_id) : null;
@@ -96,22 +113,16 @@ router.post("/", async (req, res) => {
     });
 
     res.status(201).json(scheduleWithHabit || created);
-  } catch (err) {
-    console.error("❌ Error creating schedule:", err);
-    res.status(500).json({ error: "Failed to add schedule", "err": err });
-  }
-});
+  })
+);
 
-// DELETE schedule
-router.delete("/:id", async (req, res) => {
-  try {
+router.delete(
+  "/:id",
+  asyncHandler(async (req, res) => {
     const n = await Schedule.destroy({ where: { id: req.params.id } });
     if (!n) return res.status(404).json({ error: "Schedule not found" });
     res.json({ message: "Deleted" });
-  } catch (err) {
-    console.error("❌ Error deleting schedule:", err);
-    res.status(500).json({ error: "Failed to delete schedule" });
-  }
-});
+  })
+);
 
 export default router;
