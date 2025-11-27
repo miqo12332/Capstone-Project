@@ -1,16 +1,22 @@
 import express from "express";
+import { Op } from "sequelize";
 import Progress from "../models/Progress.js";
 import Habit from "../models/Habit.js";
+import asyncHandler from "../utils/asyncHandler.js";
 
 const router = express.Router();
 
-/**
- * NEW: Log a single press (+ or -)
- * Body: { userId: number, status: "done" | "missed" }
- * Each call inserts a NEW ROW for today.
- */
-router.post("/:habitId/log", async (req, res) => {
-  try {
+const todayIso = () => new Date().toISOString().split("T")[0];
+
+const normalizeDate = (value) => {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().split("T")[0];
+};
+
+router.post(
+  "/:habitId/log",
+  asyncHandler(async (req, res) => {
     const { habitId } = req.params;
     const { userId, status } = req.body;
 
@@ -24,24 +30,17 @@ router.post("/:habitId/log", async (req, res) => {
     const row = await Progress.create({
       user_id: userId,
       habit_id: habitId,
-      status,                // 'done' or 'missed'
-      progress_date: new Date(), // stored as DATE; time ignored by PG
+      status,
+      progress_date: todayIso(),
     });
 
     res.status(201).json({ message: "Logged", row });
-  } catch (err) {
-    console.error("❌ /log error:", err);
-    res.status(500).json({ error: "Failed to log progress" });
-  }
-});
+  })
+);
 
-/**
- * Update the number of logs for a specific status on a given day.
- * Body: { userId: number, status: "done" | "missed", targetCount: number, date?: string }
- * The optional date defaults to today (server timezone).
- */
-router.put("/:habitId/logs", async (req, res) => {
-  try {
+router.put(
+  "/:habitId/logs",
+  asyncHandler(async (req, res) => {
     const { habitId } = req.params;
     const { userId, status, targetCount, date } = req.body;
 
@@ -59,12 +58,10 @@ router.put("/:habitId/logs", async (req, res) => {
       return res.status(404).json({ error: "Habit not found" });
     }
 
-    const targetDate = date ? new Date(date) : new Date();
-    if (Number.isNaN(targetDate.getTime())) {
+    const isoDate = normalizeDate(date);
+    if (!isoDate) {
       return res.status(400).json({ error: "Invalid date provided" });
     }
-
-    const isoDate = targetDate.toISOString().split("T")[0];
 
     const existing = await Progress.findAll({
       where: {
@@ -120,38 +117,26 @@ router.put("/:habitId/logs", async (req, res) => {
       counts: { done: doneCount, missed: missedCount },
       date: isoDate,
     });
-  } catch (err) {
-    console.error("❌ /logs update error:", err);
-    res.status(500).json({ error: "Failed to update progress" });
-  }
-});
+  })
+);
 
-/**
- * Already had this: get today's progress for a user
- * (Dashboard uses this to build charts)
- */
-router.get("/today/:userId", async (req, res) => {
-  try {
+router.get(
+  "/today/:userId",
+  asyncHandler(async (req, res) => {
     const userId = req.params.userId;
 
-    // fetch ALL today's rows for this user
-    const today = new Date().toISOString().split("T")[0];
     const rows = await Progress.findAll({
-      where: { user_id: userId, progress_date: today },
-      // include: [{ model: Habit }], // optional
+      where: { user_id: userId, progress_date: todayIso() },
       order: [["id", "ASC"]],
     });
 
     res.json(rows);
-  } catch (err) {
-    console.error("❌ /today error:", err);
-    res.status(500).json({ error: "Failed to fetch progress" });
-  }
-});
+  })
+);
 
-/* (Optional) keep the old "done" route if you still use it elsewhere */
-router.post("/:habitId/done", async (req, res) => {
-  try {
+router.post(
+  "/:habitId/done",
+  asyncHandler(async (req, res) => {
     const { userId } = req.body;
     const { habitId } = req.params;
 
@@ -162,14 +147,142 @@ router.post("/:habitId/done", async (req, res) => {
       user_id: userId,
       habit_id: habitId,
       status: "done",
-      progress_date: new Date(),
+      progress_date: todayIso(),
     });
 
     res.json({ message: "✅ Habit logged as done", progress });
-  } catch (err) {
-    console.error("❌ Mark done error:", err);
-    res.status(500).json({ error: "Failed to log progress" });
+  })
+);
+
+router.get(
+  "/:habitId/summary",
+  asyncHandler(async (req, res) => {
+    const { habitId } = req.params;
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    const totals = await Progress.findAll({
+      where: { habit_id: habitId, user_id: userId, status: { [Op.in]: ["done", "missed"] } },
+      attributes: ["status", [Progress.sequelize.fn("COUNT", Progress.sequelize.col("id")), "count"]],
+      group: ["status"],
+      order: [["status", "ASC"]],
+    });
+
+    const base = { done: 0, missed: 0 };
+    totals.forEach((row) => {
+      base[row.status] = Number(row.get("count"));
+    });
+    const total = base.done + base.missed;
+    const successRate = total > 0 ? Math.round((base.done / total) * 100) : null;
+
+    const lastEntry = await Progress.findOne({
+      where: { habit_id: habitId, user_id: userId },
+      order: [["progress_date", "DESC"], ["created_at", "DESC"]],
+      attributes: ["progress_date"],
+    });
+
+    res.json({
+      totals: base,
+      successRate,
+      lastEntryDate: lastEntry?.progress_date ?? null,
+    });
+  })
+);
+
+const buildDateStatusMap = (rows) => {
+  return rows.reduce((acc, row) => {
+    const date = row.progress_date;
+    if (!acc[date]) {
+      acc[date] = { done: 0, missed: 0 };
+    }
+    if (row.status === "done") acc[date].done += 1;
+    if (row.status === "missed") acc[date].missed += 1;
+    return acc;
+  }, {});
+};
+
+const computeStreaks = (dateStatusMap) => {
+  const today = todayIso();
+  const dates = Object.keys(dateStatusMap).sort((a, b) => (a < b ? 1 : -1));
+
+  let currentStreak = 0;
+  let longestStreak = 0;
+  let pointer = today;
+
+  // Build a set for quick lookup
+  const hasDate = new Set(dates);
+
+  while (hasDate.has(pointer)) {
+    const status = dateStatusMap[pointer];
+    if (status.done > 0) {
+      currentStreak += 1;
+      longestStreak = Math.max(longestStreak, currentStreak);
+    } else {
+      break;
+    }
+
+    const prev = new Date(pointer);
+    prev.setDate(prev.getDate() - 1);
+    pointer = prev.toISOString().split("T")[0];
   }
-});
+
+  // Longest streak across all recorded dates
+  let tempStreak = 0;
+  const ordered = Object.keys(dateStatusMap).sort();
+  ordered.forEach((d, idx) => {
+    const status = dateStatusMap[d];
+    if (status.done > 0) {
+      tempStreak += 1;
+      longestStreak = Math.max(longestStreak, tempStreak);
+    } else {
+      tempStreak = 0;
+    }
+
+    const next = ordered[idx + 1];
+    if (next) {
+      const currDate = new Date(d);
+      currDate.setDate(currDate.getDate() + 1);
+      const expected = currDate.toISOString().split("T")[0];
+      if (expected !== next) {
+        tempStreak = 0;
+      }
+    }
+  });
+
+  return { currentStreak, longestStreak };
+};
+
+router.get(
+  "/:habitId/streak",
+  asyncHandler(async (req, res) => {
+    const { habitId } = req.params;
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    const rows = await Progress.findAll({
+      where: {
+        habit_id: habitId,
+        user_id: userId,
+        status: { [Op.in]: ["done", "missed"] },
+      },
+      attributes: ["progress_date", "status"],
+      order: [["progress_date", "DESC"], ["created_at", "DESC"]],
+    });
+
+    const dateStatusMap = buildDateStatusMap(rows);
+    const streaks = computeStreaks(dateStatusMap);
+
+    res.json({
+      ...streaks,
+      lastUpdated: rows[0]?.progress_date ?? null,
+    });
+  })
+);
 
 export default router;
