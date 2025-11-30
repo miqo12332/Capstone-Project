@@ -6,10 +6,8 @@ import {
   cilBell,
   cilCalendar,
   cilContact,
-  cilGraph,
   cilInfo,
   cilGroup,
-  cilLightbulb,
   cilList,
   cilLockLocked,
   cilSettings,
@@ -18,7 +16,6 @@ import {
   cilSync,
   cilUser,
   cilUserPlus,
-  cilChatBubble,
 } from "@coreui/icons"
 
 const _nav = [
@@ -64,27 +61,9 @@ const _nav = [
   },
   {
     component: CNavItem,
-    name: 'Friends',
-    to: '/friends',
-    icon: <CIcon icon={cilUser} customClassName="nav-icon" />,
-  },
-  {
-    component: CNavItem,
-    name: 'Messages',
-    to: '/messages',
-    icon: <CIcon icon={cilChatBubble} customClassName="nav-icon" />,
-  },
-  {
-    component: CNavItem,
-    name: 'Leaderboard',
-    to: '/leaderboard',
+    name: 'Community',
+    to: '/community',
     icon: <CIcon icon={cilGroup} customClassName="nav-icon" />,
-  },
-  {
-    component: CNavItem,
-    name: 'Group Challenges',
-    to: '/group-challenges',
-    icon: <CIcon icon={cilLightbulb} customClassName="nav-icon" />,
   },
 
   {

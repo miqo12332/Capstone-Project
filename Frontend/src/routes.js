@@ -19,10 +19,7 @@ const Preferences = React.lazy(() => import("./views/profile/Preferences"));
 const Settings = React.lazy(() => import("./views/profile/Settings"));
 
 // ===== Community =====
-const Friends = React.lazy(() => import("./views/community/Friends"));
-const Messages = React.lazy(() => import("./views/community/Messages"));
-const GroupChallenges = React.lazy(() => import("./views/community/GroupChallenges"));
-const Leaderboard = React.lazy(() => import("./views/community/Leaderboard"));
+const Community = React.lazy(() => import("./views/community/Community"));
 
 // ===== Sync =====
 const FitnessSync = React.lazy(() => import("./views/sync/FitnessSync"));
@@ -57,10 +54,11 @@ const routes = [
   { path: "/preferences", name: "Preferences", element: Preferences },
 
   // ===== Community =====
-  { path: "/friends", name: "Friends", element: Friends },
-  { path: "/messages", name: "Messages", element: Messages },
-  { path: "/leaderboard", name: "Leaderboard", element: Leaderboard },
-  { path: "/group-challenges", name: "Group Challenges", element: GroupChallenges },
+  { path: "/community", name: "Community", element: Community },
+  { path: "/friends", name: "Community", element: Community },
+  { path: "/messages", name: "Community", element: Community },
+  { path: "/leaderboard", name: "Community", element: Community },
+  { path: "/group-challenges", name: "Community", element: Community },
 
   // ===== Sync =====
   { path: "/calendar-sync", name: "Planner", element: Planner },
