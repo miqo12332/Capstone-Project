@@ -75,6 +75,26 @@ const startServer = async () => {
     await sequelize.authenticate();
     console.log("✅ Database connection established successfully.");
 
+    // Clean up legacy data that can violate new foreign key constraints when
+    // `sequelize.sync({ alter: true })` attempts to add them. Without this, an
+    // orphaned record in `user_settings` (left over from older schemas) causes
+    // Postgres to reject the migration with `SequelizeForeignKeyConstraintError`.
+    const queryInterface = sequelize.getQueryInterface();
+    const tables = await queryInterface.showAllTables();
+    const tableNames = tables.map((table) =>
+      typeof table === "string" ? table : table.tableName || table.table_name
+    );
+    const hasUsersTable = tableNames.includes("users");
+    const hasUserSettingsTable = tableNames.includes("user_settings");
+
+    if (hasUsersTable && hasUserSettingsTable) {
+      await sequelize.query(`
+        DELETE FROM user_settings
+        WHERE user_id IS NOT NULL
+        AND user_id NOT IN (SELECT id FROM users);
+      `);
+    }
+
     // Ensure any new columns or tables introduced in the models are available
     // without requiring a manual migration step. This keeps features such as
     // user profile preferences in sync across environments where the schema
