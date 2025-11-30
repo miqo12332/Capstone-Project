@@ -19,15 +19,19 @@ import {
   CRow,
   CSpinner,
 } from "@coreui/react";
+import { useNavigate } from "react-router-dom";
 import {
   Area,
   AreaChart,
   CartesianGrid,
+  ComposedChart,
   Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
+  Bar,
+  Line,
 } from "recharts";
 import { getHabits } from "../../services/habits";
 import { getSchedules } from "../../services/schedules";
@@ -51,6 +55,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [editingHabitId, setEditingHabitId] = useState(null);
   const [editCounts, setEditCounts] = useState({ done: 0, missed: 0 });
+  const navigate = useNavigate();
 
   const user = useMemo(
     () => JSON.parse(localStorage.getItem("user") || "{}"),
@@ -174,6 +179,21 @@ const Dashboard = () => {
     [analytics]
   );
 
+  const weeklyTrend = useMemo(() => {
+    let streak = 0;
+    return trend.slice(-7).map((day) => {
+      const completed = Number(day.completed) || 0;
+      const missed = Number(day.missed) || 0;
+      const total = completed + missed;
+      streak = missed > 0 ? 0 : total > 0 ? streak + 1 : streak;
+      return {
+        ...day,
+        completionRate: total ? Math.round((completed / total) * 100) : 0,
+        runningStreak: streak,
+      };
+    });
+  }, [trend]);
+
   const upcomingPlans = useMemo(() => {
     const schedulePlans = schedules
       .map((schedule) => {
@@ -295,8 +315,50 @@ const Dashboard = () => {
     });
   };
 
+  const dailyTips = [
+    "Stack a new habit onto an existing routine to make it effortless.",
+    "Micro-wins beat big streaks—aim for a two-minute start today.",
+    "Protect your energy: schedule focus habits next to light tasks.",
+    "Use a calendar reminder to close the loop on one habit today.",
+    "Visual cues work—place what you need for your next habit in sight.",
+    "Review your toughest habit and plan a backup time slot now.",
+    "Reward consistency, not perfection—celebrate showing up today.",
+  ];
+
+  const todayTip = useMemo(() => {
+    const index = new Date().getDay();
+    return dailyTips[index % dailyTips.length];
+  }, []);
+
+  const allCaughtUp = useMemo(() => {
+    const allCompleted =
+      habits.length > 0 &&
+      habits.every((habit) => {
+        const counts = todayCounts[habit.id] ?? { done: 0, missed: 0 };
+        return counts.missed === 0 && counts.done > 0;
+      });
+    return allCompleted && overallToday.missed === 0 && upcomingPlans.length === 0;
+  }, [habits, overallToday.missed, todayCounts, upcomingPlans]);
+
+  const quickActions = [
+    { label: "Add Habit", icon: "➕", path: "/addhabit" },
+    { label: "Add Schedule", icon: "📅", path: "/schedules" },
+    { label: "Log Progress", icon: "📝", path: "/progress-tracker" },
+  ];
+
+  const streakSnapshot = analytics?.summary?.streakLeader?.streak;
+
+  const nextUp = upcomingPlans[0];
+
   return (
     <div className="mt-4">
+      <style>{`
+        @keyframes pulseGlow {
+          0% { box-shadow: 0 0 0 0 rgba(46, 184, 92, 0.35); }
+          70% { box-shadow: 0 0 0 18px rgba(46, 184, 92, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(46, 184, 92, 0); }
+        }
+      `}</style>
       <h2 className="mb-4">Today at a Glance</h2>
 
       {loading && (
@@ -345,6 +407,85 @@ const Dashboard = () => {
                   ? analytics.summary.streakLeader.habitName
                   : analyticsError || "Build momentum to unlock streak insights"
               )}
+            </CCol>
+          </CRow>
+
+          <CRow className="g-4 mb-4">
+            <CCol xs={12} lg={5}>
+              <CCard className="h-100">
+                <CCardHeader className="fw-semibold">Quick actions</CCardHeader>
+                <CCardBody>
+                  <div className="d-flex flex-wrap gap-2">
+                    {quickActions.map((action) => (
+                      <CButton
+                        key={action.path}
+                        color="primary"
+                        variant="outline"
+                        onClick={() => navigate(action.path)}
+                      >
+                        <span className="me-2">{action.icon}</span>
+                        {action.label}
+                      </CButton>
+                    ))}
+                  </div>
+                </CCardBody>
+              </CCard>
+            </CCol>
+            <CCol xs={12} lg={4}>
+              <CCard className="h-100">
+                <CCardHeader className="fw-semibold">Next up today</CCardHeader>
+                <CCardBody>
+                  {nextUp ? (
+                    <div className="d-flex flex-column gap-1">
+                      <div className="fw-semibold">{nextUp.title}</div>
+                      <div className="text-body-secondary small">
+                        {formatDateTime(nextUp.startDate)}
+                        {nextUp.endDate ? ` – ${nextUp.endDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}
+                        {nextUp.type === "calendar" && nextUp.provider
+                          ? ` · ${nextUp.provider}`
+                          : nextUp.type === "timeblock" && nextUp.repeat
+                            ? ` · ${nextUp.repeat}`
+                            : ""}
+                      </div>
+                      {nextUp.notes && (
+                        <div className="small text-body-secondary">{nextUp.notes}</div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-body-secondary">
+                      No events or habits scheduled. Use Quick actions to add one.
+                    </div>
+                  )}
+                </CCardBody>
+              </CCard>
+            </CCol>
+            <CCol xs={12} lg={3}>
+              <CCard className="h-100">
+                <CCardHeader className="fw-semibold">Momentum snapshot</CCardHeader>
+                <CCardBody>
+                  <div className="d-flex align-items-center justify-content-between mb-2">
+                    <div>
+                      <div className="text-body-secondary small">Completion today</div>
+                      <div className="display-6">{overallToday.completionRate}%</div>
+                    </div>
+                    <CBadge color={overallToday.completionRate >= 80 ? "success" : "warning"}>
+                      {overallToday.done} done
+                    </CBadge>
+                  </div>
+                  <CProgress height={10} className="mb-3">
+                    <CProgressBar
+                      color="success"
+                      value={overallToday.completionRate}
+                      aria-label="Today's completion"
+                    />
+                  </CProgress>
+                  <div className="small text-body-secondary">
+                    {streakSnapshot?.current
+                      ? `Current streak: ${streakSnapshot.current} days · Best: ${streakSnapshot.best} days`
+                      : "Build a streak by logging two days in a row."}
+                  </div>
+                </CCardBody>
+              </CCard>
             </CCol>
           </CRow>
 
@@ -533,6 +674,107 @@ const Dashboard = () => {
                 </CCardBody>
               </CCard>
             </CCol>
+
+            <CCol xs={12} lg={5}>
+              <CCard className="h-100">
+                <CCardHeader className="fw-semibold">
+                  Weekly streak & completion
+                </CCardHeader>
+                <CCardBody style={{ height: 280 }}>
+                  {weeklyTrend.length ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={weeklyTrend}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis yAxisId="left" domain={[0, 100]} />
+                        <YAxis yAxisId="right" orientation="right" allowDecimals={false} />
+                        <Tooltip />
+                        <Legend />
+                        <Bar
+                          yAxisId="left"
+                          dataKey="completionRate"
+                          name="Completion %"
+                          fill="#39f"
+                          radius={[6, 6, 0, 0]}
+                        />
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="runningStreak"
+                          name="Running streak"
+                          stroke="#2eb85c"
+                          strokeWidth={3}
+                          dot={false}
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="text-body-secondary text-center my-5">
+                      Complete check-ins this week to unlock your streak graph.
+                    </div>
+                  )}
+                </CCardBody>
+              </CCard>
+            </CCol>
+          </CRow>
+
+          <CRow className="g-4 mb-4">
+            <CCol xs={12} lg={7}>
+              <CCard className="h-100">
+                <CCardHeader className="fw-semibold">Daily AI Tip</CCardHeader>
+                <CCardBody>
+                  <div className="d-flex align-items-center gap-3">
+                    <div
+                      style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: "50%",
+                        background: "linear-gradient(135deg, #321fdb, #39f)",
+                        display: "grid",
+                        placeItems: "center",
+                        color: "white",
+                        fontSize: 24,
+                        boxShadow: "0 10px 30px rgba(50, 31, 219, 0.25)",
+                      }}
+                    >
+                      💡
+                    </div>
+                    <div>
+                      <div className="fw-semibold mb-1">One-sentence boost</div>
+                      <div className="text-body-secondary">{todayTip}</div>
+                    </div>
+                  </div>
+                </CCardBody>
+              </CCard>
+            </CCol>
+            {allCaughtUp && (
+              <CCol xs={12} lg={5}>
+                <CCard className="h-100 text-center">
+                  <CCardHeader className="fw-semibold">All caught up</CCardHeader>
+                  <CCardBody className="d-flex flex-column align-items-center gap-3">
+                    <div
+                      style={{
+                        width: 96,
+                        height: 96,
+                        borderRadius: "50%",
+                        background: "linear-gradient(135deg, #2eb85c, #7dd56f)",
+                        display: "grid",
+                        placeItems: "center",
+                        color: "white",
+                        fontSize: 36,
+                        animation: "pulseGlow 1.6s ease-in-out infinite",
+                      }}
+                    >
+                      ✅
+                    </div>
+                    <div className="fw-semibold">Great job!</div>
+                    <div className="text-body-secondary">
+                      You've logged everything for today and have no upcoming events.
+                    </div>
+                  </CCardBody>
+                </CCard>
+              </CCol>
+            )}
           </CRow>
 
           <CRow className="g-4">
