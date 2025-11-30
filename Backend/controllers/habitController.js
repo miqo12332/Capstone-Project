@@ -33,6 +33,36 @@ export const createHabit = async (req, res, next) => {
   }
 };
 
+export const updateHabit = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const habit = await Habit.findByPk(id);
+
+    if (!habit) {
+      return res.status(404).json({ error: "Habit not found" });
+    }
+
+    const updates = (({
+      title,
+      description,
+      category,
+      target_reps,
+      is_daily_goal,
+    }) => ({ title, description, category, target_reps, is_daily_goal }))(req.body);
+
+    Object.entries(updates).forEach(([key, value]) => {
+      if (typeof value !== "undefined") {
+        habit[key] = value;
+      }
+    });
+
+    await habit.save();
+    res.json(habit);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const removeHabit = async (req, res, next) => {
   try {
     const { id } = req.params;

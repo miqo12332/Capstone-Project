@@ -8,18 +8,11 @@ const Profile = React.lazy(() => import("./views/auth/Profile"));
 
 // ===== Dashboard & Habits =====
 const Dashboard = React.lazy(() => import("./views/dashboard/Dashboard"));
-const AddHabit = React.lazy(() => import("./views/dashboard/AddHabit"));
-const HabitLibrary = React.lazy(() => import("./views/dashboard/HabitLibrary"));
+const Habits = React.lazy(() => import("./views/dashboard/Habits"));
 const Notifications = React.lazy(() => import("./views/dashboard/Notifications"));
-const ProgressTracker = React.lazy(() => import("./views/dashboard/ProgressTracker"));
 const ReportsAnalytics = React.lazy(() => import("./views/dashboard/ReportsAnalytics"));
 const Schedules = React.lazy(() => import("./views/dashboard/Schedules"));
-const DailyChallenge = React.lazy(() => import("./views/dashboard/DailyChallenge"));
 const SmartScheduler = React.lazy(() => import("./views/dashboard/SmartScheduler"));
-const HabitCoach = React.lazy(() => import("./views/dashboard/HabitCoach"));
-
-// ===== My Routine =====
-const MyRoutine = React.lazy(() => import("./views/pages/MyRoutine"));
 
 // ===== Profile =====
 const UserProfile = React.lazy(() => import("./views/profile/UserProfile"));
@@ -45,18 +38,19 @@ const routes = [
   // ===== Dashboard =====
   { path: "/", name: "Home", element: Dashboard },
   { path: "/dashboard", name: "Dashboard", element: Dashboard },
-  { path: "/addhabit", name: "Add Habit", element: AddHabit },
-  { path: "/habit-library", name: "Habit Library", element: HabitLibrary },
+  { path: "/habits", name: "Habits", element: Habits },
+  { path: "/addhabit", name: "Habits", element: Habits },
+  { path: "/habit-library", name: "Habits", element: Habits },
   { path: "/notifications", name: "Notifications", element: Notifications },
-  { path: "/progress-tracker", name: "Progress Tracker", element: ProgressTracker },
   { path: "/reportsanalytics", name: "Reports & Analytics", element: ReportsAnalytics },
   { path: "/schedules", name: "Schedules", element: Schedules },
-  { path: "/dailychallenge", name: "Daily Challenge", element: DailyChallenge },
   { path: "/smart-scheduler", name: "Smart Scheduler", element: SmartScheduler },
-  { path: "/habit-coach", name: "Habit Coach", element: HabitCoach },
+  { path: "/progress-tracker", name: "Habits", element: Habits },
+  { path: "/dailychallenge", name: "Habits", element: Habits },
+  { path: "/habit-coach", name: "Habits", element: Habits },
 
-  // ===== My Routine =====
-  { path: "/myroutine", name: "My Routine", element: MyRoutine },
+  // ===== My Routine (rerouted) =====
+  { path: "/myroutine", name: "Habits", element: Habits },
 
   // ===== Profile =====
   { path: "/profile", name: "User Profile", element: UserProfile },
