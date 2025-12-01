@@ -20,13 +20,28 @@ export const getHabitsByUser = async (req, res, next) => {
 
 export const createHabit = async (req, res, next) => {
   try {
-    const { title, user_id } = req.body;
+    const title = req.body.title?.trim() || req.body.name?.trim();
+    const { user_id } = req.body;
 
     if (!title || !user_id) {
       return res.status(400).json({ error: "title and user_id are required" });
     }
 
-    const habit = await Habit.create(req.body);
+    const payload = {
+      title,
+      user_id,
+      description: req.body.description?.trim() || null,
+      category: req.body.category?.trim() || null,
+      target_reps:
+        typeof req.body.target_reps === "number"
+          ? req.body.target_reps
+          : req.body.target_reps
+          ? Number(req.body.target_reps)
+          : null,
+      is_daily_goal: Boolean(req.body.is_daily_goal),
+    };
+
+    const habit = await Habit.create(payload);
     res.status(201).json(habit);
   } catch (error) {
     next(error);

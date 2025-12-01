@@ -35,6 +35,8 @@ CREATE TABLE habits (
     title VARCHAR(100) NOT NULL,
     description TEXT,
     category VARCHAR(50),
+    target_reps INT,
+    is_daily_goal BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
