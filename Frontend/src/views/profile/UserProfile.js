@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useMemo, useRef, useState } from "react"
 import {
   CAlert,
   CAvatar,
+  CBadge,
   CButton,
   CCard,
   CCardBody,
@@ -26,13 +27,17 @@ import {
 import CIcon from "@coreui/icons-react"
 import {
   cilBell,
+  cilCalendar,
+  cilCheckCircle,
   cilCloudUpload,
   cilContact,
   cilInfo,
   cilLifeRing,
   cilLink,
   cilLockLocked,
+  cilMoodGood,
   cilSettings,
+  cilSpeedometer,
   cilStar,
   cilUser,
 } from "@coreui/icons"
@@ -175,6 +180,25 @@ const UserProfile = () => {
     return Math.round((filled / pieces.length) * 100)
   }, [profile, preferences])
 
+  const achievementsSummary = useMemo(
+    () => ({
+      totalHabits: habits.length,
+      streak: analytics?.streak ?? analytics?.longestStreak ?? 0,
+      badges: analytics?.badges || analytics?.milestones || [],
+    }),
+    [habits.length, analytics]
+  )
+
+  const badgeNames = useMemo(() => {
+    return (achievementsSummary.badges || []).map((badge, index) => {
+      if (typeof badge === "string") return badge
+      if (typeof badge === "object" && badge !== null) {
+        return badge.name || badge.title || `Badge ${index + 1}`
+      }
+      return `Badge ${index + 1}`
+    })
+  }, [achievementsSummary.badges])
+
   const handleAvatarChange = async (event) => {
     const file = event.target.files?.[0]
     if (!file || !user?.id) return
@@ -258,26 +282,24 @@ const UserProfile = () => {
     setStatus("Password reset instructions will be sent to your email.")
   }
 
-  const achievementsSummary = useMemo(
-    () => ({
-      totalHabits: habits.length,
-      streak: analytics?.streak ?? analytics?.longestStreak ?? 0,
-      badges: analytics?.badges || analytics?.milestones || [],
-    }),
-    [habits.length, analytics]
-  )
-
   const renderAccountTab = () => (
     <CRow className="g-4">
       <CCol md={4}>
-        <CCard className="h-100 shadow-sm border-0">
-          <CCardHeader className="bg-white border-0">
-            <h5 className="mb-1">Avatar</h5>
-            <small className="text-body-secondary">Keep your profile recognizable across the app.</small>
+        <CCard className="h-100 glass-panel border-0">
+          <CCardHeader className="bg-transparent border-0">
+            <div className="d-flex justify-content-between align-items-start">
+              <div>
+                <h5 className="mb-1">Avatar</h5>
+                <small className="text-body-secondary">
+                  Keep your profile recognizable across the app.
+                </small>
+              </div>
+              <CBadge color="light" textColor="dark" className="rounded-pill">{completionScore}%</CBadge>
+            </div>
           </CCardHeader>
           <CCardBody className="text-center">
-            <CAvatar src={avatarUrl} size="xl" className="mb-3" />
-            <div className="text-body-secondary small mb-3">Completion {completionScore}%</div>
+            <CAvatar src={avatarUrl} size="xl" className="mb-3 shadow-sm" />
+            <div className="text-body-secondary small mb-3">Freshen your look with a quick upload.</div>
             <CProgress thin className="mb-3">
               <CProgressBar color="primary" value={completionScore} />
             </CProgress>
@@ -302,8 +324,8 @@ const UserProfile = () => {
         </CCard>
       </CCol>
       <CCol md={8}>
-        <CCard className="h-100 shadow-sm border-0">
-          <CCardHeader className="bg-white border-0 d-flex justify-content-between align-items-center">
+        <CCard className="h-100 glass-panel border-0">
+          <CCardHeader className="bg-transparent border-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
               <h5 className="mb-1">Account</h5>
               <small className="text-body-secondary">
@@ -315,6 +337,10 @@ const UserProfile = () => {
             </CButton>
           </CCardHeader>
           <CCardBody>
+            <CAlert color="info" className="soft-alert">
+              <CIcon icon={cilCheckCircle} className="me-2" /> Fill the highlighted fields to unlock your best
+              recommendations.
+            </CAlert>
             <CRow className="g-3">
               <CCol md={6}>
                 <CFormLabel className="fw-semibold">Full name</CFormLabel>
@@ -324,6 +350,7 @@ const UserProfile = () => {
                   placeholder="How should we address you?"
                   required
                 />
+                <small className="text-body-secondary">Use your preferred display name.</small>
               </CCol>
               <CCol md={6}>
                 <CFormLabel className="fw-semibold">Email</CFormLabel>
@@ -334,6 +361,7 @@ const UserProfile = () => {
                   placeholder="your@email.com"
                   required
                 />
+                <small className="text-body-secondary">We only use this for account security.</small>
               </CCol>
               <CCol md={6}>
                 <CFormLabel className="fw-semibold">Gender</CFormLabel>
@@ -347,6 +375,7 @@ const UserProfile = () => {
                   <option value="non-binary">Non-binary</option>
                   <option value="prefer_not_to_say">Prefer not to say</option>
                 </CFormSelect>
+                <small className="text-body-secondary">Optional, helps us tailor insights.</small>
               </CCol>
             </CRow>
           </CCardBody>
@@ -356,8 +385,8 @@ const UserProfile = () => {
   )
 
   const renderPreferencesTab = () => (
-    <CCard className="shadow-sm border-0">
-      <CCardHeader className="bg-white border-0">
+    <CCard className="glass-panel border-0">
+      <CCardHeader className="bg-transparent border-0">
         <h5 className="mb-1">Preferences</h5>
         <small className="text-body-secondary">Shape how StepHabit feels and sounds.</small>
       </CCardHeader>
@@ -373,6 +402,7 @@ const UserProfile = () => {
               <option value="dark">Dark</option>
               <option value="system">Match system</option>
             </CFormSelect>
+            <small className="text-body-secondary">Switch between light, dark, or your device default.</small>
           </CCol>
           <CCol md={4}>
             <CFormLabel className="fw-semibold">AI tone</CFormLabel>
@@ -384,6 +414,7 @@ const UserProfile = () => {
               <option value="gentle">Gentle encourager</option>
               <option value="direct">Direct accountability</option>
             </CFormSelect>
+            <small className="text-body-secondary">Choose the voice that feels right for your routines.</small>
           </CCol>
           <CCol md={4}>
             <CFormLabel className="fw-semibold">Support style</CFormLabel>
@@ -397,6 +428,7 @@ const UserProfile = () => {
               <option value="insights">Deep insights</option>
               <option value="nudges">Gentle nudges</option>
             </CFormSelect>
+            <small className="text-body-secondary">Fine-tune how we cheer you on.</small>
           </CCol>
         </CRow>
       </CCardBody>
@@ -404,12 +436,16 @@ const UserProfile = () => {
   )
 
   const renderNotificationsTab = () => (
-    <CCard className="shadow-sm border-0">
-      <CCardHeader className="bg-white border-0">
+    <CCard className="glass-panel border-0">
+      <CCardHeader className="bg-transparent border-0">
         <h5 className="mb-1">Notifications</h5>
         <small className="text-body-secondary">Choose how you want to stay on track.</small>
       </CCardHeader>
       <CCardBody>
+        <CAlert color="light" className="soft-alert border-0">
+          <CIcon icon={cilBell} className="me-2 text-primary" /> Smart reminders are spaced to avoid notification
+          fatigue.
+        </CAlert>
         <CFormSwitch
           label="Email alerts for reminders and recaps"
           checked={notificationPrefs.emailAlerts}
@@ -430,8 +466,8 @@ const UserProfile = () => {
   )
 
   const renderConnectedAppsTab = () => (
-    <CCard className="shadow-sm border-0">
-      <CCardHeader className="bg-white border-0">
+    <CCard className="glass-panel border-0">
+      <CCardHeader className="bg-transparent border-0">
         <h5 className="mb-1">Connected Apps</h5>
         <small className="text-body-secondary">
           Sync calendars and fitness data so StepHabit can plan around your real life.
@@ -439,41 +475,56 @@ const UserProfile = () => {
       </CCardHeader>
       <CCardBody>
         <CListGroup flush>
-          <CListGroupItem className="d-flex justify-content-between align-items-center">
+          <CListGroupItem className="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
               <div className="fw-semibold">Google Calendar</div>
               <small className="text-body-secondary">Block time for routines alongside events.</small>
             </div>
-            <CFormSwitch
-              checked={connectedApps.googleCalendar}
-              onChange={(event) =>
-                setConnectedApps((prev) => ({ ...prev, googleCalendar: event.target.checked }))
-              }
-            />
+            <div className="d-flex align-items-center gap-2">
+              <CBadge color={connectedApps.googleCalendar ? "success" : "secondary"}>
+                {connectedApps.googleCalendar ? "Connected" : "Not connected"}
+              </CBadge>
+              <CFormSwitch
+                checked={connectedApps.googleCalendar}
+                onChange={(event) =>
+                  setConnectedApps((prev) => ({ ...prev, googleCalendar: event.target.checked }))
+                }
+              />
+            </div>
           </CListGroupItem>
-          <CListGroupItem className="d-flex justify-content-between align-items-center">
+          <CListGroupItem className="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
               <div className="fw-semibold">Apple Calendar</div>
               <small className="text-body-secondary">See habits next to your schedule.</small>
             </div>
-            <CFormSwitch
-              checked={connectedApps.appleCalendar}
-              onChange={(event) =>
-                setConnectedApps((prev) => ({ ...prev, appleCalendar: event.target.checked }))
-              }
-            />
+            <div className="d-flex align-items-center gap-2">
+              <CBadge color={connectedApps.appleCalendar ? "success" : "secondary"}>
+                {connectedApps.appleCalendar ? "Connected" : "Not connected"}
+              </CBadge>
+              <CFormSwitch
+                checked={connectedApps.appleCalendar}
+                onChange={(event) =>
+                  setConnectedApps((prev) => ({ ...prev, appleCalendar: event.target.checked }))
+                }
+              />
+            </div>
           </CListGroupItem>
-          <CListGroupItem className="d-flex justify-content-between align-items-center">
+          <CListGroupItem className="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
               <div className="fw-semibold">Fitness Sync</div>
               <small className="text-body-secondary">Import steps and workouts to fuel streaks.</small>
             </div>
-            <CFormSwitch
-              checked={connectedApps.fitnessSync}
-              onChange={(event) =>
-                setConnectedApps((prev) => ({ ...prev, fitnessSync: event.target.checked }))
-              }
-            />
+            <div className="d-flex align-items-center gap-2">
+              <CBadge color={connectedApps.fitnessSync ? "success" : "secondary"}>
+                {connectedApps.fitnessSync ? "Connected" : "Not connected"}
+              </CBadge>
+              <CFormSwitch
+                checked={connectedApps.fitnessSync}
+                onChange={(event) =>
+                  setConnectedApps((prev) => ({ ...prev, fitnessSync: event.target.checked }))
+                }
+              />
+            </div>
           </CListGroupItem>
         </CListGroup>
       </CCardBody>
@@ -483,11 +534,11 @@ const UserProfile = () => {
   const renderAchievementsTab = () => (
     <CRow className="g-4">
       <CCol md={4}>
-        <CCard className="shadow-sm border-0 h-100">
+        <CCard className="glass-panel border-0 h-100">
           <CCardBody>
             <div className="d-flex align-items-center mb-3">
-              <div className="rounded-circle bg-primary-subtle p-2 me-3">
-                <CIcon icon={cilStar} className="text-primary" />
+              <div className="icon-chip icon-chip-primary">
+                <CIcon icon={cilStar} />
               </div>
               <div>
                 <div className="fw-semibold">Badges</div>
@@ -495,16 +546,27 @@ const UserProfile = () => {
               </div>
             </div>
             <h2 className="fw-bold mb-1">{achievementsSummary.badges.length}</h2>
-            <div className="text-body-secondary small">Earned so far</div>
+            <div className="text-body-secondary small mb-3">Earned so far</div>
+            <CListGroup flush className="rounded-3 bg-body-tertiary">
+              {badgeNames.length ? (
+                badgeNames.slice(0, 3).map((badge, index) => (
+                  <CListGroupItem key={badge + index} className="border-0">
+                    <CIcon icon={cilCheckCircle} className="me-2 text-success" /> {badge}
+                  </CListGroupItem>
+                ))
+              ) : (
+                <CListGroupItem className="border-0 text-body-secondary">No badges yet—start a streak!</CListGroupItem>
+              )}
+            </CListGroup>
           </CCardBody>
         </CCard>
       </CCol>
       <CCol md={4}>
-        <CCard className="shadow-sm border-0 h-100">
+        <CCard className="glass-panel border-0 h-100">
           <CCardBody>
             <div className="d-flex align-items-center mb-3">
-              <div className="rounded-circle bg-success-subtle p-2 me-3">
-                <CIcon icon={cilSettings} className="text-success" />
+              <div className="icon-chip icon-chip-success">
+                <CIcon icon={cilSettings} />
               </div>
               <div>
                 <div className="fw-semibold">Active streak</div>
@@ -517,11 +579,11 @@ const UserProfile = () => {
         </CCard>
       </CCol>
       <CCol md={4}>
-        <CCard className="shadow-sm border-0 h-100">
+        <CCard className="glass-panel border-0 h-100">
           <CCardBody>
             <div className="d-flex align-items-center mb-3">
-              <div className="rounded-circle bg-warning-subtle p-2 me-3">
-                <CIcon icon={cilBell} className="text-warning" />
+              <div className="icon-chip icon-chip-warning">
+                <CIcon icon={cilBell} />
               </div>
               <div>
                 <div className="fw-semibold">Milestones</div>
@@ -539,29 +601,29 @@ const UserProfile = () => {
   const renderHelpTab = () => (
     <CRow className="g-4">
       <CCol md={4}>
-        <CCard className="shadow-sm border-0 h-100">
+        <CCard className="glass-panel border-0 h-100">
           <CCardBody>
             <div className="d-flex align-items-center mb-3">
-              <div className="rounded-circle bg-info-subtle p-2 me-3">
-                <CIcon icon={cilInfo} className="text-info" />
+              <div className="icon-chip icon-chip-info">
+                <CIcon icon={cilInfo} />
               </div>
               <div>
                 <div className="fw-semibold">About StepHabit</div>
                 <small className="text-body-secondary">Learn how the app keeps you on track.</small>
               </div>
             </div>
-            <CButton color="info" variant="outline" onClick={() => navigate("/dashboard")}> 
+            <CButton color="info" variant="outline" onClick={() => navigate("/dashboard")}>
               Explore the dashboard
             </CButton>
           </CCardBody>
         </CCard>
       </CCol>
       <CCol md={4}>
-        <CCard className="shadow-sm border-0 h-100">
+        <CCard className="glass-panel border-0 h-100">
           <CCardBody>
             <div className="d-flex align-items-center mb-3">
-              <div className="rounded-circle bg-primary-subtle p-2 me-3">
-                <CIcon icon={cilLifeRing} className="text-primary" />
+              <div className="icon-chip icon-chip-primary">
+                <CIcon icon={cilLifeRing} />
               </div>
               <div>
                 <div className="fw-semibold">Help Center</div>
@@ -573,11 +635,11 @@ const UserProfile = () => {
         </CCard>
       </CCol>
       <CCol md={4}>
-        <CCard className="shadow-sm border-0 h-100">
+        <CCard className="glass-panel border-0 h-100">
           <CCardBody>
             <div className="d-flex align-items-center mb-3">
-              <div className="rounded-circle bg-warning-subtle p-2 me-3">
-                <CIcon icon={cilContact} className="text-warning" />
+              <div className="icon-chip icon-chip-warning">
+                <CIcon icon={cilContact} />
               </div>
               <div>
                 <div className="fw-semibold">Contact</div>
@@ -628,70 +690,162 @@ const UserProfile = () => {
   }
 
   return (
-    <CContainer fluid className="py-4">
-      <div className="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
-        <div>
-          <div className="d-flex align-items-center gap-3 mb-2">
-            <CAvatar src={avatarUrl} size="lg" />
+    <CContainer fluid className="py-4 profile-page">
+      <div className="profile-hero glass-panel gradient-border mb-4">
+        <div className="d-flex align-items-start gap-3 flex-wrap">
+          <div className="d-flex align-items-center gap-3">
+            <div className="avatar-ring">
+              <CAvatar src={avatarUrl} size="lg" />
+            </div>
             <div>
-              <h2 className="fw-bold mb-0">Profile</h2>
-              <div className="text-body-secondary">One hub for account, preferences, and support.</div>
+              <p className="eyebrow text-uppercase mb-1">Profile control center</p>
+              <h2 className="fw-bold mb-1">Hey {profile.name || "there"}, keep your space fresh</h2>
+              <div className="text-body-secondary">One curated place for account, preferences, and support.</div>
+              <div className="d-flex align-items-center gap-2 flex-wrap mt-2">
+                <CBadge color="primary" shape="rounded-pill" className="soft-badge">
+                  <CIcon icon={cilCheckCircle} className="me-1" /> Profile score {completionScore}%
+                </CBadge>
+                <CBadge color="success" shape="rounded-pill" className="soft-badge">
+                  <CIcon icon={cilMoodGood} className="me-1" /> Mindful coaching: {preferences.aiTone}
+                </CBadge>
+                {status && (
+                  <CBadge color="info" shape="rounded-pill" className="soft-badge">
+                    <CIcon icon={cilLink} className="me-1" /> {status}
+                  </CBadge>
+                )}
+                {error && (
+                  <CBadge color="danger" shape="rounded-pill" className="soft-badge">
+                    <CIcon icon={cilLink} className="me-1" /> {error}
+                  </CBadge>
+                )}
+              </div>
             </div>
           </div>
-          {status && (
-            <CAlert color="success" className="py-2 px-3 mb-0 d-inline-flex align-items-center">
-              <CIcon icon={cilLink} className="me-2" /> {status}
-            </CAlert>
-          )}
-          {error && (
-            <CAlert color="danger" className="py-2 px-3 mb-0 d-inline-flex align-items-center">
-              <CIcon icon={cilLink} className="me-2" /> {error}
-            </CAlert>
-          )}
+          <div className="ms-auto d-flex gap-2 flex-wrap">
+            <CButton color="secondary" variant="outline" onClick={() => setActiveTab("preferences")}>
+              <CIcon icon={cilSpeedometer} className="me-2" /> Fine-tune experience
+            </CButton>
+            <CButton color="primary" size="lg" onClick={handleSave} disabled={saving}>
+              {saving ? <CSpinner size="sm" className="me-2" /> : <CIcon icon={cilSettings} className="me-2" />}
+              {saving ? "Saving" : "Save changes"}
+            </CButton>
+          </div>
         </div>
-        <CButton color="primary" size="lg" onClick={handleSave} disabled={saving}>
-          {saving ? <CSpinner size="sm" className="me-2" /> : <CIcon icon={cilSettings} className="me-2" />}
-          {saving ? "Saving" : "Save changes"}
-        </CButton>
+        <div className="mt-3">
+          <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <div className="flex-grow-1">
+              <div className="d-flex justify-content-between align-items-center mb-1">
+                <span className="fw-semibold">Progress to a complete profile</span>
+                <span className="text-body-secondary small">{completionScore}% ready</span>
+              </div>
+              <CProgress className="profile-progress" color="info" value={completionScore} animated>
+                <CProgressBar color="gradient" value={completionScore} />
+              </CProgress>
+            </div>
+            <CBadge color="light" textColor="dark" className="rounded-pill px-3 py-2">
+              <CIcon icon={cilCalendar} className="me-2" /> Synced habits: {habits.length}
+            </CBadge>
+          </div>
+        </div>
       </div>
 
-      <CNav variant="tabs" role="tablist" className="mb-4">
-        <CNavItem>
-          <CNavLink active={activeTab === "account"} onClick={() => setActiveTab("account")}>
-            <CIcon icon={cilUser} className="me-2" /> Account
-          </CNavLink>
-        </CNavItem>
-        <CNavItem>
-          <CNavLink active={activeTab === "preferences"} onClick={() => setActiveTab("preferences")}>
-            <CIcon icon={cilSettings} className="me-2" /> Preferences
-          </CNavLink>
-        </CNavItem>
-        <CNavItem>
-          <CNavLink active={activeTab === "notifications"} onClick={() => setActiveTab("notifications")}>
-            <CIcon icon={cilBell} className="me-2" /> Notifications
-          </CNavLink>
-        </CNavItem>
-        <CNavItem>
-          <CNavLink
-            active={activeTab === "connected-apps"}
-            onClick={() => setActiveTab("connected-apps")}
-          >
-            <CIcon icon={cilLink} className="me-2" /> Connected Apps
-          </CNavLink>
-        </CNavItem>
-        <CNavItem>
-          <CNavLink active={activeTab === "achievements"} onClick={() => setActiveTab("achievements")}>
-            <CIcon icon={cilStar} className="me-2" /> Achievements
-          </CNavLink>
-        </CNavItem>
-        <CNavItem>
-          <CNavLink active={activeTab === "help"} onClick={() => setActiveTab("help")}>
-            <CIcon icon={cilLifeRing} className="me-2" /> Help & Support
-          </CNavLink>
-        </CNavItem>
-      </CNav>
+      <CRow className="g-3 mb-4">
+        {[ 
+          {
+            label: "Profile completion",
+            value: `${completionScore}%`,
+            helper: "Fill in account & preferences",
+            color: "primary",
+            icon: cilCheckCircle,
+          },
+          {
+            label: "Habits tracked",
+            value: achievementsSummary.totalHabits,
+            helper: "Active routines across StepHabit",
+            color: "success",
+            icon: cilBell,
+          },
+          {
+            label: "Streak heat",
+            value: `${achievementsSummary.streak} days`,
+            helper: "Stay on your momentum",
+            color: "warning",
+            icon: cilStar,
+          },
+        ].map((card) => (
+          <CCol md={4} key={card.label}>
+            <CCard className="glass-panel h-100">
+              <CCardBody className="d-flex align-items-start gap-3">
+                <div className={`icon-chip icon-chip-${card.color}`}>
+                  <CIcon icon={card.icon} />
+                </div>
+                <div>
+                  <div className="text-body-secondary small fw-semibold text-uppercase">{card.label}</div>
+                  <h4 className="fw-bold mb-1">{card.value}</h4>
+                  <div className="text-body-secondary small">{card.helper}</div>
+                </div>
+              </CCardBody>
+            </CCard>
+          </CCol>
+        ))}
+      </CRow>
 
-      <CForm onSubmit={handleSave}>{renderTabContent()}</CForm>
+      <div className="glass-panel p-0 mb-3 profile-nav">
+        <CNav variant="pills" role="tablist" className="profile-nav__list">
+          <CNavItem>
+            <CNavLink
+              className="profile-tab"
+              active={activeTab === "account"}
+              onClick={() => setActiveTab("account")}
+            >
+              <CIcon icon={cilUser} className="me-2" /> Account
+            </CNavLink>
+          </CNavItem>
+          <CNavItem>
+            <CNavLink
+              className="profile-tab"
+              active={activeTab === "preferences"}
+              onClick={() => setActiveTab("preferences")}
+            >
+              <CIcon icon={cilSettings} className="me-2" /> Preferences
+            </CNavLink>
+          </CNavItem>
+          <CNavItem>
+            <CNavLink
+              className="profile-tab"
+              active={activeTab === "notifications"}
+              onClick={() => setActiveTab("notifications")}
+            >
+              <CIcon icon={cilBell} className="me-2" /> Notifications
+            </CNavLink>
+          </CNavItem>
+          <CNavItem>
+            <CNavLink
+              className="profile-tab"
+              active={activeTab === "connected-apps"}
+              onClick={() => setActiveTab("connected-apps")}
+            >
+              <CIcon icon={cilLink} className="me-2" /> Connected Apps
+            </CNavLink>
+          </CNavItem>
+          <CNavItem>
+            <CNavLink
+              className="profile-tab"
+              active={activeTab === "achievements"}
+              onClick={() => setActiveTab("achievements")}
+            >
+              <CIcon icon={cilStar} className="me-2" /> Achievements
+            </CNavLink>
+          </CNavItem>
+          <CNavItem>
+            <CNavLink className="profile-tab" active={activeTab === "help"} onClick={() => setActiveTab("help")}>
+              <CIcon icon={cilLifeRing} className="me-2" /> Help & Support
+            </CNavLink>
+          </CNavItem>
+        </CNav>
+      </div>
+
+      <CForm onSubmit={handleSave} className="profile-content">{renderTabContent()}</CForm>
     </CContainer>
   )
 }
