@@ -296,7 +296,7 @@ const ReportsAnalytics = () => {
                     </div>
 
                     {habit.productivity.length ? (
-                      <div style={{ height: 160 }} className="mb-3">
+                      <div style={{ height: 220 }} className="mb-3">
                         <ResponsiveContainer
                           width="100%"
                           height="100%"
