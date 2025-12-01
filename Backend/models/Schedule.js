@@ -9,7 +9,14 @@ const Schedule = sequelize.define(
 
     // your actual DB columns
     habit_id: { type: DataTypes.INTEGER, allowNull: true },
-    userid:   { type: DataTypes.INTEGER, allowNull: false },
+
+    // Align the attribute naming with the rest of the codebase while keeping
+    // compatibility with the existing `userid` column in the database.
+    user_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: "userid",
+    },
 
     day:       { type: DataTypes.DATEONLY, allowNull: false },
     starttime: { type: DataTypes.TIME, allowNull: false },

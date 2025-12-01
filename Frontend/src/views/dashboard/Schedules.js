@@ -93,7 +93,7 @@ const MySchedule = () => {
       }
 
       const payload = {
-        userid: user.id,
+        user_id: user.id,
         type: newSchedule.type,
         habit_id:
           newSchedule.type === "habit" && newSchedule.habit_id

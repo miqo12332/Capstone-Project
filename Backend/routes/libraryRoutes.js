@@ -237,7 +237,7 @@ router.post("/:userId/refresh", async (req, res) => {
 
     const schedules = await Schedule.findAll({
       where: {
-        userid: userId,
+        user_id: userId,
         day: {
           [Op.between]: [
             today.toISOString().slice(0, 10),

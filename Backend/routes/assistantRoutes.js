@@ -105,7 +105,7 @@ const buildUserSnapshot = async (userId) => {
       limit: 90,
     }),
     Schedule.findAll({
-      where: { userid: userId },
+      where: { user_id: userId },
       order: [
         ["day", "ASC"],
         ["starttime", "ASC"],

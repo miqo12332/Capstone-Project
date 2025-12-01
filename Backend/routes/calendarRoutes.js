@@ -34,7 +34,7 @@ const buildOverview = async (userId, rangeDays = 30) => {
       ],
     }),
     Schedule.findAll({
-      where: { userid: userId },
+      where: { user_id: userId },
       include: [
         {
           model: Habit,

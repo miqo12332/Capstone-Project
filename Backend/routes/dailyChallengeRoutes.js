@@ -191,7 +191,7 @@ router.get("/summary", async (req, res) => {
       }),
       Schedule.findAll({
         where: {
-          userid: userId,
+          user_id: userId,
           day: { [Op.between]: [todayISO, toISODate(horizon)] },
         },
         include: [

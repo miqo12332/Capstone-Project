@@ -227,7 +227,7 @@ router.get("/insights", async (req, res) => {
       }),
       Schedule.findAll({
         where: {
-          userid: userId,
+          user_id: userId,
           day: { [Op.between]: [startISO, endISO] },
         },
         include: [
@@ -371,7 +371,7 @@ router.post("/auto-plan", async (req, res) => {
 
     const existing = await Schedule.findOne({
       where: {
-        userid: userId,
+        user_id: userId,
         habit_id: habitId,
         day,
         starttime,
@@ -384,7 +384,7 @@ router.post("/auto-plan", async (req, res) => {
     }
 
     const created = await Schedule.create({
-      userid: userId,
+      user_id: userId,
       habit_id: habitId,
       day,
       starttime,

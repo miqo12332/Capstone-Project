@@ -9,7 +9,7 @@ const router = express.Router();
 router.get("/user/:userId", async (req, res) => {
   try {
     const schedules = await Schedule.findAll({
-      where: { userid: req.params.userId },
+      where: { user_id: req.params.userId },
       include: [
         {
           model: Habit,
@@ -32,7 +32,7 @@ router.post("/", async (req, res) => {
   try {
     const {
       habit_id,
-      userid,
+      user_id,
       day,
       starttime,
       endtime,
@@ -44,8 +44,8 @@ router.post("/", async (req, res) => {
       custom_title,
     } = req.body;
 
-    if (!userid || !day || !starttime) {
-      return res.status(400).json({ error: "userid, day and starttime are required" });
+    if (!user_id || !day || !starttime) {
+      return res.status(400).json({ error: "user_id, day and starttime are required" });
     }
 
     let resolvedHabitId = habit_id ? Number(habit_id) : null;
@@ -60,7 +60,7 @@ router.post("/", async (req, res) => {
         }
 
         const [habit] = await Habit.findOrCreate({
-          where: { user_id: userid, title },
+          where: { user_id, title },
           defaults: {
             description: notes || null,
             category: "custom",
@@ -75,7 +75,7 @@ router.post("/", async (req, res) => {
 
     const created = await Schedule.create({
       habit_id: resolvedHabitId,
-      userid,
+      user_id,
       day,
       starttime,
       endtime: endtime || null,
