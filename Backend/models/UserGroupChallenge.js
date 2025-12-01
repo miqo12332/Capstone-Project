@@ -7,6 +7,17 @@ const UserGroupChallenge = sequelize.define(
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
     user_id: { type: DataTypes.INTEGER, allowNull: false },
     challenge_id: { type: DataTypes.INTEGER, allowNull: false },
+    status: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: "accepted",
+    },
+    role: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: "participant",
+    },
+    invited_by: { type: DataTypes.INTEGER, allowNull: true },
     joined_at: {
       type: DataTypes.DATE,
       allowNull: false,
