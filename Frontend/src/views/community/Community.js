@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useContext, useEffect, useMemo, useState } from "react"
 import {
   CBadge,
   CNav,
@@ -10,6 +10,10 @@ import {
 import CIcon from "@coreui/icons-react"
 import { cilChatBubble, cilGroup, cilSpeedometer, cilUser } from "@coreui/icons"
 import { useLocation, useNavigate } from "react-router-dom"
+import { AuthContext } from "../../context/AuthContext"
+import { fetchFriends } from "../../services/friends"
+import { fetchThreads } from "../../services/messages"
+import { fetchChallenges } from "../../services/challenges"
 
 import Friends from "./Friends"
 import Messages from "./Messages"
@@ -36,9 +40,58 @@ const pathToTab = {
 const getTabFromPath = (pathname) => pathToTab[pathname?.replace(/\/$/, "")] || "friends"
 
 const Community = () => {
+  const { user } = useContext(AuthContext)
   const location = useLocation()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState(() => getTabFromPath(location.pathname))
+  const [friendTotal, setFriendTotal] = useState(0)
+  const [unreadMessages, setUnreadMessages] = useState(0)
+  const [joinedChallenges, setJoinedChallenges] = useState(0)
+
+  useEffect(() => {
+    if (!user?.id) {
+      setFriendTotal(0)
+      setUnreadMessages(0)
+      setJoinedChallenges(0)
+      return
+    }
+
+    const loadCounts = async () => {
+      try {
+        const [friends, threads, challenges] = await Promise.all([
+          fetchFriends(user.id),
+          fetchThreads(user.id),
+          fetchChallenges(),
+        ])
+
+        setFriendTotal(Array.isArray(friends) ? friends.length : 0)
+
+        const unreadCount = Array.isArray(threads)
+          ? threads.reduce((sum, thread) => sum + (Number(thread.unread) || 0), 0)
+          : 0
+        setUnreadMessages(unreadCount)
+
+        const joinedCount = Array.isArray(challenges)
+          ? challenges.reduce((count, challenge) => {
+              const membership = (challenge.participants || []).find(
+                (participant) => participant.id === user.id
+              )
+              const status = membership?.UserGroupChallenge?.status
+              const role = membership?.UserGroupChallenge?.role
+              return status === "accepted" || role === "creator" ? count + 1 : count
+            }, 0)
+          : 0
+        setJoinedChallenges(joinedCount)
+      } catch (error) {
+        console.error("Failed to load community counts", error)
+        setFriendTotal(0)
+        setUnreadMessages(0)
+        setJoinedChallenges(0)
+      }
+    }
+
+    loadCounts()
+  }, [user?.id])
 
   useEffect(() => {
     const tabFromPath = getTabFromPath(location.pathname)
@@ -91,11 +144,14 @@ const Community = () => {
     []
   )
 
+  const formatValue = (value) =>
+    typeof value === "number" && value > 999 ? `${(value / 1000).toFixed(1)}k` : value
+
   const heroStats = [
-    { label: "Friends", value: "120+", detail: "active connections" },
-    { label: "Messages", value: "3.2k", detail: "wins shared" },
-    { label: "Challenges", value: "28", detail: "group goals" },
-    { label: "Leaderboard", value: "Top 10", detail: "weekly update" },
+    { label: "Friends", value: formatValue(friendTotal), detail: "Your friends" },
+    { label: "Messages", value: formatValue(unreadMessages), detail: "Unread" },
+    { label: "Challenges", value: formatValue(joinedChallenges), detail: "Joined" },
+    { label: "Leaderboard", value: "", detail: "" },
   ]
 
   return (
