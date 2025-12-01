@@ -17,6 +17,15 @@ const GroupChallenge = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    creator_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    approval_required: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
     start_date: {
       type: DataTypes.DATEONLY,
       allowNull: false,
@@ -33,7 +42,7 @@ const GroupChallenge = sequelize.define(
   },
   {
     tableName: "group_challenges", // ✅ exact DB table name
-    timestamps: false,             // 🚫 no createdAt/updatedAt
+    timestamps: false, // 🚫 no createdAt/updatedAt
   }
 );
 

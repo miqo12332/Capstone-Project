@@ -68,6 +68,8 @@ GroupChallenge.belongsToMany(User, {
   otherKey: "user_id",
   as: "participants",
 });
+GroupChallenge.belongsTo(User, { foreignKey: "creator_id", as: "creator" });
+User.hasMany(GroupChallenge, { foreignKey: "creator_id", as: "createdChallenges" });
 
 // === Notifications ===
 User.hasMany(Notification, { foreignKey: "user_id", as: "notifications" });
