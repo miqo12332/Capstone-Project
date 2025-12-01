@@ -220,7 +220,12 @@ const SmartScheduler = () => {
           </CCardHeader>
           <CCardBody style={{ height: "320px" }}>
             {densityData.length ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                minWidth={200}
+                minHeight={200}
+              >
                 <BarChart data={densityData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="date" tick={{ fontSize: 12 }} />

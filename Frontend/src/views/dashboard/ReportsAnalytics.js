@@ -187,7 +187,12 @@ const ReportsAnalytics = () => {
                 </CCardHeader>
                 <CCardBody style={{ height: 320 }}>
                   {dailyTrend.length ? (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer
+                      width="100%"
+                      height="100%"
+                      minWidth={200}
+                      minHeight={200}
+                    >
                       <AreaChart data={dailyTrend}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="date" tickFormatter={formatDate} />
@@ -227,7 +232,12 @@ const ReportsAnalytics = () => {
                 </CCardHeader>
                 <CCardBody style={{ height: 320 }}>
                   {leaderboard.length ? (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer
+                      width="100%"
+                      height="100%"
+                      minWidth={200}
+                      minHeight={200}
+                    >
                       <BarChart data={leaderboard}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="habitName" hide />
@@ -286,8 +296,13 @@ const ReportsAnalytics = () => {
                     </div>
 
                     {habit.productivity.length ? (
-                      <div style={{ height: 160 }} className="mb-3">
-                        <ResponsiveContainer width="100%" height="100%">
+                      <div style={{ height: 220 }} className="mb-3">
+                        <ResponsiveContainer
+                          width="100%"
+                          height="100%"
+                          minWidth={200}
+                          minHeight={200}
+                        >
                           <LineChart data={habit.productivity}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="date" tickFormatter={formatDate} />

@@ -599,7 +599,7 @@ const UserProfile = () => {
   if (loading) {
     return (
       <div className="text-center py-5">
-        <CSpinner color="primary" size="lg" />
+        <CSpinner color="primary" />
         <p className="mt-3 text-body-secondary">Loading your profile…</p>
       </div>
     )
