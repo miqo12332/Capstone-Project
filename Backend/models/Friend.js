@@ -20,17 +20,22 @@ const Friend = sequelize.define(
     status: {
       type: DataTypes.STRING,
       allowNull: false,
-      defaultValue: "pending", // or whatever default fits your logic
+      defaultValue: "pending",
     },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
     },
+    share_habits: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
   },
   {
-    tableName: "friends",  // ✅ matches your DB
-    timestamps: false,     // 🚫 disables createdAt/updatedAt auto-columns
+    tableName: "friends",
+    timestamps: false,
   }
 );
 

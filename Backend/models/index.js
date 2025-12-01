@@ -52,6 +52,8 @@ User.belongsToMany(User, {
   foreignKey: "user_id",
   otherKey: "friend_id",
 });
+Friend.belongsTo(User, { foreignKey: "user_id", as: "requester" });
+Friend.belongsTo(User, { foreignKey: "friend_id", as: "recipient" });
 
 // === Group challenges ===
 User.belongsToMany(GroupChallenge, {

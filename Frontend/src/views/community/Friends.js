@@ -8,6 +8,7 @@ import {
   CCol,
   CForm,
   CFormInput,
+  CFormSwitch,
   CInputGroup,
   CInputGroupText,
   CListGroup,
@@ -18,7 +19,14 @@ import {
 import CIcon from "@coreui/icons-react"
 import { cilSearch, cilUserPlus } from "@coreui/icons"
 import { AuthContext } from "../../context/AuthContext"
-import { addFriend, fetchFriends, searchPotentialFriends } from "../../services/friends"
+import {
+  addFriend,
+  fetchFriendRequests,
+  fetchFriends,
+  respondToFriendRequest,
+  searchPotentialFriends,
+  updateHabitVisibility,
+} from "../../services/friends"
 
 const Friends = () => {
   const { user } = useContext(AuthContext)
@@ -28,27 +36,37 @@ const Friends = () => {
   const [searching, setSearching] = useState(false)
   const [searchResults, setSearchResults] = useState([])
   const [addingFriendIds, setAddingFriendIds] = useState([])
+  const [requests, setRequests] = useState([])
+  const [loadingRequests, setLoadingRequests] = useState(false)
+  const [respondingIds, setRespondingIds] = useState([])
+  const [updatingVisibility, setUpdatingVisibility] = useState([])
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
 
   useEffect(() => {
     if (!user?.id) return
 
-    const loadFriends = async () => {
+    const loadFriendsAndRequests = async () => {
       try {
         setLoadingFriends(true)
+        setLoadingRequests(true)
         setError("")
-        const data = await fetchFriends(user.id)
-        setFriends(Array.isArray(data) ? data : [])
+        const [friendData, requestData] = await Promise.all([
+          fetchFriends(user.id),
+          fetchFriendRequests(user.id),
+        ])
+        setFriends(Array.isArray(friendData) ? friendData : [])
+        setRequests(Array.isArray(requestData) ? requestData : [])
       } catch (err) {
         console.error("Failed to load friends", err)
         setError("Unable to load friends right now. Please try again.")
       } finally {
         setLoadingFriends(false)
+        setLoadingRequests(false)
       }
     }
 
-    loadFriends()
+    loadFriendsAndRequests()
   }, [user?.id])
 
   const handleSearch = async (event) => {
@@ -80,10 +98,9 @@ const Friends = () => {
 
     try {
       setError("")
-      const newFriend = await addFriend(user.id, friendId)
-      setFriends((prev) => [...prev, newFriend])
+      const response = await addFriend(user.id, friendId)
       setSearchResults((prev) => prev.filter((candidate) => candidate.id !== friendId))
-      setSuccess(`You're now connected with ${newFriend.name}.`)
+      setSuccess(response?.message || "Friend request sent.")
     } catch (err) {
       console.error("Failed to add friend", err)
       const message =
@@ -96,6 +113,56 @@ const Friends = () => {
     }
   }
 
+  const handleRespondToRequest = async (requesterId, action) => {
+    if (respondingIds.includes(requesterId)) return
+
+    setRespondingIds((prev) => [...prev, requesterId])
+    setError("")
+    setSuccess("")
+
+    try {
+      const response = await respondToFriendRequest(user.id, requesterId, action)
+
+      if (action === "accept" && response) {
+        setFriends((prev) => [...prev, response])
+      }
+
+      setRequests((prev) => prev.filter((request) => request.requester.id !== requesterId))
+      setSuccess(
+        action === "accept" ? "Friend request accepted." : "Friend request rejected."
+      )
+    } catch (err) {
+      console.error("Failed to respond to request", err)
+      const message =
+        err?.response?.data?.error || err?.message || "Unable to process the request."
+      setError(message)
+    } finally {
+      setRespondingIds((prev) => prev.filter((id) => id !== requesterId))
+    }
+  }
+
+  const handleUpdateVisibility = async (friendId, shareHabits) => {
+    setUpdatingVisibility((prev) => [...prev, friendId])
+    setError("")
+    setSuccess("")
+
+    try {
+      await updateHabitVisibility(user.id, friendId, shareHabits)
+      setFriends((prev) =>
+        prev.map((friend) =>
+          friend.id === friendId ? { ...friend, can_view_my_habits: shareHabits } : friend
+        )
+      )
+      setSuccess("Visibility updated.")
+    } catch (err) {
+      console.error("Failed to update visibility", err)
+      const message = err?.response?.data?.error || err?.message || "Update failed."
+      setError(message)
+    } finally {
+      setUpdatingVisibility((prev) => prev.filter((id) => id !== friendId))
+    }
+  }
+
   if (!user) {
     return (
       <CAlert color="info" className="mt-4">
@@ -105,6 +172,7 @@ const Friends = () => {
   }
 
   const hasSearchResults = searchResults.length > 0
+  const hasRequests = requests.length > 0
 
   return (
     <CRow className="justify-content-center mt-4">
@@ -172,6 +240,56 @@ const Friends = () => {
           </CCardBody>
         </CCard>
 
+        <CCard className="mb-4">
+          <CCardHeader>
+            <h4 className="mb-0">Pending Requests</h4>
+          </CCardHeader>
+          <CCardBody>
+            {loadingRequests ? (
+              <div className="text-center my-4">
+                <CSpinner />
+              </div>
+            ) : hasRequests ? (
+              <CListGroup>
+                {requests.map((request) => {
+                  const isResponding = respondingIds.includes(request.requester.id)
+                  return (
+                    <CListGroupItem
+                      key={request.id}
+                      className="d-flex justify-content-between align-items-center flex-wrap gap-2"
+                    >
+                      <div>
+                        <div className="fw-semibold">{request.requester.name}</div>
+                        <small className="text-muted">{request.requester.email}</small>
+                      </div>
+                      <div className="d-flex gap-2">
+                        <CButton
+                          color="success"
+                          size="sm"
+                          disabled={isResponding}
+                          onClick={() => handleRespondToRequest(request.requester.id, "accept")}
+                        >
+                          {isResponding ? <CSpinner size="sm" /> : "Accept"}
+                        </CButton>
+                        <CButton
+                          color="secondary"
+                          size="sm"
+                          disabled={isResponding}
+                          onClick={() => handleRespondToRequest(request.requester.id, "reject")}
+                        >
+                          {isResponding ? <CSpinner size="sm" /> : "Reject"}
+                        </CButton>
+                      </div>
+                    </CListGroupItem>
+                  )
+                })}
+              </CListGroup>
+            ) : (
+              <p className="text-muted mb-0">No pending requests right now.</p>
+            )}
+          </CCardBody>
+        </CCard>
+
         <CCard>
           <CCardHeader>
             <h4 className="mb-0">Your Friends</h4>
@@ -183,35 +301,62 @@ const Friends = () => {
               </div>
             ) : friends.length > 0 ? (
               <CListGroup>
-                {friends.map((friend) => (
-                  <CListGroupItem key={friend.id}>
-                    <div className="d-flex justify-content-between flex-wrap">
-                      <div>
-                        <div className="fw-semibold">{friend.name}</div>
-                        {friend.email && <small className="text-muted">{friend.email}</small>}
+                {friends.map((friend) => {
+                  const isUpdating = updatingVisibility.includes(friend.id)
+                  return (
+                    <CListGroupItem key={friend.id}>
+                      <div className="d-flex justify-content-between flex-wrap">
+                        <div>
+                          <div className="fw-semibold">{friend.name}</div>
+                          {friend.email && <small className="text-muted">{friend.email}</small>}
+                        </div>
+                        {friend.created_at && (
+                          <small className="text-muted">
+                            Joined {new Date(friend.created_at).toLocaleDateString()}
+                          </small>
+                        )}
                       </div>
-                      {friend.created_at && (
-                        <small className="text-muted">Joined {new Date(friend.created_at).toLocaleDateString()}</small>
-                      )}
-                    </div>
 
-                    {Array.isArray(friend.habits) && friend.habits.length > 0 ? (
-                      <div className="mt-3">
-                        <div className="fw-semibold mb-2">Habits</div>
-                        <ul className="mb-0 ps-3">
-                          {friend.habits.map((habit) => (
-                            <li key={habit.id}>
-                              <span className="fw-semibold">{habit.title}</span>
-                              {habit.category && <span className="text-muted"> · {habit.category}</span>}
-                            </li>
-                          ))}
-                        </ul>
+                      <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mt-3">
+                        <div>
+                          <div className="fw-semibold mb-1">Sharing preferences</div>
+                          <small className="text-muted d-block">
+                            {friend.shares_habits_with_me
+                              ? `${friend.name} shares their habits with you.`
+                              : `${friend.name} has hidden their habits.`}
+                          </small>
+                        </div>
+                        <div className="d-flex align-items-center gap-2">
+                          <small className="text-muted">Share my habits</small>
+                          <CFormSwitch
+                            id={`share-${friend.id}`}
+                            checked={!!friend.can_view_my_habits}
+                            disabled={isUpdating}
+                            onChange={(event) =>
+                              handleUpdateVisibility(friend.id, event.target.checked)
+                            }
+                          />
+                        </div>
                       </div>
-                    ) : (
-                      <p className="text-muted mb-0 mt-3">No habits shared yet.</p>
-                    )}
-                  </CListGroupItem>
-                ))}
+
+                      {Array.isArray(friend.habits) && friend.habits.length > 0 ? (
+                        <div className="mt-3">
+                          <div className="fw-semibold mb-2">Habits</div>
+                          <ul className="mb-0 ps-3">
+                            {friend.habits.map((habit) => (
+                              <li key={habit.id}>
+                                <span className="fw-semibold">{habit.title}</span>
+                                {habit.category && <span className="text-muted"> · {habit.category}</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        <p className="text-muted mb-0 mt-3">No habits shared yet.</p>
+                      )}
+                    </CListGroupItem>
+                  )
+                })}
               </CListGroup>
             ) : (
               <p className="text-muted mb-0">
