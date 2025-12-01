@@ -1,6 +1,8 @@
 import React, { useContext, useEffect, useState } from "react"
 import {
   CAlert,
+  CAvatar,
+  CBadge,
   CButton,
   CCard,
   CCardBody,
@@ -17,7 +19,7 @@ import {
   CSpinner,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
-import { cilSearch, cilUserPlus } from "@coreui/icons"
+import { cilSearch, cilUser, cilUserPlus } from "@coreui/icons"
 import { AuthContext } from "../../context/AuthContext"
 import {
   addFriend,
@@ -165,7 +167,7 @@ const Friends = () => {
 
   if (!user) {
     return (
-      <CAlert color="info" className="mt-4">
+      <CAlert color="info" className="mt-4 community-section-card subtle-bg">
         Please log in to view and manage your friends.
       </CAlert>
     )
@@ -176,18 +178,26 @@ const Friends = () => {
 
   return (
     <CRow className="justify-content-center mt-4">
-      <CCol xs={12} lg={10} xl={8}>
+      <CCol xs={12} lg={10} xl={9}>
         {error && <CAlert color="danger">{error}</CAlert>}
         {success && <CAlert color="success">{success}</CAlert>}
 
-        <CCard className="mb-4">
-          <CCardHeader>
-            <h4 className="mb-0">Find New Friends</h4>
+        <CCard className="mb-4 community-section-card subtle-bg border-0">
+          <CCardHeader className="bg-transparent border-0 pt-4 pb-0">
+            <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <div>
+                <p className="text-uppercase small text-body-secondary mb-1">Find friends</p>
+                <h4 className="mb-0">Discover new accountability partners</h4>
+              </div>
+              <CBadge color="primary" className="px-3 py-2 rounded-pill">
+                <CIcon icon={cilUserPlus} className="me-2" /> Grow your circle
+              </CBadge>
+            </div>
           </CCardHeader>
-          <CCardBody>
+          <CCardBody className="pt-3">
             <CForm onSubmit={handleSearch} className="mb-3">
-              <CInputGroup>
-                <CInputGroupText>
+              <CInputGroup className="shadow-sm">
+                <CInputGroupText className="bg-white">
                   <CIcon icon={cilSearch} />
                 </CInputGroupText>
                 <CFormInput
@@ -195,7 +205,7 @@ const Friends = () => {
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                 />
-                <CButton type="submit" color="primary" disabled={searching}>
+                <CButton type="submit" color="primary" disabled={searching} className="px-4">
                   {searching ? <CSpinner size="sm" /> : "Search"}
                 </CButton>
               </CInputGroup>
@@ -208,23 +218,29 @@ const Friends = () => {
             )}
 
             {!searching && hasSearchResults && (
-              <CListGroup>
+              <CListGroup className="rounded-4 overflow-hidden">
                 {searchResults.map((person) => {
                   const isAdding = addingFriendIds.includes(person.id)
                   return (
                     <CListGroupItem
                       key={person.id}
-                      className="d-flex justify-content-between align-items-center"
+                      className="d-flex justify-content-between align-items-center flex-wrap gap-2"
                     >
-                      <div>
-                        <div className="fw-semibold">{person.name}</div>
-                        <small className="text-muted">{person.email}</small>
+                      <div className="d-flex align-items-center gap-3">
+                        <CAvatar color="primary" text={person.name?.[0] || "?"}>
+                          <CIcon icon={cilUser} />
+                        </CAvatar>
+                        <div>
+                          <div className="fw-semibold">{person.name}</div>
+                          <small className="text-muted">{person.email}</small>
+                        </div>
                       </div>
                       <CButton
                         color="success"
                         size="sm"
                         disabled={isAdding}
                         onClick={() => handleAddFriend(person.id)}
+                        className="px-3"
                       >
                         {isAdding ? <CSpinner size="sm" /> : <CIcon icon={cilUserPlus} />} Add
                       </CButton>
@@ -240,9 +256,12 @@ const Friends = () => {
           </CCardBody>
         </CCard>
 
-        <CCard className="mb-4">
-          <CCardHeader>
-            <h4 className="mb-0">Pending Requests</h4>
+        <CCard className="mb-4 community-section-card border-0">
+          <CCardHeader className="bg-transparent border-0 pt-4 pb-0">
+            <div className="d-flex align-items-center justify-content-between">
+              <h4 className="mb-0">Pending Requests</h4>
+              <CBadge color="warning" className="rounded-pill">Action needed</CBadge>
+            </div>
           </CCardHeader>
           <CCardBody>
             {loadingRequests ? (
@@ -250,7 +269,7 @@ const Friends = () => {
                 <CSpinner />
               </div>
             ) : hasRequests ? (
-              <CListGroup>
+              <CListGroup className="rounded-4 overflow-hidden">
                 {requests.map((request) => {
                   const isResponding = respondingIds.includes(request.requester.id)
                   return (
@@ -258,14 +277,20 @@ const Friends = () => {
                       key={request.id}
                       className="d-flex justify-content-between align-items-center flex-wrap gap-2"
                     >
-                      <div>
-                        <div className="fw-semibold">{request.requester.name}</div>
-                        <small className="text-muted">{request.requester.email}</small>
+                      <div className="d-flex align-items-center gap-3">
+                        <CAvatar color="info" text={request.requester.name?.[0] || "?"}>
+                          <CIcon icon={cilUser} />
+                        </CAvatar>
+                        <div>
+                          <div className="fw-semibold">{request.requester.name}</div>
+                          <small className="text-muted">{request.requester.email}</small>
+                        </div>
                       </div>
                       <div className="d-flex gap-2">
                         <CButton
                           color="success"
                           size="sm"
+                          variant="outline"
                           disabled={isResponding}
                           onClick={() => handleRespondToRequest(request.requester.id, "accept")}
                         >
@@ -274,6 +299,7 @@ const Friends = () => {
                         <CButton
                           color="secondary"
                           size="sm"
+                          variant="outline"
                           disabled={isResponding}
                           onClick={() => handleRespondToRequest(request.requester.id, "reject")}
                         >
@@ -290,9 +316,14 @@ const Friends = () => {
           </CCardBody>
         </CCard>
 
-        <CCard>
-          <CCardHeader>
-            <h4 className="mb-0">Your Friends</h4>
+        <CCard className="community-section-card border-0">
+          <CCardHeader className="bg-transparent border-0 pt-4 pb-0">
+            <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <h4 className="mb-0">Your Friends</h4>
+              <CBadge color="success" className="rounded-pill">
+                {friends.length} connected
+              </CBadge>
+            </div>
           </CCardHeader>
           <CCardBody>
             {loadingFriends ? (
@@ -300,15 +331,20 @@ const Friends = () => {
                 <CSpinner />
               </div>
             ) : friends.length > 0 ? (
-              <CListGroup>
+              <CListGroup className="rounded-4 overflow-hidden">
                 {friends.map((friend) => {
                   const isUpdating = updatingVisibility.includes(friend.id)
                   return (
-                    <CListGroupItem key={friend.id}>
+                    <CListGroupItem key={friend.id} className="p-3">
                       <div className="d-flex justify-content-between flex-wrap">
-                        <div>
-                          <div className="fw-semibold">{friend.name}</div>
-                          {friend.email && <small className="text-muted">{friend.email}</small>}
+                        <div className="d-flex align-items-center gap-3">
+                          <CAvatar color="light" text={friend.name?.[0] || "?"}>
+                            <CIcon icon={cilUser} />
+                          </CAvatar>
+                          <div>
+                            <div className="fw-semibold">{friend.name}</div>
+                            {friend.email && <small className="text-muted">{friend.email}</small>}
+                          </div>
                         </div>
                         {friend.created_at && (
                           <small className="text-muted">
@@ -344,7 +380,7 @@ const Friends = () => {
                           <div className="fw-semibold mb-2">Habits</div>
                           <ul className="mb-0 ps-3">
                             {friend.habits.map((habit) => (
-                              <li key={habit.id}>
+                              <li key={habit.id} className="mb-1">
                                 <span className="fw-semibold">{habit.title}</span>
                                 {habit.category && <span className="text-muted"> · {habit.category}</span>}
                               </li>
@@ -372,4 +408,3 @@ const Friends = () => {
 }
 
 export default Friends
-

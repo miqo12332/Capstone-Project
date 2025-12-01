@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, { useContext, useEffect, useMemo, useRef, useState } from "react"
 import {
   CAlert,
   CBadge,
@@ -22,11 +22,11 @@ import {
   CModalTitle,
   CRow,
   CSpinner,
-} from "@coreui/react";
-import CIcon from "@coreui/icons-react";
-import { cilCheckCircle, cilChatBubble, cilPlus, cilSend } from "@coreui/icons";
+} from "@coreui/react"
+import CIcon from "@coreui/icons-react"
+import { cilCheckCircle, cilChatBubble, cilPlus, cilSend } from "@coreui/icons"
 
-import { AuthContext } from "../../context/AuthContext";
+import { AuthContext } from "../../context/AuthContext"
 import {
   createChallenge,
   fetchChallenges,
@@ -35,8 +35,8 @@ import {
   decideJoinRequest,
   fetchChallengeMessages,
   sendChallengeMessage,
-} from "../../services/challenges";
-import { fetchFriends } from "../../services/friends";
+} from "../../services/challenges"
+import { fetchFriends } from "../../services/friends"
 
 const initialFormState = {
   title: "",
@@ -45,152 +45,152 @@ const initialFormState = {
   endDate: "",
   requiresApproval: false,
   invites: [],
-};
+}
 
 const GroupChallenges = () => {
-  const { user } = useContext(AuthContext);
-  const [challenges, setChallenges] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [joining, setJoining] = useState([]);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [canceling, setCanceling] = useState([]);
-  const [friends, setFriends] = useState([]);
-  const [loadingFriends, setLoadingFriends] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState(initialFormState);
-  const [chatChallenge, setChatChallenge] = useState(null);
-  const [chatMessages, setChatMessages] = useState([]);
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatError, setChatError] = useState("");
-  const [chatText, setChatText] = useState("");
-  const [sendingChat, setSendingChat] = useState(false);
-  const [deciding, setDeciding] = useState({});
-  const chatBottomRef = useRef(null);
+  const { user } = useContext(AuthContext)
+  const [challenges, setChallenges] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [joining, setJoining] = useState([])
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
+  const [canceling, setCanceling] = useState([])
+  const [friends, setFriends] = useState([])
+  const [loadingFriends, setLoadingFriends] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+  const [form, setForm] = useState(initialFormState)
+  const [chatChallenge, setChatChallenge] = useState(null)
+  const [chatMessages, setChatMessages] = useState([])
+  const [chatLoading, setChatLoading] = useState(false)
+  const [chatError, setChatError] = useState("")
+  const [chatText, setChatText] = useState("")
+  const [sendingChat, setSendingChat] = useState(false)
+  const [deciding, setDeciding] = useState({})
+  const chatBottomRef = useRef(null)
 
-  const isAuthenticated = Boolean(user);
+  const isAuthenticated = Boolean(user)
 
   const refreshChallenges = async () => {
     try {
-      setLoading(true);
-      const data = await fetchChallenges();
-      setChallenges(Array.isArray(data) ? data : []);
+      setLoading(true)
+      const data = await fetchChallenges()
+      setChallenges(Array.isArray(data) ? data : [])
     } catch (err) {
-      console.error("Failed to load challenges", err);
-      setError("Could not load challenges. Please try again.");
+      console.error("Failed to load challenges", err)
+      setError("Could not load challenges. Please try again.")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    refreshChallenges();
-  }, []);
+    refreshChallenges()
+  }, [])
 
   useEffect(() => {
     const loadFriends = async () => {
-      if (!user?.id) return;
+      if (!user?.id) return
       try {
-        setLoadingFriends(true);
-        const data = await fetchFriends(user.id);
-        setFriends(Array.isArray(data) ? data : []);
+        setLoadingFriends(true)
+        const data = await fetchFriends(user.id)
+        setFriends(Array.isArray(data) ? data : [])
       } catch (err) {
-        console.error("Failed to load friends", err);
+        console.error("Failed to load friends", err)
       } finally {
-        setLoadingFriends(false);
+        setLoadingFriends(false)
       }
-    };
+    }
 
-    loadFriends();
-  }, [user?.id]);
+    loadFriends()
+  }, [user?.id])
 
   const handleJoin = async (challengeId) => {
     if (!user?.id) {
-      setError("Please log in to join challenges.");
-      return;
+      setError("Please log in to join challenges.")
+      return
     }
 
-    if (joining.includes(challengeId)) return;
+    if (joining.includes(challengeId)) return
 
-    setJoining((prev) => [...prev, challengeId]);
-    setError("");
-    setSuccess("");
+    setJoining((prev) => [...prev, challengeId])
+    setError("")
+    setSuccess("")
 
     try {
-      const result = await joinChallenge(challengeId, user.id);
-      setSuccess(result?.message || "Joined challenge");
-      await refreshChallenges();
+      const result = await joinChallenge(challengeId, user.id)
+      setSuccess(result?.message || "Joined challenge")
+      await refreshChallenges()
     } catch (err) {
-      console.error("Failed to join challenge", err);
+      console.error("Failed to join challenge", err)
       const message =
-        err?.response?.data?.error || err?.message || "Unable to join challenge.";
-      setError(message);
+        err?.response?.data?.error || err?.message || "Unable to join challenge."
+      setError(message)
     } finally {
-      setJoining((prev) => prev.filter((id) => id !== challengeId));
+      setJoining((prev) => prev.filter((id) => id !== challengeId))
     }
-  };
+  }
 
   const handleCancelJoin = async (challengeId) => {
     if (!user?.id) {
-      setError("Please log in to manage your requests.");
-      return;
+      setError("Please log in to manage your requests.")
+      return
     }
 
-    if (canceling.includes(challengeId)) return;
+    if (canceling.includes(challengeId)) return
 
-    setCanceling((prev) => [...prev, challengeId]);
-    setError("");
-    setSuccess("");
+    setCanceling((prev) => [...prev, challengeId])
+    setError("")
+    setSuccess("")
 
     try {
-      await cancelJoinRequest(challengeId, user.id);
-      setSuccess("Join request canceled.");
-      await refreshChallenges();
+      await cancelJoinRequest(challengeId, user.id)
+      setSuccess("Join request canceled.")
+      await refreshChallenges()
     } catch (err) {
-      console.error("Failed to cancel join request", err);
+      console.error("Failed to cancel join request", err)
       const message =
-        err?.response?.data?.error || err?.message || "Unable to cancel request.";
-      setError(message);
+        err?.response?.data?.error || err?.message || "Unable to cancel request."
+      setError(message)
     } finally {
-      setCanceling((prev) => prev.filter((id) => id !== challengeId));
+      setCanceling((prev) => prev.filter((id) => id !== challengeId))
     }
-  };
+  }
 
   const handleDecision = async (challengeId, memberId, action) => {
     if (!user?.id) {
-      setError("Please log in to manage requests.");
-      return;
+      setError("Please log in to manage requests.")
+      return
     }
 
-    setDeciding((prev) => ({ ...prev, [memberId]: true }));
-    setError("");
-    setSuccess("");
+    setDeciding((prev) => ({ ...prev, [memberId]: true }))
+    setError("")
+    setSuccess("")
 
     try {
-      await decideJoinRequest(challengeId, memberId, user.id, action);
+      await decideJoinRequest(challengeId, memberId, user.id, action)
       setSuccess(
         action === "approve" ? "Request approved and member added." : "Request rejected."
-      );
-      await refreshChallenges();
+      )
+      await refreshChallenges()
     } catch (err) {
-      console.error("Failed to process request", err);
-      const message = err?.response?.data?.error || err?.message || "Unable to update request.";
-      setError(message);
+      console.error("Failed to process request", err)
+      const message = err?.response?.data?.error || err?.message || "Unable to update request."
+      setError(message)
     } finally {
-      setDeciding((prev) => ({ ...prev, [memberId]: false }));
+      setDeciding((prev) => ({ ...prev, [memberId]: false }))
     }
-  };
+  }
 
   const handleCreate = async (event) => {
-    event.preventDefault();
+    event.preventDefault()
 
     if (!user?.id) {
-      setError("Please log in to create a challenge.");
-      return;
+      setError("Please log in to create a challenge.")
+      return
     }
 
-    setError("");
-    setSuccess("");
+    setError("")
+    setSuccess("")
 
     try {
       const payload = {
@@ -201,48 +201,48 @@ const GroupChallenges = () => {
         requiresApproval: form.requiresApproval,
         creatorId: user.id,
         invites: form.invites,
-      };
+      }
 
-      const created = await createChallenge(payload);
-      setChallenges((prev) => [created, ...prev]);
-      setForm(initialFormState);
-      setShowModal(false);
-      setSuccess("Challenge created and saved to the community list.");
+      const created = await createChallenge(payload)
+      setChallenges((prev) => [created, ...prev])
+      setForm(initialFormState)
+      setShowModal(false)
+      setSuccess("Challenge created and saved to the community list.")
     } catch (err) {
-      console.error("Failed to create challenge", err);
+      console.error("Failed to create challenge", err)
       const message =
-        err?.response?.data?.error || err?.message || "Unable to create challenge.";
-      setError(message);
+        err?.response?.data?.error || err?.message || "Unable to create challenge."
+      setError(message)
     }
-  };
+  }
 
   const toggleInvite = (friendId) => {
     setForm((prev) => {
       const invites = prev.invites.includes(friendId)
         ? prev.invites.filter((id) => id !== friendId)
-        : [...prev.invites, friendId];
+        : [...prev.invites, friendId]
 
-      return { ...prev, invites };
-    });
-  };
+      return { ...prev, invites }
+    })
+  }
 
   const membershipStatus = (challenge) => {
-    if (!user?.id || !challenge?.participants) return null;
-    const membership = challenge.participants.find((participant) => participant.id === user.id);
-    return membership?.UserGroupChallenge?.status || null;
-  };
+    if (!user?.id || !challenge?.participants) return null
+    const membership = challenge.participants.find((participant) => participant.id === user.id)
+    return membership?.UserGroupChallenge?.status || null
+  }
 
   const membershipRole = (challenge) => {
-    if (!user?.id || !challenge?.participants) return null;
-    const membership = challenge.participants.find((participant) => participant.id === user.id);
-    return membership?.UserGroupChallenge?.role || null;
-  };
+    if (!user?.id || !challenge?.participants) return null
+    const membership = challenge.participants.find((participant) => participant.id === user.id)
+    return membership?.UserGroupChallenge?.role || null
+  }
 
   const canChat = (challenge) => {
-    const status = membershipStatus(challenge);
-    const role = membershipRole(challenge);
-    return status === "accepted" || role === "creator";
-  };
+    const status = membershipStatus(challenge)
+    const role = membershipRole(challenge)
+    return status === "accepted" || role === "creator"
+  }
 
   const formattedChallenges = useMemo(
     () =>
@@ -256,15 +256,15 @@ const GroupChallenges = () => {
         ),
       })),
     [challenges]
-  );
+  )
 
   const renderJoinButton = (challenge) => {
-    const status = membershipStatus(challenge);
-    const role = membershipRole(challenge);
-    const requiresApproval = challenge.approval_required;
+    const status = membershipStatus(challenge)
+    const role = membershipRole(challenge)
+    const requiresApproval = challenge.approval_required
 
     if (role === "creator") {
-      return <CBadge color="success">You created this</CBadge>;
+      return <CBadge color="success">You created this</CBadge>
     }
 
     if (status === "accepted") {
@@ -272,7 +272,7 @@ const GroupChallenges = () => {
         <CBadge color="success" className="d-inline-flex align-items-center gap-2">
           <CIcon icon={cilCheckCircle} /> Joined
         </CBadge>
-      );
+      )
     }
 
     if (status === "pending") {
@@ -289,7 +289,7 @@ const GroupChallenges = () => {
             {canceling.includes(challenge.id) ? <CSpinner size="sm" /> : "Cancel"}
           </CButton>
         </div>
-      );
+      )
     }
 
     if (status === "invited") {
@@ -302,7 +302,7 @@ const GroupChallenges = () => {
         >
           {joining.includes(challenge.id) ? <CSpinner size="sm" /> : "Accept invite"}
         </CButton>
-      );
+      )
     }
 
     return (
@@ -318,77 +318,77 @@ const GroupChallenges = () => {
             ? "Request to join"
             : "Join challenge"}
       </CButton>
-    );
-  };
+    )
+  }
 
   const openChat = (challenge) => {
     if (!user?.id) {
-      setError("Please log in to chat with challenge members.");
-      return;
+      setError("Please log in to chat with challenge members.")
+      return
     }
 
     if (!canChat(challenge)) {
-      setError("Join this challenge to chat with the group.");
-      return;
+      setError("Join this challenge to chat with the group.")
+      return
     }
 
-    setChatChallenge(challenge);
-    setChatMessages([]);
-    setChatText("");
-    setChatError("");
-  };
+    setChatChallenge(challenge)
+    setChatMessages([])
+    setChatText("")
+    setChatError("")
+  }
 
   useEffect(() => {
-    if (!chatChallenge?.id || !user?.id) return;
+    if (!chatChallenge?.id || !user?.id) return
 
     const loadMessages = async () => {
       try {
-        setChatLoading(true);
-        setChatError("");
-        const data = await fetchChallengeMessages(chatChallenge.id, user.id);
-        setChatMessages(Array.isArray(data) ? data : []);
+        setChatLoading(true)
+        setChatError("")
+        const data = await fetchChallengeMessages(chatChallenge.id, user.id)
+        setChatMessages(Array.isArray(data) ? data : [])
       } catch (err) {
-        console.error("Failed to load chat messages", err);
+        console.error("Failed to load chat messages", err)
         const message =
-          err?.response?.data?.error || err?.message || "Unable to load chat messages.";
-        setChatError(message);
+          err?.response?.data?.error || err?.message || "Unable to load chat messages."
+        setChatError(message)
       } finally {
-        setChatLoading(false);
+        setChatLoading(false)
       }
-    };
+    }
 
-    loadMessages();
-  }, [chatChallenge?.id, user?.id]);
+    loadMessages()
+  }, [chatChallenge?.id, user?.id])
 
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages]);
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [chatMessages])
 
   const handleSendChat = async (event) => {
-    event.preventDefault();
+    event.preventDefault()
 
-    if (!chatChallenge?.id || !user?.id || !chatText.trim()) return;
+    if (!chatChallenge?.id || !user?.id || !chatText.trim()) return
 
     try {
-      setSendingChat(true);
-      const created = await sendChallengeMessage(chatChallenge.id, user.id, chatText);
-      setChatMessages((prev) => [...prev, created]);
-      setChatText("");
+      setSendingChat(true)
+      const created = await sendChallengeMessage(chatChallenge.id, user.id, chatText)
+      setChatMessages((prev) => [...prev, created])
+      setChatText("")
     } catch (err) {
-      console.error("Failed to send chat message", err);
-      const message = err?.response?.data?.error || err?.message || "Could not send message.";
-      setChatError(message);
+      console.error("Failed to send chat message", err)
+      const message = err?.response?.data?.error || err?.message || "Could not send message."
+      setChatError(message)
     } finally {
-      setSendingChat(false);
+      setSendingChat(false)
     }
-  };
+  }
 
   const closeChat = () => {
-    setChatChallenge(null);
-    setChatMessages([]);
-    setChatText("");
-    setChatError("");
-  };
+    setChatChallenge(null)
+    setChatMessages([])
+    setChatText("")
+    setChatError("")
+  }
 
   return (
     <>
@@ -397,15 +397,16 @@ const GroupChallenges = () => {
           {error && <CAlert color="danger">{error}</CAlert>}
           {success && <CAlert color="success">{success}</CAlert>}
 
-          <CCard>
-            <CCardHeader className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <CCard className="community-section-card border-0 subtle-bg">
+            <CCardHeader className="d-flex justify-content-between align-items-center flex-wrap gap-2 bg-transparent border-0 pt-4 pb-0">
               <div>
-                <h4 className="mb-1">🤝 Group Challenges</h4>
+                <p className="text-uppercase small text-body-secondary mb-1">Group Challenges</p>
+                <h4 className="mb-1">Team up to reach milestones faster</h4>
                 <p className="text-body-secondary mb-0">
                   Create a challenge, invite friends, and decide whether members need approval to join.
                 </p>
               </div>
-              <CButton color="primary" onClick={() => setShowModal(true)} disabled={!isAuthenticated}>
+              <CButton color="primary" onClick={() => setShowModal(true)} disabled={!isAuthenticated} className="rounded-pill px-4">
                 <CIcon icon={cilPlus} className="me-2" /> New Challenge
               </CButton>
             </CCardHeader>
@@ -425,11 +426,11 @@ const GroupChallenges = () => {
                   No challenges yet. Be the first to start one!
                 </div>
               ) : (
-                <CListGroup>
+                <CListGroup className="rounded-4 overflow-hidden">
                   {formattedChallenges.map((challenge) => (
                     <CListGroupItem
                       key={challenge.id}
-                      className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2"
+                      className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 p-3"
                     >
                       <div className="me-md-3">
                         <div className="d-flex align-items-center gap-2 mb-1">
@@ -505,6 +506,7 @@ const GroupChallenges = () => {
                             size="sm"
                             disabled={!canChat(challenge) || !isAuthenticated}
                             onClick={() => openChat(challenge)}
+                            className="rounded-pill"
                           >
                             <CIcon icon={cilChatBubble} className="me-2" />
                             {canChat(challenge) ? "Open chat" : "Join to chat"}
@@ -576,8 +578,7 @@ const GroupChallenges = () => {
             </CRow>
 
             <CFormSwitch
-              id="requires-approval"
-              label="Members need my approval to join"
+              label="Require approval to join"
               checked={form.requiresApproval}
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, requiresApproval: event.target.checked }))
@@ -654,7 +655,7 @@ const GroupChallenges = () => {
                   </div>
                 ) : (
                   chatMessages.map((message) => {
-                    const isMine = Number(message.sender_id) === Number(user?.id);
+                    const isMine = Number(message.sender_id) === Number(user?.id)
                     return (
                       <div
                         key={message.id}
@@ -675,7 +676,7 @@ const GroupChallenges = () => {
                           </div>
                         </div>
                       </div>
-                    );
+                    )
                   })
                 )}
                 <div ref={chatBottomRef} />
@@ -699,7 +700,7 @@ const GroupChallenges = () => {
         </CModalBody>
       </CModal>
     </>
-  );
-};
+  )
+}
 
-export default GroupChallenges;
+export default GroupChallenges

@@ -1,6 +1,7 @@
-import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, { useContext, useEffect, useMemo, useRef, useState } from "react"
 import {
   CAlert,
+  CAvatar,
   CBadge,
   CButton,
   CCard,
@@ -14,59 +15,59 @@ import {
   CRow,
   CSpinner,
   CTooltip,
-} from "@coreui/react";
-import CIcon from "@coreui/icons-react";
-import { cilChatBubble, cilSend, cilUser } from "@coreui/icons";
-import { AuthContext } from "../../context/AuthContext";
+} from "@coreui/react"
+import CIcon from "@coreui/icons-react"
+import { cilChatBubble, cilSend, cilUser } from "@coreui/icons"
+import { AuthContext } from "../../context/AuthContext"
 import {
   fetchConversation,
   fetchThreads,
   markConversationRead,
   sendMessage,
-} from "../../services/messages";
-import { fetchFriends } from "../../services/friends";
+} from "../../services/messages"
+import { fetchFriends } from "../../services/friends"
 
 const truncate = (text, length = 60) => {
-  if (!text) return "";
-  return text.length > length ? `${text.slice(0, length)}…` : text;
-};
+  if (!text) return ""
+  return text.length > length ? `${text.slice(0, length)}…` : text
+}
 
 const Messages = () => {
-  const { user } = useContext(AuthContext);
-  const [threads, setThreads] = useState([]);
-  const [loadingThreads, setLoadingThreads] = useState(false);
-  const [activeUser, setActiveUser] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [loadingMessages, setLoadingMessages] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState("");
-  const [composer, setComposer] = useState("");
-  const bottomRef = useRef(null);
-  const [contacts, setContacts] = useState([]);
+  const { user } = useContext(AuthContext)
+  const [threads, setThreads] = useState([])
+  const [loadingThreads, setLoadingThreads] = useState(false)
+  const [activeUser, setActiveUser] = useState(null)
+  const [messages, setMessages] = useState([])
+  const [loadingMessages, setLoadingMessages] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState("")
+  const [composer, setComposer] = useState("")
+  const bottomRef = useRef(null)
+  const [contacts, setContacts] = useState([])
 
   const emptyState = useMemo(
     () => (
       <div className="text-center py-5 text-muted">
-        <CIcon icon={cilChatBubble} size="3xl" className="mb-3" />
+        <CIcon icon={cilChatBubble} size="3xl" className="mb-3 text-primary" />
         <div className="fw-semibold">Select a friend to start chatting</div>
         <div className="small">Keep in touch, share tips, and celebrate wins together.</div>
       </div>
     ),
     []
-  );
+  )
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) return
     const loadThreads = async () => {
       try {
-        setLoadingThreads(true);
+        setLoadingThreads(true)
         const [threadData, friendData] = await Promise.all([
           fetchThreads(user.id),
           fetchFriends(user.id),
-        ]);
+        ])
 
-        const existingThreads = Array.isArray(threadData) ? threadData : [];
-        const friends = Array.isArray(friendData) ? friendData : [];
+        const existingThreads = Array.isArray(threadData) ? threadData : []
+        const friends = Array.isArray(friendData) ? friendData : []
 
         const friendThreads = friends
           .filter((friend) => !existingThreads.find((t) => t.user?.id === friend.id))
@@ -79,64 +80,64 @@ const Messages = () => {
             },
             lastMessage: null,
             unread: 0,
-          }));
+          }))
 
-        setContacts(friends);
-        setThreads([...existingThreads, ...friendThreads]);
+        setContacts(friends)
+        setThreads([...existingThreads, ...friendThreads])
       } catch (err) {
-        console.error("Failed to load threads", err);
-        setError("Could not load conversations right now.");
+        console.error("Failed to load threads", err)
+        setError("Could not load conversations right now.")
       } finally {
-        setLoadingThreads(false);
+        setLoadingThreads(false)
       }
-    };
+    }
 
-    loadThreads();
-  }, [user?.id]);
+    loadThreads()
+  }, [user?.id])
 
   useEffect(() => {
-    if (!activeUser || !user?.id) return;
+    if (!activeUser || !user?.id) return
 
     const loadMessages = async () => {
       try {
-        setLoadingMessages(true);
-        const data = await fetchConversation(user.id, activeUser.id);
-        setMessages(Array.isArray(data) ? data : []);
-        await markConversationRead(user.id, activeUser.id);
+        setLoadingMessages(true)
+        const data = await fetchConversation(user.id, activeUser.id)
+        setMessages(Array.isArray(data) ? data : [])
+        await markConversationRead(user.id, activeUser.id)
         setThreads((prev) =>
           prev.map((thread) =>
             thread.user?.id === activeUser.id ? { ...thread, unread: 0 } : thread
           )
-        );
+        )
       } catch (err) {
-        console.error("Failed to load conversation", err);
-        setError("Unable to load messages right now.");
+        console.error("Failed to load conversation", err)
+        setError("Unable to load messages right now.")
       } finally {
-        setLoadingMessages(false);
+        setLoadingMessages(false)
       }
-    };
+    }
 
-    loadMessages();
-  }, [activeUser, user?.id]);
+    loadMessages()
+  }, [activeUser, user?.id])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
 
   const handleSend = async (event) => {
-    event.preventDefault();
-    if (!composer.trim() || !activeUser) return;
+    event.preventDefault()
+    if (!composer.trim() || !activeUser) return
 
     try {
-      setSending(true);
-      setError("");
+      setSending(true)
+      setError("")
       const created = await sendMessage(user.id, {
         recipientId: activeUser.id,
         content: composer.trim(),
-      });
-      setMessages((prev) => [...prev, created]);
+      })
+      setMessages((prev) => [...prev, created])
       setThreads((prev) => {
-        const without = prev.filter((thread) => thread.user?.id !== activeUser.id);
+        const without = prev.filter((thread) => thread.user?.id !== activeUser.id)
         return [
           {
             user: activeUser,
@@ -144,36 +145,34 @@ const Messages = () => {
             unread: 0,
           },
           ...without,
-        ];
-      });
-      setComposer("");
+        ]
+      })
+      setComposer("")
     } catch (err) {
-      console.error("Failed to send message", err);
+      console.error("Failed to send message", err)
       const message =
-        err?.response?.data?.error || err?.message || "Could not send message.";
-      setError(message);
+        err?.response?.data?.error || err?.message || "Could not send message."
+      setError(message)
     } finally {
-      setSending(false);
+      setSending(false)
     }
-  };
+  }
 
   if (!user) {
     return (
-      <CAlert color="info" className="mt-4">
+      <CAlert color="info" className="mt-4 community-section-card subtle-bg">
         Please log in to start chatting with your friends.
       </CAlert>
-    );
+    )
   }
 
   return (
     <CRow className="mt-4">
       <CCol md={4} className="mb-4">
-        <CCard className="h-100">
-          <CCardHeader>
-            <div className="d-flex align-items-center justify-content-between">
-              <span className="fw-semibold">Conversations</span>
-              {loadingThreads && <CSpinner size="sm" />}
-            </div>
+        <CCard className="h-100 community-section-card border-0">
+          <CCardHeader className="bg-transparent border-0 d-flex align-items-center justify-content-between">
+            <span className="fw-semibold">Conversations</span>
+            {loadingThreads && <CSpinner size="sm" />}
           </CCardHeader>
           <CCardBody className="p-0">
             {loadingThreads ? (
@@ -185,22 +184,19 @@ const Messages = () => {
                   : "Find friends to start a chat and keep each other motivated."}
               </div>
             ) : (
-              <CListGroup flush>
+              <CListGroup flush className="rounded-0">
                 {threads.map((thread) => (
                   <CListGroupItem
                     key={thread.user?.id}
                     as="button"
                     active={activeUser?.id === thread.user?.id}
                     onClick={() => setActiveUser(thread.user)}
-                    className="d-flex justify-content-between align-items-start"
+                    className="d-flex justify-content-between align-items-start border-0 border-bottom"
                   >
                     <div className="d-flex align-items-start gap-3">
-                      <div
-                        className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center"
-                        style={{ width: 42, height: 42 }}
-                      >
-                        <CIcon icon={cilUser} className="text-primary" />
-                      </div>
+                      <CAvatar color="primary" text={thread.user?.name?.[0] || "?"}>
+                        <CIcon icon={cilUser} />
+                      </CAvatar>
                       <div>
                         <div className="fw-semibold">{thread.user?.name || "Friend"}</div>
                         <div className="small text-muted">
@@ -222,8 +218,8 @@ const Messages = () => {
       </CCol>
 
       <CCol md={8}>
-        <CCard className="h-100">
-          <CCardHeader className="d-flex justify-content-between align-items-center">
+        <CCard className="h-100 community-section-card border-0">
+          <CCardHeader className="bg-transparent border-0 d-flex justify-content-between align-items-center">
             <div>
               <div className="fw-semibold">
                 {activeUser ? activeUser.name : "Pick a conversation"}
@@ -235,7 +231,7 @@ const Messages = () => {
               </div>
             </div>
           </CCardHeader>
-          <CCardBody className="d-flex flex-column" style={{ minHeight: 420 }}>
+          <CCardBody className="d-flex flex-column subtle-bg" style={{ minHeight: 420 }}>
             {error && <CAlert color="danger">{error}</CAlert>}
             {activeUser ? (
               <div className="flex-grow-1 overflow-auto pe-2" style={{ maxHeight: 420 }}>
@@ -247,15 +243,15 @@ const Messages = () => {
                   </div>
                 ) : (
                   messages.map((msg) => {
-                    const isMine = Number(msg.sender_id) === Number(user.id);
+                    const isMine = Number(msg.sender_id) === Number(user.id)
                     return (
                       <div
                         key={msg.id}
                         className={`d-flex ${isMine ? "justify-content-end" : "justify-content-start"} mb-3`}
                       >
                         <div
-                          className={`p-3 rounded-3 shadow-sm ${
-                            isMine ? "bg-primary text-white" : "bg-light"
+                          className={`p-3 rounded-4 shadow-sm ${
+                            isMine ? "bg-primary text-white" : "bg-white border"
                           }`}
                           style={{ maxWidth: "80%" }}
                         >
@@ -270,7 +266,7 @@ const Messages = () => {
                           </div>
                         </div>
                       </div>
-                    );
+                    )
                   })
                 )}
                 <div ref={bottomRef} />
@@ -304,7 +300,7 @@ const Messages = () => {
         </CCard>
       </CCol>
     </CRow>
-  );
-};
+  )
+}
 
-export default Messages;
+export default Messages
