@@ -1,10 +1,11 @@
 import api from "./api";
 
-export const fetchUserSettings = async (userId) => {
+export const fetchUserSettings = async (userId, config = {}) => {
   if (!userId) {
     throw new Error("userId is required to load settings");
   }
-  const response = await api.get(`/users/profile/${userId}`);
+
+  const response = await api.get(`/users/profile/${userId}`, config);
   return response.data;
 };
 

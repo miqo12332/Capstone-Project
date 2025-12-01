@@ -83,6 +83,22 @@ const UserProfile = () => {
   }, [location.state?.tab])
 
   useEffect(() => {
+    if (!user) return
+
+    setProfile({
+      name: user.name || "",
+      email: user.email || "",
+      gender: user.gender || "",
+    })
+
+    setAvatarUrl(
+      user.avatar ? `http://localhost:5001${user.avatar}` : "/uploads/default-avatar.png"
+    )
+  }, [user])
+
+  useEffect(() => {
+    const controller = new AbortController()
+
     const loadProfile = async () => {
       if (!user?.id) {
         setLoading(false)
@@ -91,7 +107,10 @@ const UserProfile = () => {
 
       try {
         setLoading(true)
-        const { user: payload } = await fetchUserSettings(user.id)
+        const { user: payload } = await fetchUserSettings(user.id, {
+          signal: controller.signal,
+          timeout: 8000,
+        })
         setProfile({
           name: payload.name || "",
           email: payload.email || "",
@@ -123,6 +142,7 @@ const UserProfile = () => {
           login(payload)
         }
       } catch (err) {
+        if (err.name === "CanceledError") return
         console.error(err)
         setError("We couldn't load your profile details. Please try again.")
       } finally {
@@ -131,6 +151,8 @@ const UserProfile = () => {
     }
 
     loadProfile()
+
+    return () => controller.abort()
   }, [user?.id, login])
 
   useEffect(() => {
