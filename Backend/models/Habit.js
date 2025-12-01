@@ -9,6 +9,8 @@ const Habit = sequelize.define(
     title: { type: DataTypes.STRING(100), allowNull: false },
     description: { type: DataTypes.TEXT, allowNull: true },
     category: { type: DataTypes.STRING(50), allowNull: true },
+    target_reps: { type: DataTypes.INTEGER, allowNull: true },
+    is_daily_goal: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,

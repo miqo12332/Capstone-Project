@@ -34,9 +34,10 @@ const res = await fetch(`http://localhost:5001/api/habits?user_id=${user.id}`);
       const res = await fetch("http://localhost:5001/api/habits", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: habitName, description, user_id: user.id }),
+        body: JSON.stringify({ title: habitName, description, user_id: user.id }),
       });
 
+      if (!res.ok) throw new Error("Failed to add habit");
       const newHabit = await res.json();
       setHabits((prev) => [...prev, newHabit]);
     } catch (err) {
