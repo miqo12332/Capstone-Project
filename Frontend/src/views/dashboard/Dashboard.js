@@ -296,7 +296,7 @@ const Dashboard = () => {
   };
 
   const renderSummaryCard = (title, value, helper) => (
-    <CCard className="h-100">
+    <CCard className="h-100 elevated-card metric-card">
       <CCardHeader className="fw-semibold">{title}</CCardHeader>
       <CCardBody>
         <div className="display-6 mb-2">{value}</div>
@@ -350,8 +350,10 @@ const Dashboard = () => {
 
   const nextUp = upcomingPlans[0];
 
+  const welcomeName = user?.name || user?.username || "there";
+
   return (
-    <div className="mt-4">
+    <div className="dashboard-page">
       <style>{`
         @keyframes pulseGlow {
           0% { box-shadow: 0 0 0 0 rgba(46, 184, 92, 0.35); }
@@ -359,7 +361,55 @@ const Dashboard = () => {
           100% { box-shadow: 0 0 0 0 rgba(46, 184, 92, 0); }
         }
       `}</style>
-      <h2 className="mb-4">Today at a Glance</h2>
+
+      <div className="dashboard-hero">
+        <div>
+          <p className="eyebrow">Personal hub</p>
+          <h2 className="hero-title">Welcome back, {welcomeName} 👋</h2>
+          <p className="hero-subtitle">
+            Track habits, review your streaks, and glide through today with a calmer, cleaner workspace.
+          </p>
+          <div className="d-flex flex-wrap gap-2 mt-3">
+            {quickActions.map((action) => (
+              <CButton
+                key={action.path}
+                color="primary"
+                className="action-chip"
+                onClick={() => navigate(action.path)}
+              >
+                <span className="me-2">{action.icon}</span>
+                {action.label}
+              </CButton>
+            ))}
+            <CButton
+              color="light"
+              className="action-chip text-primary"
+              variant="ghost"
+              onClick={() => navigate("/planner")}
+            >
+              ✨ Open planner
+            </CButton>
+          </div>
+        </div>
+        <div className="hero-card">
+          <div className="small text-body-secondary">Today's completion</div>
+          <div className="display-5 fw-semibold text-primary mb-2">
+            {overallToday.completionRate}%
+          </div>
+          <CProgress height={10} className="soft-progress mb-3">
+            <CProgressBar color="primary" value={overallToday.completionRate} />
+          </CProgress>
+          <div className="d-flex justify-content-between text-body-secondary small">
+            <span>{overallToday.done} done</span>
+            <span>{overallToday.missed} missed</span>
+          </div>
+          {streakSnapshot?.current && (
+            <div className="mt-3 rounded-3 soft-pill bg-success bg-opacity-10 text-success">
+              🔥 {streakSnapshot.current}-day streak · Best {streakSnapshot.best} days
+            </div>
+          )}
+        </div>
+      </div>
 
       {loading && (
         <div className="d-flex justify-content-center my-5">
@@ -411,45 +461,35 @@ const Dashboard = () => {
           </CRow>
 
           <CRow className="g-4 mb-4">
-            <CCol xs={12} lg={5}>
-              <CCard className="h-100">
-                <CCardHeader className="fw-semibold">Quick actions</CCardHeader>
-                <CCardBody>
-                  <div className="d-flex flex-wrap gap-2">
-                    {quickActions.map((action) => (
-                      <CButton
-                        key={action.path}
-                        color="primary"
-                        variant="outline"
-                        onClick={() => navigate(action.path)}
-                      >
-                        <span className="me-2">{action.icon}</span>
-                        {action.label}
-                      </CButton>
-                    ))}
-                  </div>
-                </CCardBody>
-              </CCard>
-            </CCol>
             <CCol xs={12} lg={4}>
-              <CCard className="h-100">
+              <CCard className="h-100 elevated-card">
                 <CCardHeader className="fw-semibold">Next up today</CCardHeader>
                 <CCardBody>
                   {nextUp ? (
-                    <div className="d-flex flex-column gap-1">
-                      <div className="fw-semibold">{nextUp.title}</div>
-                      <div className="text-body-secondary small">
-                        {formatDateTime(nextUp.startDate)}
-                        {nextUp.endDate ? ` – ${nextUp.endDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}
-                        {nextUp.type === "calendar" && nextUp.provider
-                          ? ` · ${nextUp.provider}`
-                          : nextUp.type === "timeblock" && nextUp.repeat
-                            ? ` · ${nextUp.repeat}`
-                            : ""}
+                    <div className="d-flex flex-column gap-2">
+                      <div className="d-flex align-items-start gap-2">
+                        <div className="icon-pill">⏱️</div>
+                        <div>
+                          <div className="fw-semibold">{nextUp.title}</div>
+                          <div className="text-body-secondary small">
+                            {formatDateTime(nextUp.startDate)}
+                            {nextUp.endDate
+                              ? ` – ${nextUp.endDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+                              : ""}
+                            {nextUp.type === "calendar" && nextUp.provider
+                              ? ` · ${nextUp.provider}`
+                              : nextUp.type === "timeblock" && nextUp.repeat
+                                ? ` · ${nextUp.repeat}`
+                                : ""}
+                          </div>
+                          {nextUp.notes && (
+                            <div className="small text-body-secondary">{nextUp.notes}</div>
+                          )}
+                        </div>
                       </div>
-                      {nextUp.notes && (
-                        <div className="small text-body-secondary">{nextUp.notes}</div>
-                      )}
+                      <div className="muted-tile">
+                        Plan ahead: align this block with your highest energy window.
+                      </div>
                     </div>
                   ) : (
                     <div className="text-body-secondary">
@@ -459,11 +499,11 @@ const Dashboard = () => {
                 </CCardBody>
               </CCard>
             </CCol>
-            <CCol xs={12} lg={3}>
-              <CCard className="h-100">
+            <CCol xs={12} lg={5}>
+              <CCard className="h-100 elevated-card">
                 <CCardHeader className="fw-semibold">Momentum snapshot</CCardHeader>
                 <CCardBody>
-                  <div className="d-flex align-items-center justify-content-between mb-2">
+                  <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-2">
                     <div>
                       <div className="text-body-secondary small">Completion today</div>
                       <div className="display-6">{overallToday.completionRate}%</div>
@@ -472,17 +512,34 @@ const Dashboard = () => {
                       {overallToday.done} done
                     </CBadge>
                   </div>
-                  <CProgress height={10} className="mb-3">
+                  <CProgress height={10} className="mb-3 soft-progress">
                     <CProgressBar
                       color="success"
                       value={overallToday.completionRate}
                       aria-label="Today's completion"
                     />
                   </CProgress>
-                  <div className="small text-body-secondary">
+                  <div className="small text-body-secondary mb-2">
                     {streakSnapshot?.current
                       ? `Current streak: ${streakSnapshot.current} days · Best: ${streakSnapshot.best} days`
                       : "Build a streak by logging two days in a row."}
+                  </div>
+                  <div className="muted-tile">
+                    Tip: keep habits above 80% and batch them next to calendar breaks.
+                  </div>
+                </CCardBody>
+              </CCard>
+            </CCol>
+            <CCol xs={12} lg={3}>
+              <CCard className="h-100 elevated-card">
+                <CCardHeader className="fw-semibold">Daily AI Tip</CCardHeader>
+                <CCardBody>
+                  <div className="ai-tile">
+                    <div className="ai-icon">💡</div>
+                    <div>
+                      <div className="fw-semibold mb-1">One-sentence boost</div>
+                      <div className="text-body-secondary">{todayTip}</div>
+                    </div>
                   </div>
                 </CCardBody>
               </CCard>
@@ -491,7 +548,7 @@ const Dashboard = () => {
 
           <CRow className="g-4 mb-4">
             <CCol xs={12} lg={7}>
-              <CCard className="h-100">
+              <CCard className="h-100 elevated-card">
                 <CCardHeader className="fw-semibold">
                   Today's Habit Controls
                 </CCardHeader>
@@ -634,7 +691,7 @@ const Dashboard = () => {
             </CCol>
 
             <CCol xs={12} lg={5}>
-              <CCard className="h-100">
+              <CCard className="h-100 elevated-card">
                 <CCardHeader className="fw-semibold">Momentum Trend</CCardHeader>
                 <CCardBody style={{ height: 320 }}>
                   {trend.length ? (
@@ -676,7 +733,7 @@ const Dashboard = () => {
             </CCol>
 
             <CCol xs={12} lg={5}>
-              <CCard className="h-100">
+              <CCard className="h-100 elevated-card">
                 <CCardHeader className="fw-semibold">
                   Weekly streak & completion
                 </CCardHeader>
@@ -720,102 +777,30 @@ const Dashboard = () => {
 
           <CRow className="g-4 mb-4">
             <CCol xs={12} lg={7}>
-              <CCard className="h-100">
-                <CCardHeader className="fw-semibold">Daily AI Tip</CCardHeader>
-                <CCardBody>
-                  <div className="d-flex align-items-center gap-3">
-                    <div
-                      style={{
-                        width: 56,
-                        height: 56,
-                        borderRadius: "50%",
-                        background: "linear-gradient(135deg, #321fdb, #39f)",
-                        display: "grid",
-                        placeItems: "center",
-                        color: "white",
-                        fontSize: 24,
-                        boxShadow: "0 10px 30px rgba(50, 31, 219, 0.25)",
-                      }}
-                    >
-                      💡
+              <CCard className="h-100 elevated-card">
+                <CCardHeader className="fw-semibold">All caught up</CCardHeader>
+                <CCardBody className="d-flex flex-column flex-lg-row align-items-center gap-3">
+                  <div
+                    className={`status-badge ${allCaughtUp ? "bg-success text-white" : "bg-body"}`}
+                    style={{ animation: allCaughtUp ? "pulseGlow 1.6s ease-in-out infinite" : undefined }}
+                  >
+                    {allCaughtUp ? "✅" : "⏳"}
+                  </div>
+                  <div className="text-center text-lg-start">
+                    <div className="fw-semibold mb-1">
+                      {allCaughtUp ? "You're all set" : "Keep logging today"}
                     </div>
-                    <div>
-                      <div className="fw-semibold mb-1">One-sentence boost</div>
-                      <div className="text-body-secondary">{todayTip}</div>
+                    <div className="text-body-secondary">
+                      {allCaughtUp
+                        ? "You've logged everything for today and have no upcoming events."
+                        : "Log a check-in or align a habit with your next free block."}
                     </div>
                   </div>
                 </CCardBody>
               </CCard>
             </CCol>
-            {allCaughtUp && (
-              <CCol xs={12} lg={5}>
-                <CCard className="h-100 text-center">
-                  <CCardHeader className="fw-semibold">All caught up</CCardHeader>
-                  <CCardBody className="d-flex flex-column align-items-center gap-3">
-                    <div
-                      style={{
-                        width: 96,
-                        height: 96,
-                        borderRadius: "50%",
-                        background: "linear-gradient(135deg, #2eb85c, #7dd56f)",
-                        display: "grid",
-                        placeItems: "center",
-                        color: "white",
-                        fontSize: 36,
-                        animation: "pulseGlow 1.6s ease-in-out infinite",
-                      }}
-                    >
-                      ✅
-                    </div>
-                    <div className="fw-semibold">Great job!</div>
-                    <div className="text-body-secondary">
-                      You've logged everything for today and have no upcoming events.
-                    </div>
-                  </CCardBody>
-                </CCard>
-              </CCol>
-            )}
-          </CRow>
-
-          <CRow className="g-4">
-            <CCol xs={12} lg={6}>
-              <CCard className="h-100">
-                <CCardHeader className="fw-semibold">
-                  Focus Habits
-                </CCardHeader>
-                <CCardBody>
-                  {attentionHabits.length === 0 ? (
-                    <div className="text-body-secondary">
-                      Your habits are waiting for more history before we can make
-                      personalized suggestions.
-                    </div>
-                  ) : (
-                    <CListGroup flush>
-                      {attentionHabits.map((habit) => (
-                        <CListGroupItem
-                          key={habit.habitId}
-                          className="d-flex justify-content-between align-items-center"
-                        >
-                          <div>
-                            <div className="fw-semibold">{habit.habitName}</div>
-                            <div className="small text-body-secondary">
-                              {habit.recent.completionRate}% completion last 7 days ·
-                              best streak {habit.streak.best} days
-                            </div>
-                          </div>
-                          <CBadge color="warning">
-                            {formatPercent(habit.successRate)} lifetime
-                          </CBadge>
-                        </CListGroupItem>
-                      ))}
-                    </CListGroup>
-                  )}
-                </CCardBody>
-              </CCard>
-            </CCol>
-
-            <CCol xs={12} lg={6}>
-              <CCard className="h-100">
+            <CCol xs={12} lg={5}>
+              <CCard className="h-100 elevated-card">
                 <CCardHeader className="fw-semibold">Busy times & plans</CCardHeader>
                 <CCardBody>
                   {upcomingPlans.length === 0 ? (
@@ -866,14 +851,48 @@ const Dashboard = () => {
             </CCol>
           </CRow>
 
-          {leaderboard.length > 0 && (
-            <CRow className="g-4 mt-4">
-              <CCol xs={12}>
-                <CCard>
-                  <CCardHeader className="fw-semibold">
-                    Habit Leaderboard
-                  </CCardHeader>
-                  <CCardBody>
+          <CRow className="g-4">
+            <CCol xs={12} lg={6}>
+              <CCard className="h-100 elevated-card">
+                <CCardHeader className="fw-semibold">
+                  Focus Habits
+                </CCardHeader>
+                <CCardBody>
+                  {attentionHabits.length === 0 ? (
+                    <div className="text-body-secondary">
+                      Your habits are waiting for more history before we can make
+                      personalized suggestions.
+                    </div>
+                  ) : (
+                    <CListGroup flush>
+                      {attentionHabits.map((habit) => (
+                        <CListGroupItem
+                          key={habit.habitId}
+                          className="d-flex justify-content-between align-items-center"
+                        >
+                          <div>
+                            <div className="fw-semibold">{habit.habitName}</div>
+                            <div className="small text-body-secondary">
+                              {habit.recent.completionRate}% completion last 7 days ·
+                              best streak {habit.streak.best} days
+                            </div>
+                          </div>
+                          <CBadge color="warning">
+                            {formatPercent(habit.successRate)} lifetime
+                          </CBadge>
+                        </CListGroupItem>
+                      ))}
+                    </CListGroup>
+                  )}
+                </CCardBody>
+              </CCard>
+            </CCol>
+
+            <CCol xs={12} lg={6}>
+              <CCard className="h-100 elevated-card">
+                <CCardHeader className="fw-semibold">Habit Leaderboard</CCardHeader>
+                <CCardBody>
+                  {leaderboard.length > 0 ? (
                     <CListGroup flush>
                       {leaderboard.map((entry, index) => (
                         <CListGroupItem
@@ -896,11 +915,15 @@ const Dashboard = () => {
                         </CListGroupItem>
                       ))}
                     </CListGroup>
-                  </CCardBody>
-                </CCard>
-              </CCol>
-            </CRow>
-          )}
+                  ) : (
+                    <div className="text-body-secondary">
+                      Keep logging to surface your top-performing habits.
+                    </div>
+                  )}
+                </CCardBody>
+              </CCard>
+            </CCol>
+          </CRow>
         </>
       )}
     </div>
