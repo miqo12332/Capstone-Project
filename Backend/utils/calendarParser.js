@@ -52,6 +52,24 @@ const parseICalDate = (rawValue = "", params = {}) => {
     date = isUTC
       ? new Date(Date.UTC(year, month, day, hour, minute, second))
       : new Date(year, month, day, hour, minute, second);
+  } else if (/^[0-9]{8}T[0-9]{6}[+-][0-9]{4}$/.test(normalizedValue)) {
+    const base = normalizedValue.slice(0, 15);
+    const offset = normalizedValue.slice(15);
+    const year = Number.parseInt(base.slice(0, 4), 10);
+    const month = Number.parseInt(base.slice(4, 6), 10) - 1;
+    const day = Number.parseInt(base.slice(6, 8), 10);
+    const hour = Number.parseInt(base.slice(9, 11), 10);
+    const minute = Number.parseInt(base.slice(11, 13), 10);
+    const second = Number.parseInt(base.slice(13, 15), 10);
+    const offsetHours = Number.parseInt(offset.slice(1, 3), 10);
+    const offsetMinutes = Number.parseInt(offset.slice(3, 5), 10);
+    const totalOffsetMinutes = offsetHours * 60 + offsetMinutes;
+    const utcDate = Date.UTC(year, month, day, hour, minute, second);
+    const adjustedUtc =
+      offset[0] === "-"
+        ? utcDate + totalOffsetMinutes * 60000
+        : utcDate - totalOffsetMinutes * 60000;
+    date = new Date(adjustedUtc);
   } else {
     const parsed = new Date(normalizedValue);
     if (Number.isNaN(parsed.getTime())) {
@@ -71,15 +89,36 @@ const parseICalDate = (rawValue = "", params = {}) => {
   };
 };
 
+const normalizeEvents = (events = []) =>
+  Array.from(events)
+    .filter((event) => event?.start)
+    .map((event) => {
+      const start = event.start instanceof Date ? event.start : new Date(event.start);
+      const end = event.end instanceof Date ? event.end : event.end ? new Date(event.end) : start;
+      return {
+        uid: event.uid || null,
+        title: event.title || event.summary || "Calendar Event",
+        description: event.description || null,
+        location: event.location || null,
+        start,
+        end: end || start,
+        allDay: Boolean(event.allDay || event.datetype === "date"),
+        timezone: event.timezone || event.tz || event.start?.timezone || null,
+        url: event.url || null,
+        categories: event.categories || [],
+      };
+    })
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+
 export const parseIcsFeed = (icsText = "") => {
   if (!icsText) return [];
 
   const unfolded = unfoldContent(icsText);
-  const rawEvents = unfolded.split(/BEGIN:VEVENT/gi).slice(1);
+  const rawEvents = unfolded.match(/BEGIN:VEVENT[\s\S]*?END:VEVENT/gi) || [];
   const unique = new Map();
 
   rawEvents.forEach((chunk) => {
-    const lines = chunk.split(/\r?\n/);
+    const lines = chunk.split(/\r?\n|\r/);
     const event = {};
     let skipAlarm = false;
 
@@ -148,9 +187,8 @@ export const parseIcsFeed = (icsText = "") => {
     });
   });
 
-  return Array.from(unique.values()).sort(
-    (a, b) => a.start.getTime() - b.start.getTime()
-  );
+  const parsedEvents = normalizeEvents(unique.values());
+  return parsedEvents;
 };
 
 export default parseIcsFeed;
