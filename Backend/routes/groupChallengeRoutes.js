@@ -150,6 +150,81 @@ router.post("/:challengeId/join", async (req, res) => {
   }
 });
 
+// Cancel a join request
+router.delete("/:challengeId/join", async (req, res) => {
+  try {
+    const { challengeId } = req.params;
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    const membership = await UserGroupChallenge.findOne({
+      where: { user_id: userId, challenge_id: challengeId },
+    });
+
+    if (!membership) {
+      return res.status(404).json({ error: "Join request not found" });
+    }
+
+    if (!["pending", "invited"].includes(membership.status)) {
+      return res.status(400).json({ error: "Only pending requests can be canceled" });
+    }
+
+    await membership.destroy();
+
+    res.json({ message: "Join request canceled" });
+  } catch (err) {
+    console.error("Failed to cancel join request", err);
+    res.status(500).json({ error: "Failed to cancel join request" });
+  }
+});
+
+// Approve or reject a pending request (creator only)
+router.post("/:challengeId/requests/:userId/decision", async (req, res) => {
+  try {
+    const { challengeId, userId } = req.params;
+    const { approverId, action } = req.body;
+
+    if (!approverId || !action) {
+      return res.status(400).json({ error: "approverId and action are required" });
+    }
+
+    const challenge = await GroupChallenge.findByPk(challengeId);
+    if (!challenge) {
+      return res.status(404).json({ error: "Challenge not found" });
+    }
+
+    if (challenge.creator_id !== Number(approverId)) {
+      return res.status(403).json({ error: "Only the creator can approve or reject requests" });
+    }
+
+    const membership = await UserGroupChallenge.findOne({
+      where: { user_id: userId, challenge_id: challengeId },
+    });
+
+    if (!membership || membership.status !== "pending") {
+      return res.status(404).json({ error: "Pending request not found" });
+    }
+
+    if (!["approve", "reject"].includes(action)) {
+      return res.status(400).json({ error: "action must be approve or reject" });
+    }
+
+    membership.status = action === "approve" ? "accepted" : "rejected";
+    await membership.save();
+
+    res.json({
+      message: action === "approve" ? "Request approved" : "Request rejected",
+      status: membership.status,
+    });
+  } catch (err) {
+    console.error("Failed to process request decision", err);
+    res.status(500).json({ error: "Failed to process request" });
+  }
+});
+
 // List chat messages for a challenge (participants only)
 router.get("/:challengeId/messages", async (req, res) => {
   try {

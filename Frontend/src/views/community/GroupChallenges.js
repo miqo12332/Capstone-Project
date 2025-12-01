@@ -31,6 +31,8 @@ import {
   createChallenge,
   fetchChallenges,
   joinChallenge,
+  cancelJoinRequest,
+  decideJoinRequest,
   fetchChallengeMessages,
   sendChallengeMessage,
 } from "../../services/challenges";
@@ -52,6 +54,7 @@ const GroupChallenges = () => {
   const [joining, setJoining] = useState([]);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [canceling, setCanceling] = useState([]);
   const [friends, setFriends] = useState([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -62,6 +65,7 @@ const GroupChallenges = () => {
   const [chatError, setChatError] = useState("");
   const [chatText, setChatText] = useState("");
   const [sendingChat, setSendingChat] = useState(false);
+  const [deciding, setDeciding] = useState({});
   const chatBottomRef = useRef(null);
 
   const isAuthenticated = Boolean(user);
@@ -123,6 +127,57 @@ const GroupChallenges = () => {
       setError(message);
     } finally {
       setJoining((prev) => prev.filter((id) => id !== challengeId));
+    }
+  };
+
+  const handleCancelJoin = async (challengeId) => {
+    if (!user?.id) {
+      setError("Please log in to manage your requests.");
+      return;
+    }
+
+    if (canceling.includes(challengeId)) return;
+
+    setCanceling((prev) => [...prev, challengeId]);
+    setError("");
+    setSuccess("");
+
+    try {
+      await cancelJoinRequest(challengeId, user.id);
+      setSuccess("Join request canceled.");
+      await refreshChallenges();
+    } catch (err) {
+      console.error("Failed to cancel join request", err);
+      const message =
+        err?.response?.data?.error || err?.message || "Unable to cancel request.";
+      setError(message);
+    } finally {
+      setCanceling((prev) => prev.filter((id) => id !== challengeId));
+    }
+  };
+
+  const handleDecision = async (challengeId, memberId, action) => {
+    if (!user?.id) {
+      setError("Please log in to manage requests.");
+      return;
+    }
+
+    setDeciding((prev) => ({ ...prev, [memberId]: true }));
+    setError("");
+    setSuccess("");
+
+    try {
+      await decideJoinRequest(challengeId, memberId, user.id, action);
+      setSuccess(
+        action === "approve" ? "Request approved and member added." : "Request rejected."
+      );
+      await refreshChallenges();
+    } catch (err) {
+      console.error("Failed to process request", err);
+      const message = err?.response?.data?.error || err?.message || "Unable to update request.";
+      setError(message);
+    } finally {
+      setDeciding((prev) => ({ ...prev, [memberId]: false }));
     }
   };
 
@@ -196,6 +251,9 @@ const GroupChallenges = () => {
         participantCount: (challenge.participants || []).filter(
           (participant) => participant?.UserGroupChallenge?.status !== "invited"
         ).length,
+        pendingRequests: (challenge.participants || []).filter(
+          (participant) => participant?.UserGroupChallenge?.status === "pending"
+        ),
       })),
     [challenges]
   );
@@ -218,7 +276,20 @@ const GroupChallenges = () => {
     }
 
     if (status === "pending") {
-      return <CBadge color="warning">Pending approval</CBadge>;
+      return (
+        <div className="d-flex align-items-center gap-2">
+          <CBadge color="warning" className="px-3 py-2">Pending approval</CBadge>
+          <CButton
+            color="danger"
+            size="sm"
+            variant="outline"
+            disabled={canceling.includes(challenge.id)}
+            onClick={() => handleCancelJoin(challenge.id)}
+          >
+            {canceling.includes(challenge.id) ? <CSpinner size="sm" /> : "Cancel"}
+          </CButton>
+        </div>
+      );
     }
 
     if (status === "invited") {
@@ -374,6 +445,54 @@ const GroupChallenges = () => {
                           {challenge.start_date} → {challenge.end_date} · {challenge.participantCount} member
                           {challenge.participantCount === 1 ? "" : "s"}
                         </div>
+
+                        {membershipRole(challenge) === "creator" &&
+                          challenge.pendingRequests?.length > 0 && (
+                            <div className="mt-3">
+                              <div className="fw-semibold mb-2">Pending requests</div>
+                              <div className="d-flex flex-column gap-2">
+                                {challenge.pendingRequests.map((participant) => (
+                                  <div
+                                    key={participant.id}
+                                    className="d-flex align-items-center justify-content-between border rounded px-3 py-2"
+                                  >
+                                    <div>
+                                      <div className="fw-semibold">
+                                        {participant.name || participant.email || "New member"}
+                                      </div>
+                                      <div className="small text-body-secondary">Awaiting your approval</div>
+                                    </div>
+                                    <div className="d-flex gap-2">
+                                      <CButton
+                                        color="success"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={Boolean(deciding[participant.id])}
+                                        onClick={() =>
+                                          handleDecision(challenge.id, participant.id, "approve")
+                                        }
+                                      >
+                                        {deciding[participant.id] ? (
+                                          <CSpinner size="sm" />
+                                        ) : (
+                                          "Approve"
+                                        )}
+                                      </CButton>
+                                      <CButton
+                                        color="danger"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={Boolean(deciding[participant.id])}
+                                        onClick={() => handleDecision(challenge.id, participant.id, "reject")}
+                                      >
+                                        {deciding[participant.id] ? <CSpinner size="sm" /> : "Reject"}
+                                      </CButton>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                       </div>
                       <div className="text-md-end w-100 w-md-auto d-flex align-items-center gap-2 justify-content-between">
                         <div className="text-body-secondary small">

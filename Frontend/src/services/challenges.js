@@ -11,6 +11,19 @@ export const joinChallenge = (challengeId, userId) =>
     .post(`/group-challenges/${challengeId}/join`, { userId })
     .then((response) => response.data);
 
+export const cancelJoinRequest = (challengeId, userId) =>
+  api
+    .delete(`/group-challenges/${challengeId}/join`, { data: { userId } })
+    .then((response) => response.data);
+
+export const decideJoinRequest = (challengeId, userId, approverId, action) =>
+  api
+    .post(`/group-challenges/${challengeId}/requests/${userId}/decision`, {
+      approverId,
+      action,
+    })
+    .then((response) => response.data);
+
 export const fetchChallengeMessages = (challengeId, userId) =>
   api
     .get(`/group-challenges/${challengeId}/messages`, { params: { userId } })
