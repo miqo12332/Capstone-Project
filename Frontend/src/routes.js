@@ -9,6 +9,7 @@ const Profile = React.lazy(() => import("./views/auth/Profile"))
 const Dashboard = React.lazy(() => import("./views/dashboard/Dashboard"))
 const Habits = React.lazy(() => import("./views/dashboard/Habits"))
 const Planner = React.lazy(() => import("./views/dashboard/Planner"))
+const Notifications = React.lazy(() => import("./views/dashboard/Notifications"))
 
 // ===== Profile =====
 const UserProfile = React.lazy(() => import("./views/profile/UserProfile"))
@@ -25,6 +26,7 @@ const routes = [
   // ===== Dashboard =====
   { path: "/", name: "Home", element: Dashboard },
   { path: "/dashboard", name: "Dashboard", element: Dashboard },
+  { path: "/notifications", name: "Notifications", element: Notifications },
   { path: "/habits", name: "Habits", element: Habits },
   { path: "/addhabit", name: "Habits", element: Habits },
   { path: "/habit-library", name: "Habits", element: Habits },
