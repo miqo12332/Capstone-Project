@@ -189,7 +189,7 @@ const Messages = () => {
                 {threads.map((thread) => (
                   <CListGroupItem
                     key={thread.user?.id}
-                    action
+                    as="button"
                     active={activeUser?.id === thread.user?.id}
                     onClick={() => setActiveUser(thread.user)}
                     className="d-flex justify-content-between align-items-start"

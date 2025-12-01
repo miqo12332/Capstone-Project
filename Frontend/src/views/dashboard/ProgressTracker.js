@@ -380,7 +380,12 @@ const ProgressTracker = () => {
                         </CCardHeader>
                         <CCardBody style={{ height: 280 }}>
                           {recentDaily.length ? (
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer
+                              width="100%"
+                              height="100%"
+                              minWidth={200}
+                              minHeight={200}
+                            >
                               <AreaChart data={recentDaily}>
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="date" tickFormatter={formatDate} />
@@ -418,7 +423,12 @@ const ProgressTracker = () => {
                         </CCardHeader>
                         <CCardBody style={{ height: 280 }}>
                           {leaderboard.length ? (
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer
+                              width="100%"
+                              height="100%"
+                              minWidth={200}
+                              minHeight={200}
+                            >
                               <BarChart data={leaderboard}>
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="habitName" hide />

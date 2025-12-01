@@ -250,7 +250,7 @@ const DailyChallenge = () => {
                     Progress this week
                   </div>
                   {focusTrend.length ? (
-                    <ResponsiveContainer width="100%" height={180}>
+                    <ResponsiveContainer width="100%" height={180} minWidth={200} minHeight={120}>
                       <AreaChart data={focusTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <defs>
                           <linearGradient id="focusGradient" x1="0" y1="0" x2="0" y2="1">

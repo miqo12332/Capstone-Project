@@ -638,7 +638,7 @@ const Dashboard = () => {
                 <CCardHeader className="fw-semibold">Momentum Trend</CCardHeader>
                 <CCardBody style={{ height: 320 }}>
                   {trend.length ? (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
                       <AreaChart data={trend}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="date" />
@@ -682,7 +682,7 @@ const Dashboard = () => {
                 </CCardHeader>
                 <CCardBody style={{ height: 280 }}>
                   {weeklyTrend.length ? (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
                       <ComposedChart data={weeklyTrend}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="date" />
