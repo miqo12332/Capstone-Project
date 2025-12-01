@@ -1,0 +1,75 @@
+.planner-shell {
+  background: radial-gradient(circle at 10% 20%, rgba(113, 92, 255, 0.12), transparent 25%),
+    radial-gradient(circle at 80% 0%, rgba(0, 209, 255, 0.18), transparent 26%),
+    #f8f9fb;
+  border-radius: 18px;
+  padding: 1.5rem;
+}
+
+.planner-hero {
+  background: linear-gradient(135deg, #4436f8 0%, #7a67ff 50%, #35c8ff 100%);
+  border-radius: 18px;
+  padding: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.planner-hero::after {
+  content: "";
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.2), transparent 60%);
+  top: -40px;
+  right: -60px;
+  filter: blur(10px);
+}
+
+.planner-panel {
+  margin-top: 1.5rem;
+  border-radius: 16px;
+}
+
+.planner-tabs .nav-link {
+  border: none;
+  color: #6c757d;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 0.75rem 1.25rem;
+  transition: all 0.2s ease;
+  margin-right: 0.25rem;
+}
+
+.planner-tabs .nav-link.active {
+  background: linear-gradient(120deg, #4338ca, #7c3aed);
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(67, 56, 202, 0.25);
+}
+
+.planner-tabs .nav-link:hover:not(.active) {
+  background: #f2f2ff;
+  color: #4338ca;
+}
+
+.metric-card {
+  backdrop-filter: blur(4px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+.planner-pane {
+  background: #fdfdff;
+  border: 1px solid #f1f1f9;
+  border-radius: 14px;
+  padding: 1rem;
+}
+
+@media (max-width: 767px) {
+  .planner-shell {
+    padding: 1rem;
+  }
+
+  .planner-tabs .nav-link {
+    width: 100%;
+    margin-bottom: 0.35rem;
+  }
+}
