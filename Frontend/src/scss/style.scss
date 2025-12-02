@@ -75,6 +75,62 @@ body {
   pointer-events: none;
 }
 
+.brand-crest {
+  position: relative;
+  padding: 0.7rem 1rem;
+  border-radius: 16px;
+  background: radial-gradient(circle at 10% 20%, rgba(99, 123, 255, 0.16), transparent 55%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  isolation: isolate;
+}
+
+.brand-crest::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 80% 0%, rgba(46, 184, 92, 0.18), transparent 45%);
+  filter: blur(12px);
+  opacity: 0.8;
+  z-index: -1;
+}
+
+.brand-crest__orb {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(91, 231, 196, 0.3), rgba(124, 123, 255, 0.4));
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 12px 24px rgba(0, 0, 0, 0.22);
+  position: relative;
+  animation: floatPulse 4s ease-in-out infinite;
+}
+
+.brand-crest__orb::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 10px;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9), transparent 60%);
+  opacity: 0.8;
+}
+
+.brand-crest__logo {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.brand-crest__logo .sidebar-brand-full,
+.brand-crest__logo .sidebar-brand-narrow {
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.3));
+}
+
+.brand-crest__logo .sidebar-brand-full svg {
+  width: auto;
+}
+
 .sidebar-glow {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -110,6 +166,21 @@ body {
   100% {
     transform: scale(1.6);
     opacity: 0;
+  }
+}
+
+@keyframes floatPulse {
+  0% {
+    transform: translateY(0) scale(1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 12px 24px rgba(0, 0, 0, 0.22);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 16px 30px rgba(0, 0, 0, 0.28);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 12px 24px rgba(0, 0, 0, 0.22);
   }
 }
 
