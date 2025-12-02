@@ -50,6 +50,7 @@ import { fetchCalendarOverview } from "../../services/calendar";
 import { promptMissedReflection } from "../../utils/reflection";
 import {
   fetchAssistantProfile,
+  fetchAssistantSummary,
   saveAssistantProfile,
 } from "../../services/assistant";
 
@@ -69,6 +70,11 @@ const Dashboard = () => {
   const [aiProfile, setAiProfile] = useState(null);
   const [aiSaving, setAiSaving] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [aiSummaryOpen, setAiSummaryOpen] = useState(false);
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [aiSummary, setAiSummary] = useState("");
+  const [aiSummaryAgent, setAiSummaryAgent] = useState(null);
+  const [aiSummaryError, setAiSummaryError] = useState("");
   const navigate = useNavigate();
 
   const user = useMemo(
@@ -176,6 +182,34 @@ const Dashboard = () => {
   useEffect(() => {
     loadAiProfileMemory();
   }, [loadAiProfileMemory]);
+
+  const loadAiSummary = useCallback(async () => {
+    if (!user?.id) return;
+
+    setAiSummaryLoading(true);
+    setAiSummaryError("");
+    setAiSummary("");
+
+    try {
+      const data = await fetchAssistantSummary(user.id);
+      setAiSummary(data.summary || "");
+      setAiSummaryAgent(data.agent || null);
+    } catch (err) {
+      console.error("⚠️ Unable to load AI summary", err);
+      setAiSummaryError(
+        err?.response?.data?.error || "We couldn't fetch your AI summary right now."
+      );
+    } finally {
+      setAiSummaryLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (aiSummaryOpen) {
+      setAiSummary("");
+      loadAiSummary();
+    }
+  }, [aiSummaryOpen, loadAiSummary]);
 
   const saveAiNote = async (event) => {
     event.preventDefault();
@@ -436,6 +470,17 @@ const Dashboard = () => {
                 {action.label}
               </CButton>
             ))}
+            <CButton
+              color="success"
+              className="action-chip"
+              onClick={() => {
+                setAiSummaryAgent(null);
+                setAiSummaryError("");
+                setAiSummaryOpen(true);
+              }}
+            >
+              🧠 AI summary
+            </CButton>
             <CButton
               color="light"
               className="action-chip text-primary"
@@ -1019,6 +1064,63 @@ const Dashboard = () => {
           </CRow>
         </>
       )}
+
+      <CModal
+        alignment="center"
+        visible={aiSummaryOpen}
+        onClose={() => setAiSummaryOpen(false)}
+      >
+        <CModalHeader closeButton>AI journey summary</CModalHeader>
+        <CModalBody>
+          {aiSummaryAgent && (
+            <CAlert
+              color={aiSummaryAgent.ready ? "info" : "warning"}
+              className="mb-3"
+            >
+              {aiSummaryAgent.ready
+                ? `Powered by ${aiSummaryAgent.provider || "AI"}${
+                    aiSummaryAgent.model ? ` (${aiSummaryAgent.model})` : ""
+                  }`
+                : aiSummaryAgent.reason ||
+                  "AI summary is using the fallback coach."}
+            </CAlert>
+          )}
+
+          {aiSummaryError && (
+            <CAlert color="danger" className="mb-3">
+              {aiSummaryError}
+            </CAlert>
+          )}
+
+          {aiSummaryLoading ? (
+            <div className="d-flex align-items-center gap-3 text-body-secondary">
+              <CSpinner size="sm" />
+              <span>Analyzing your habits, schedules, and logs...</span>
+            </div>
+          ) : aiSummary ? (
+            <div className="text-break" style={{ whiteSpace: "pre-wrap" }}>
+              {aiSummary}
+            </div>
+          ) : (
+            <div className="text-body-secondary">
+              No summary yet. Try again in a moment.
+            </div>
+          )}
+        </CModalBody>
+        <CModalFooter className="d-flex justify-content-between">
+          <div className="text-body-secondary small">
+            Pulls from your latest habits, progress logs, schedules, and AI
+            memories.
+          </div>
+          <CButton
+            color="secondary"
+            variant="outline"
+            onClick={() => setAiSummaryOpen(false)}
+          >
+            Close
+          </CButton>
+        </CModalFooter>
+      </CModal>
 
       <CModal
         alignment="center"

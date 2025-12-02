@@ -8,6 +8,10 @@ import {
   UserSetting,
   AssistantMemory,
 } from "../models/index.js";
+import {
+  getAgentStatus,
+  runReasoningAgent,
+} from "../services/assistantAgent.js";
 
 const router = express.Router();
 
@@ -527,6 +531,78 @@ router.get("/history", async (req, res) => {
   } catch (error) {
     console.error("Failed to load assistant history", error);
     return res.status(500).json({ error: "Failed to load assistant history" });
+  }
+});
+
+router.get("/summary", async (req, res) => {
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ error: "userId is required" });
+  }
+
+  try {
+    const snapshot = await buildUserSnapshot(userId);
+    const [insightRecord, historyRecords] = await Promise.all([
+      AssistantMemory.findOne({
+        where: { user_id: userId, role: "insight" },
+        order: [["created_at", "DESC"]],
+      }),
+      AssistantMemory.findAll({
+        where: { user_id: userId, role: { [Op.in]: ["user", "assistant"] } },
+        order: [["created_at", "ASC"]],
+        limit: 14,
+      }),
+    ]);
+
+    const insightPayload = ensureObject(insightRecord?.keywords);
+    const keywordCounts = insightPayload.keywordCounts || {};
+    const history = mapHistory(historyRecords);
+    const agentStatus = getAgentStatus();
+
+    let summaryText = null;
+    let agent = agentStatus;
+
+    if (agentStatus.ready) {
+      try {
+        const { reply, meta } = await runReasoningAgent({
+          snapshot,
+          insightText: insightRecord?.content,
+          history,
+        });
+        summaryText = reply;
+        agent = meta;
+      } catch (err) {
+        console.error("LLM summary failed, using fallback", err);
+        agent = {
+          ...agentStatus,
+          ready: false,
+          reason: err.message || "LLM summary unavailable",
+        };
+      }
+    }
+
+    if (!summaryText) {
+      const insight = await updateInsightMemory(userId, snapshot, keywordCounts);
+      summaryText = insight.summaryText;
+    }
+
+    return res.json({
+      summary: summaryText,
+      agent,
+      stats: {
+        progress: snapshot.progress,
+        habits: snapshot.habits,
+        upcoming: snapshot.schedules.upcoming,
+        topKeywords: Object.entries(keywordCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 6)
+          .map(([keyword, count]) => ({ keyword, count })),
+      },
+    });
+  } catch (error) {
+    console.error("Failed to generate AI summary", error);
+    return res.status(500).json({ error: "Failed to generate AI summary" });
   }
 });
 

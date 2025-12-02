@@ -43,3 +43,12 @@ export const saveAssistantProfile = async (userId, about) => {
   const response = await api.post("/assistant/profile", { userId, about });
   return response.data;
 };
+
+export const fetchAssistantSummary = async (userId) => {
+  if (!userId) {
+    throw new Error("userId is required to generate the AI summary");
+  }
+
+  const response = await api.get("/assistant/summary", { params: { userId } });
+  return response.data;
+};
