@@ -24,7 +24,14 @@ import {
   CSpinner,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
-import { cilCheckCircle, cilChatBubble, cilPlus, cilSend } from "@coreui/icons"
+import {
+  cilCheckCircle,
+  cilChatBubble,
+  cilImage,
+  cilLocationPin,
+  cilPlus,
+  cilSend,
+} from "@coreui/icons"
 
 import { AuthContext } from "../../context/AuthContext"
 import {
@@ -47,6 +54,25 @@ const initialFormState = {
   invites: [],
 }
 
+const parseChallengeMessage = (content) => {
+  if (!content) return { text: "" }
+
+  try {
+    const parsed = JSON.parse(content)
+    if (parsed && typeof parsed === "object") {
+      return {
+        text: parsed.text || "",
+        attachment: parsed.attachment || null,
+        location: parsed.location || null,
+      }
+    }
+  } catch (err) {
+    return { text: content, attachment: null, location: null }
+  }
+
+  return { text: content, attachment: null, location: null }
+}
+
 const GroupChallenges = () => {
   const { user } = useContext(AuthContext)
   const [challenges, setChallenges] = useState([])
@@ -67,6 +93,10 @@ const GroupChallenges = () => {
   const [sendingChat, setSendingChat] = useState(false)
   const [deciding, setDeciding] = useState({})
   const chatBottomRef = useRef(null)
+  const [chatAttachment, setChatAttachment] = useState(null)
+  const [chatLocation, setChatLocation] = useState(null)
+  const [chatLocating, setChatLocating] = useState(false)
+  const chatFileInputRef = useRef(null)
 
   const isAuthenticated = Boolean(user)
 
@@ -336,6 +366,8 @@ const GroupChallenges = () => {
     setChatMessages([])
     setChatText("")
     setChatError("")
+    setChatAttachment(null)
+    setChatLocation(null)
   }
 
   useEffect(() => {
@@ -367,13 +399,27 @@ const GroupChallenges = () => {
   const handleSendChat = async (event) => {
     event.preventDefault()
 
-    if (!chatChallenge?.id || !user?.id || !chatText.trim()) return
+    if (
+      !chatChallenge?.id ||
+      !user?.id ||
+      (!chatText.trim() && !chatAttachment && !chatLocation)
+    )
+      return
 
     try {
       setSendingChat(true)
-      const created = await sendChallengeMessage(chatChallenge.id, user.id, chatText)
+      const content = chatAttachment || chatLocation
+        ? JSON.stringify({
+            text: chatText.trim() || undefined,
+            attachment: chatAttachment || undefined,
+            location: chatLocation || undefined,
+          })
+        : chatText.trim()
+      const created = await sendChallengeMessage(chatChallenge.id, user.id, content)
       setChatMessages((prev) => [...prev, created])
       setChatText("")
+      setChatAttachment(null)
+      setChatLocation(null)
     } catch (err) {
       console.error("Failed to send chat message", err)
       const message = err?.response?.data?.error || err?.message || "Could not send message."
@@ -388,6 +434,8 @@ const GroupChallenges = () => {
     setChatMessages([])
     setChatText("")
     setChatError("")
+    setChatAttachment(null)
+    setChatLocation(null)
   }
 
   return (
@@ -656,6 +704,7 @@ const GroupChallenges = () => {
                 ) : (
                   chatMessages.map((message) => {
                     const isMine = Number(message.sender_id) === Number(user?.id)
+                    const parsedContent = parseChallengeMessage(message.content)
                     return (
                       <div
                         key={message.id}
@@ -670,7 +719,45 @@ const GroupChallenges = () => {
                           <div className="small fw-semibold mb-1">
                             {isMine ? "You" : message.sender?.name || "Teammate"}
                           </div>
-                          <div>{message.content}</div>
+                          {parsedContent.text && (
+                            <div style={{ whiteSpace: "pre-wrap" }}>{parsedContent.text}</div>
+                          )}
+                          {parsedContent.attachment && (
+                            <div className="mt-2">
+                              <div className="small fw-semibold mb-1">Shared image</div>
+                              <img
+                                src={parsedContent.attachment.dataUrl}
+                                alt={parsedContent.attachment.name || "Shared image"}
+                                className="img-fluid rounded-3 border"
+                              />
+                              {parsedContent.attachment.name && (
+                                <div className={`small mt-1 ${isMine ? "text-white-50" : "text-body-secondary"}`}>
+                                  {parsedContent.attachment.name}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {parsedContent.location && (
+                            <div className="d-flex align-items-start gap-2 mt-1">
+                              <CIcon icon={cilLocationPin} />
+                              <div>
+                                <div className="small fw-semibold">Shared location</div>
+                                <a
+                                  href={`https://maps.google.com/?q=${parsedContent.location.latitude},${parsedContent.location.longitude}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className={isMine ? "text-white" : "text-primary"}
+                                >
+                                  Open in Maps
+                                </a>
+                                {parsedContent.location.label && (
+                                  <div className={`small ${isMine ? "text-white-50" : "text-body-secondary"}`}>
+                                    {parsedContent.location.label}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                           <div className={`small mt-2 ${isMine ? "text-white-50" : "text-body-secondary"}`}>
                             {new Date(message.created_at).toLocaleString()}
                           </div>
@@ -682,7 +769,99 @@ const GroupChallenges = () => {
                 <div ref={chatBottomRef} />
               </div>
 
-              <CForm onSubmit={handleSendChat}>
+              <CForm onSubmit={handleSendChat} className="d-flex flex-column gap-2">
+                {(chatAttachment || chatLocation) && (
+                  <div className="border rounded-3 p-3 bg-white">
+                    <div className="d-flex justify-content-between align-items-start mb-2">
+                      <div className="fw-semibold">Sharing extras</div>
+                      <CButton
+                        size="sm"
+                        color="link"
+                        className="text-decoration-none"
+                        onClick={() => {
+                          setChatAttachment(null)
+                          setChatLocation(null)
+                        }}
+                      >
+                        Clear
+                      </CButton>
+                    </div>
+                    {chatAttachment && (
+                      <div className="mb-2">
+                        <div className="small text-body-secondary">Image preview</div>
+                        <img
+                          src={chatAttachment.dataUrl}
+                          alt={chatAttachment.name || "Attachment"}
+                          className="img-fluid rounded-3 border"
+                        />
+                        {chatAttachment.name && (
+                          <div className="small text-body-secondary mt-1">{chatAttachment.name}</div>
+                        )}
+                      </div>
+                    )}
+                    {chatLocation && (
+                      <div className="d-flex align-items-start gap-2">
+                        <CIcon icon={cilLocationPin} className="text-primary" />
+                        <div>
+                          <div className="fw-semibold">Location ready</div>
+                          <div className="small text-body-secondary">
+                            {chatLocation.latitude.toFixed(4)}, {chatLocation.longitude.toFixed(4)}
+                          </div>
+                          <a
+                            href={`https://maps.google.com/?q=${chatLocation.latitude},${chatLocation.longitude}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="small"
+                          >
+                            Preview on map
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="d-flex gap-2 flex-wrap">
+                  <CButton
+                    type="button"
+                    variant="outline"
+                    color="secondary"
+                    onClick={() => chatFileInputRef.current?.click()}
+                    disabled={chatLoading}
+                  >
+                    <CIcon icon={cilImage} className="me-2" /> Image
+                  </CButton>
+                  <CButton
+                    type="button"
+                    variant="outline"
+                    color="secondary"
+                    onClick={() => {
+                      if (!navigator.geolocation) {
+                        setChatError("Location is not supported in this browser.")
+                        return
+                      }
+                      setChatLocating(true)
+                      navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                          setChatLocation({
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                            accuracy: position.coords.accuracy,
+                          })
+                          setChatLocating(false)
+                        },
+                        () => {
+                          setChatError("Unable to fetch your location right now.")
+                          setChatLocating(false)
+                        }
+                      )
+                    }}
+                    disabled={chatLoading || chatLocating}
+                  >
+                    {chatLocating ? <CSpinner size="sm" /> : <CIcon icon={cilLocationPin} className="me-2" />} Location
+                  </CButton>
+                </div>
+
                 <CInputGroup>
                   <CFormInput
                     placeholder="Share an update with the group"
@@ -690,11 +869,37 @@ const GroupChallenges = () => {
                     onChange={(event) => setChatText(event.target.value)}
                     disabled={chatLoading}
                   />
-                  <CButton type="submit" color="primary" disabled={sendingChat || !chatText.trim()}>
+                  <CButton
+                    type="submit"
+                    color="primary"
+                    disabled={
+                      sendingChat ||
+                      chatLocating ||
+                      (!chatText.trim() && !chatAttachment && !chatLocation)
+                    }
+                  >
                     {sendingChat ? <CSpinner size="sm" /> : <CIcon icon={cilSend} className="me-2" />}Send
                   </CButton>
                 </CInputGroup>
               </CForm>
+              <input
+                type="file"
+                accept="image/*"
+                hidden
+                ref={chatFileInputRef}
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  if (!file) return
+                  if (file.size > 2 * 1024 * 1024) {
+                    setChatError("Please choose an image smaller than 2MB.")
+                    return
+                  }
+                  const reader = new FileReader()
+                  reader.onloadend = () => setChatAttachment({ name: file.name, dataUrl: reader.result })
+                  reader.readAsDataURL(file)
+                  event.target.value = ""
+                }}
+              />
             </>
           )}
         </CModalBody>

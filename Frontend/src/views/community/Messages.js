@@ -17,7 +17,13 @@ import {
   CTooltip,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
-import { cilChatBubble, cilSend, cilUser } from "@coreui/icons"
+import {
+  cilChatBubble,
+  cilImage,
+  cilLocationPin,
+  cilSend,
+  cilUser,
+} from "@coreui/icons"
 import { AuthContext } from "../../context/AuthContext"
 import {
   fetchConversation,
@@ -32,6 +38,26 @@ const truncate = (text, length = 60) => {
   return text.length > length ? `${text.slice(0, length)}…` : text
 }
 
+const parseMessageContent = (content) => {
+  if (!content) return { text: "" }
+
+  try {
+    const parsed = JSON.parse(content)
+    if (parsed && typeof parsed === "object") {
+      return {
+        text: parsed.text || "",
+        attachment: parsed.attachment || null,
+        location: parsed.location || null,
+        isRich: true,
+      }
+    }
+  } catch (err) {
+    return { text: content, attachment: null, location: null }
+  }
+
+  return { text: content, attachment: null, location: null }
+}
+
 const Messages = () => {
   const { user } = useContext(AuthContext)
   const [threads, setThreads] = useState([])
@@ -44,6 +70,10 @@ const Messages = () => {
   const [composer, setComposer] = useState("")
   const bottomRef = useRef(null)
   const [contacts, setContacts] = useState([])
+  const [attachment, setAttachment] = useState(null)
+  const [locationPayload, setLocationPayload] = useState(null)
+  const [locating, setLocating] = useState(false)
+  const fileInputRef = useRef(null)
 
   const emptyState = useMemo(
     () => (
@@ -126,14 +156,21 @@ const Messages = () => {
 
   const handleSend = async (event) => {
     event.preventDefault()
-    if (!composer.trim() || !activeUser) return
+    if ((!composer.trim() && !attachment && !locationPayload) || !activeUser) return
 
     try {
       setSending(true)
       setError("")
+      const payloadContent = attachment || locationPayload
+        ? JSON.stringify({
+            text: composer.trim() || undefined,
+            attachment: attachment || undefined,
+            location: locationPayload || undefined,
+          })
+        : composer.trim()
       const created = await sendMessage(user.id, {
         recipientId: activeUser.id,
-        content: composer.trim(),
+        content: payloadContent,
       })
       setMessages((prev) => [...prev, created])
       setThreads((prev) => {
@@ -148,6 +185,8 @@ const Messages = () => {
         ]
       })
       setComposer("")
+      setAttachment(null)
+      setLocationPayload(null)
     } catch (err) {
       console.error("Failed to send message", err)
       const message =
@@ -185,32 +224,38 @@ const Messages = () => {
               </div>
             ) : (
               <CListGroup flush className="rounded-0">
-                {threads.map((thread) => (
-                  <CListGroupItem
-                    key={thread.user?.id}
-                    as="button"
-                    active={activeUser?.id === thread.user?.id}
-                    onClick={() => setActiveUser(thread.user)}
-                    className="d-flex justify-content-between align-items-start border-0 border-bottom"
-                  >
-                    <div className="d-flex align-items-start gap-3">
-                      <CAvatar color="primary" text={thread.user?.name?.[0] || "?"}>
-                        <CIcon icon={cilUser} />
-                      </CAvatar>
-                      <div>
-                        <div className="fw-semibold">{thread.user?.name || "Friend"}</div>
-                        <div className="small text-muted">
-                          {truncate(thread.lastMessage?.content || "Say hi")}
+                {threads.map((thread) => {
+                  const parsedPreview = parseMessageContent(thread.lastMessage?.content || "")
+                  const previewText = parsedPreview.attachment
+                    ? "Shared an image"
+                    : parsedPreview.location
+                      ? "Shared a location"
+                      : truncate(parsedPreview.text || "Say hi")
+                  return (
+                    <CListGroupItem
+                      key={thread.user?.id}
+                      as="button"
+                      active={activeUser?.id === thread.user?.id}
+                      onClick={() => setActiveUser(thread.user)}
+                      className="d-flex justify-content-between align-items-start border-0 border-bottom"
+                    >
+                      <div className="d-flex align-items-start gap-3">
+                        <CAvatar color="primary" text={thread.user?.name?.[0] || "?"}>
+                          <CIcon icon={cilUser} />
+                        </CAvatar>
+                        <div>
+                          <div className="fw-semibold">{thread.user?.name || "Friend"}</div>
+                          <div className="small text-muted">{previewText || "Say hi"}</div>
                         </div>
                       </div>
-                    </div>
-                    {thread.unread > 0 && (
-                      <CBadge color="danger" shape="rounded-pill">
-                        {thread.unread}
-                      </CBadge>
-                    )}
-                  </CListGroupItem>
-                ))}
+                      {thread.unread > 0 && (
+                        <CBadge color="danger" shape="rounded-pill">
+                          {thread.unread}
+                        </CBadge>
+                      )}
+                    </CListGroupItem>
+                  )
+                })}
               </CListGroup>
             )}
           </CCardBody>
@@ -241,61 +286,220 @@ const Messages = () => {
                   <div className="text-center text-muted py-4">
                     Start the conversation with a friendly note!
                   </div>
-                ) : (
-                  messages.map((msg) => {
-                    const isMine = Number(msg.sender_id) === Number(user.id)
-                    return (
-                      <div
-                        key={msg.id}
-                        className={`d-flex ${isMine ? "justify-content-end" : "justify-content-start"} mb-3`}
-                      >
+                  ) : (
+                    messages.map((msg) => {
+                      const isMine = Number(msg.sender_id) === Number(user.id)
+                      const parsedContent = parseMessageContent(msg.content)
+                      return (
                         <div
-                          className={`p-3 rounded-4 shadow-sm ${
-                            isMine ? "bg-primary text-white" : "bg-white border"
-                          }`}
-                          style={{ maxWidth: "80%" }}
+                          key={msg.id}
+                          className={`d-flex ${isMine ? "justify-content-end" : "justify-content-start"} mb-3`}
                         >
-                          <div className="small fw-semibold mb-1">
-                            {isMine ? "You" : msg.sender?.name || "Friend"}
-                          </div>
-                          <div className="mb-1" style={{ whiteSpace: "pre-wrap" }}>
-                            {msg.content}
-                          </div>
-                          <div className={`small ${isMine ? "text-white-50" : "text-muted"}`}>
-                            {new Date(msg.created_at).toLocaleString()}
+                          <div
+                            className={`p-3 rounded-4 shadow-sm ${
+                              isMine ? "bg-primary text-white" : "bg-white border"
+                            }`}
+                            style={{ maxWidth: "80%" }}
+                          >
+                            <div className="small fw-semibold mb-1">
+                              {isMine ? "You" : msg.sender?.name || "Friend"}
+                            </div>
+                            {parsedContent.text && (
+                              <div className="mb-1" style={{ whiteSpace: "pre-wrap" }}>
+                                {parsedContent.text}
+                              </div>
+                            )}
+                            {parsedContent.attachment && (
+                              <div className="mb-2">
+                                <div className="small fw-semibold mb-1">Shared image</div>
+                                <img
+                                  src={parsedContent.attachment.dataUrl}
+                                  alt={parsedContent.attachment.name || "Shared image"}
+                                  className="img-fluid rounded-3 border"
+                                />
+                                {parsedContent.attachment.name && (
+                                  <div className={`small mt-1 ${isMine ? "text-white-50" : "text-muted"}`}>
+                                    {parsedContent.attachment.name}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {parsedContent.location && (
+                              <div className="d-flex align-items-start gap-2">
+                                <CIcon icon={cilLocationPin} />
+                                <div>
+                                  <div className="small fw-semibold mb-1">Shared location</div>
+                                  <a
+                                    href={`https://maps.google.com/?q=${parsedContent.location.latitude},${parsedContent.location.longitude}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className={isMine ? "text-white" : "text-primary"}
+                                  >
+                                    Open in Maps
+                                  </a>
+                                  {parsedContent.location.label && (
+                                    <div className={`small ${isMine ? "text-white-50" : "text-muted"}`}>
+                                      {parsedContent.location.label}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            <div className={`small ${isMine ? "text-white-50" : "text-muted"}`}>
+                              {new Date(msg.created_at).toLocaleString()}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )
-                  })
-                )}
+                      )
+                    })
+                  )}
                 <div ref={bottomRef} />
               </div>
             ) : (
               emptyState
             )}
 
-            <div className="pt-3 border-top mt-3">
-              <CForm onSubmit={handleSend} className="d-flex gap-2 align-items-center">
-                <CFormInput
-                  placeholder={
-                    activeUser
-                      ? `Message ${activeUser.name || "your friend"}`
-                      : "Select a thread to start chatting"
-                  }
-                  disabled={!activeUser || sending}
-                  value={composer}
-                  onChange={(e) => setComposer(e.target.value)}
-                />
-                <CTooltip content="Send message">
-                  <span>
-                    <CButton type="submit" color="primary" disabled={!activeUser || sending || !composer.trim()}>
-                      {sending ? <CSpinner size="sm" /> : <CIcon icon={cilSend} />}
+              <div className="pt-3 border-top mt-3">
+                <CForm onSubmit={handleSend}>
+                  {(attachment || locationPayload) && (
+                    <div className="border rounded-4 p-3 mb-2 bg-white">
+                      <div className="d-flex justify-content-between align-items-start mb-2">
+                        <div className="fw-semibold">Ready to share</div>
+                        <CButton
+                          size="sm"
+                          color="link"
+                          className="text-decoration-none"
+                          onClick={() => {
+                            setAttachment(null)
+                            setLocationPayload(null)
+                          }}
+                        >
+                          Clear
+                        </CButton>
+                      </div>
+                      {attachment && (
+                        <div className="mb-2">
+                          <div className="small text-muted">Image preview</div>
+                          <img
+                            src={attachment.dataUrl}
+                            alt={attachment.name || "Attachment"}
+                            className="img-fluid rounded-3 border"
+                          />
+                          {attachment.name && (
+                            <div className="small text-muted mt-1">{attachment.name}</div>
+                          )}
+                        </div>
+                      )}
+                      {locationPayload && (
+                        <div className="d-flex align-items-start gap-2">
+                          <CIcon icon={cilLocationPin} className="text-primary" />
+                          <div>
+                            <div className="fw-semibold">Location locked in</div>
+                            <div className="small text-muted">
+                              {locationPayload.latitude.toFixed(4)}, {locationPayload.longitude.toFixed(4)}
+                            </div>
+                            <a
+                              href={`https://maps.google.com/?q=${locationPayload.latitude},${locationPayload.longitude}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="small"
+                            >
+                              Preview on map
+                            </a>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="d-flex gap-2 align-items-center">
+                    <CButton
+                      type="button"
+                      variant="outline"
+                      color="secondary"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={!activeUser || sending}
+                    >
+                      <CIcon icon={cilImage} className="me-2" /> Image
                     </CButton>
-                  </span>
-                </CTooltip>
-              </CForm>
-            </div>
+                    <CButton
+                      type="button"
+                      variant="outline"
+                      color="secondary"
+                      onClick={() => {
+                        if (!navigator.geolocation) {
+                          setError("Location is not supported in this browser.")
+                          return
+                        }
+                        setLocating(true)
+                        navigator.geolocation.getCurrentPosition(
+                          (position) => {
+                            setLocationPayload({
+                              latitude: position.coords.latitude,
+                              longitude: position.coords.longitude,
+                              accuracy: position.coords.accuracy,
+                            })
+                            setLocating(false)
+                          },
+                          () => {
+                            setError("Unable to fetch your location. Please try again.")
+                            setLocating(false)
+                          }
+                        )
+                      }}
+                      disabled={!activeUser || sending || locating}
+                    >
+                      {locating ? <CSpinner size="sm" /> : <CIcon icon={cilLocationPin} className="me-2" />} Location
+                    </CButton>
+                    <CFormInput
+                      placeholder={
+                        activeUser
+                          ? `Message ${activeUser.name || "your friend"}`
+                          : "Select a thread to start chatting"
+                      }
+                      disabled={!activeUser || sending}
+                      value={composer}
+                      onChange={(e) => setComposer(e.target.value)}
+                    />
+                    <CTooltip content="Send message">
+                      <span>
+                        <CButton
+                          type="submit"
+                          color="primary"
+                          disabled={
+                            !activeUser ||
+                            sending ||
+                            locating ||
+                            (!composer.trim() && !attachment && !locationPayload)
+                          }
+                        >
+                          {sending ? <CSpinner size="sm" /> : <CIcon icon={cilSend} />}
+                        </CButton>
+                      </span>
+                    </CTooltip>
+                  </div>
+                </CForm>
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  ref={fileInputRef}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    if (!file) return
+                    if (file.size > 2 * 1024 * 1024) {
+                      setError("Please choose an image smaller than 2MB.")
+                      return
+                    }
+                    const reader = new FileReader()
+                    reader.onloadend = () => {
+                      setAttachment({ name: file.name, dataUrl: reader.result })
+                    }
+                    reader.readAsDataURL(file)
+                    event.target.value = ""
+                  }}
+                />
+              </div>
           </CCardBody>
         </CCard>
       </CCol>
