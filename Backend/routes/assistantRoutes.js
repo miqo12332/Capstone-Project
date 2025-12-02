@@ -85,6 +85,37 @@ const extractKeywords = (message) => {
   return { list, counts };
 };
 
+const summarizeAboutText = (about, keywordCounts) => {
+  if (!about) return "";
+
+  const sentences = about
+    .replace(/\s+/g, " ")
+    .split(/(?<=[.!?])\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const primary = sentences[0] || about.trim();
+
+  const keywordLine = Object.entries(keywordCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([keyword]) => keyword)
+    .join(", ");
+
+  const baseSummary = primary.length > 180 ? `${primary.slice(0, 177)}…` : primary;
+  const focusLine = keywordLine ? `Focus: ${keywordLine}.` : "";
+
+  return [
+    baseSummary.endsWith(".") || baseSummary.endsWith("!") || baseSummary.endsWith("?")
+      ? baseSummary
+      : `${baseSummary}.`,
+    focusLine,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+};
+
 const buildUserSnapshot = async (userId) => {
   const userRecord = await User.findByPk(userId, {
     include: [{ model: UserSetting, as: "settings" }],
@@ -293,6 +324,24 @@ const updateInsightMemory = async (userId, snapshot, keywordCounts) => {
   };
 };
 
+const getLatestProfileMemory = async (userId) => {
+  const record = await AssistantMemory.findOne({
+    where: { user_id: userId, role: "profile" },
+    order: [["created_at", "DESC"]],
+  });
+
+  if (!record) return null;
+
+  const meta = ensureObject(record.keywords);
+
+  return {
+    summary: record.content,
+    about: meta.about || null,
+    keywords: meta.counts || meta.keywordCounts || {},
+    updatedAt: record.created_at,
+  };
+};
+
 const selectRandom = (choices, fallback) => {
   if (!Array.isArray(choices) || choices.length === 0) {
     return fallback;
@@ -434,7 +483,7 @@ router.get("/history", async (req, res) => {
   try {
     const snapshot = await buildUserSnapshot(userId);
 
-    const [historyRecords, insightRecord] = await Promise.all([
+    const [historyRecords, insightRecord, profileMemory] = await Promise.all([
       AssistantMemory.findAll({
         where: {
           user_id: userId,
@@ -446,6 +495,7 @@ router.get("/history", async (req, res) => {
         where: { user_id: userId, role: "insight" },
         order: [["created_at", "DESC"]],
       }),
+      getLatestProfileMemory(userId),
     ]);
 
     const insightPayload = ensureObject(insightRecord?.keywords);
@@ -470,12 +520,63 @@ router.get("/history", async (req, res) => {
         upcoming: snapshot.schedules.upcoming,
         habits: snapshot.habits,
         insightText: insightRecord?.content || null,
+        profileMemory,
       },
       agent: getCoachStatus(),
     });
   } catch (error) {
     console.error("Failed to load assistant history", error);
     return res.status(500).json({ error: "Failed to load assistant history" });
+  }
+});
+
+router.get("/profile", async (req, res) => {
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ error: "userId is required" });
+  }
+
+  try {
+    const profile = await getLatestProfileMemory(userId);
+    return res.json(profile || { summary: null, about: null, keywords: {}, updatedAt: null });
+  } catch (error) {
+    console.error("Failed to load assistant profile memory", error);
+    return res.status(500).json({ error: "Failed to load assistant profile" });
+  }
+});
+
+router.post("/profile", async (req, res) => {
+  const { userId, about } = req.body;
+
+  if (!userId || !about) {
+    return res.status(400).json({ error: "userId and about are required" });
+  }
+
+  try {
+    const { counts } = extractKeywords(about);
+    const summary = summarizeAboutText(about, counts);
+
+    const record = await AssistantMemory.create({
+      user_id: userId,
+      role: "profile",
+      content: summary,
+      keywords: {
+        about,
+        counts,
+        generatedAt: new Date().toISOString(),
+      },
+    });
+
+    return res.json({
+      summary,
+      about,
+      keywords: counts,
+      updatedAt: record.created_at,
+    });
+  } catch (error) {
+    console.error("Failed to store assistant profile", error);
+    return res.status(500).json({ error: "Failed to store assistant profile" });
   }
 });
 

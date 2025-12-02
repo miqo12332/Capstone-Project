@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CAlert,
   CBadge,
@@ -10,10 +10,15 @@ import {
   CCol,
   CForm,
   CFormInput,
+  CFormTextarea,
   CInputGroup,
   CInputGroupText,
   CListGroup,
   CListGroupItem,
+  CModal,
+  CModalBody,
+  CModalFooter,
+  CModalHeader,
   CProgress,
   CProgressBar,
   CRow,
@@ -43,6 +48,10 @@ import {
 import { formatPercent, getProgressAnalytics } from "../../services/analytics";
 import { fetchCalendarOverview } from "../../services/calendar";
 import { promptMissedReflection } from "../../utils/reflection";
+import {
+  fetchAssistantProfile,
+  saveAssistantProfile,
+} from "../../services/assistant";
 
 const Dashboard = () => {
   const [habits, setHabits] = useState([]);
@@ -55,6 +64,11 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [editingHabitId, setEditingHabitId] = useState(null);
   const [editCounts, setEditCounts] = useState({ done: 0, missed: 0 });
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiNote, setAiNote] = useState("");
+  const [aiProfile, setAiProfile] = useState(null);
+  const [aiSaving, setAiSaving] = useState(false);
+  const [aiError, setAiError] = useState("");
   const navigate = useNavigate();
 
   const user = useMemo(
@@ -145,6 +159,47 @@ const Dashboard = () => {
     loadAnalytics();
     loadSchedules();
   }, [user?.id]);
+
+  const loadAiProfileMemory = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const data = await fetchAssistantProfile(user.id);
+      setAiProfile(data);
+      if (data?.about) {
+        setAiNote(data.about);
+      }
+    } catch (err) {
+      console.warn("⚠️ Unable to load AI memory", err);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadAiProfileMemory();
+  }, [loadAiProfileMemory]);
+
+  const saveAiNote = async (event) => {
+    event.preventDefault();
+    if (!user?.id || !aiNote.trim()) {
+      setAiError("Share one thing the AI should remember about you.");
+      return;
+    }
+
+    setAiSaving(true);
+    setAiError("");
+
+    try {
+      const data = await saveAssistantProfile(user.id, aiNote.trim());
+      setAiProfile(data);
+      setAiModalOpen(false);
+    } catch (err) {
+      console.error("❌ Failed to save AI memory", err);
+      setAiError(
+        err?.response?.data?.error || "We couldn't save this note right now."
+      );
+    } finally {
+      setAiSaving(false);
+    }
+  };
 
   const overallToday = useMemo(() => {
     const aggregate = Object.values(todayCounts).reduce(
@@ -389,6 +444,16 @@ const Dashboard = () => {
             >
               ✨ Open planner
             </CButton>
+            <CButton
+              color="info"
+              className="action-chip text-white"
+              onClick={() => {
+                setAiError("");
+                setAiModalOpen(true);
+              }}
+            >
+              🤖 AI about me
+            </CButton>
           </div>
         </div>
         <div className="hero-card">
@@ -540,6 +605,34 @@ const Dashboard = () => {
                       <div className="fw-semibold mb-1">One-sentence boost</div>
                       <div className="text-body-secondary">{todayTip}</div>
                     </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-body-secondary text-uppercase small fw-semibold">
+                      AI remembers you
+                    </div>
+                    {aiProfile?.summary ? (
+                      <>
+                        <div className="fw-semibold mt-1">{aiProfile.summary}</div>
+                        <div className="text-body-secondary small">
+                          Updated {new Date(aiProfile.updatedAt).toLocaleString()}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-body-secondary small">
+                        Share a quick note so the AI can personalize your tips.
+                      </div>
+                    )}
+                    <CButton
+                      size="sm"
+                      color="link"
+                      className="px-0 mt-1"
+                      onClick={() => {
+                        setAiError("");
+                        setAiModalOpen(true);
+                      }}
+                    >
+                      Update what it knows about you
+                    </CButton>
                   </div>
                 </CCardBody>
               </CCard>
@@ -926,6 +1019,60 @@ const Dashboard = () => {
           </CRow>
         </>
       )}
+
+      <CModal
+        alignment="center"
+        visible={aiModalOpen}
+        onClose={() => setAiModalOpen(false)}
+      >
+        <CModalHeader closeButton>Teach the AI about you</CModalHeader>
+        <CModalBody>
+          <p className="text-body-secondary">
+            Share one or two details about your goals, routines, or coaching style.
+            The AI will store a tiny summary and use it for future tips.
+          </p>
+
+          {aiError && (
+            <CAlert color="danger" className="mb-3">
+              {aiError}
+            </CAlert>
+          )}
+
+          <CForm onSubmit={saveAiNote}>
+            <CFormTextarea
+              rows={4}
+              placeholder="Example: I'm aiming to build a morning writing habit, prefer gentle reminders, and evenings are usually busy."
+              value={aiNote}
+              onChange={(event) => setAiNote(event.target.value)}
+              disabled={aiSaving}
+            />
+            <div className="d-flex justify-content-between align-items-center mt-3 gap-2 flex-wrap">
+              <div className="text-body-secondary small">
+                AI will keep a short note like a memory for you.
+              </div>
+              <div className="d-flex gap-2 ms-auto">
+                <CButton
+                  type="button"
+                  color="secondary"
+                  variant="outline"
+                  disabled={aiSaving}
+                  onClick={() => setAiModalOpen(false)}
+                >
+                  Cancel
+                </CButton>
+                <CButton type="submit" color="primary" disabled={aiSaving}>
+                  {aiSaving ? <CSpinner size="sm" /> : "Save for the AI"}
+                </CButton>
+              </div>
+            </div>
+          </CForm>
+        </CModalBody>
+        <CModalFooter className="d-flex justify-content-between">
+          <div className="text-body-secondary small">
+            The note stays private to your account and guides the coach on this page.
+          </div>
+        </CModalFooter>
+      </CModal>
     </div>
   );
 };
