@@ -2,8 +2,9 @@ const MAX_HISTORY_MESSAGES = parseInt(process.env.ASSISTANT_HISTORY_LIMIT || "12
 const GEMINI_BASE_URL = (process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta").replace(/\/$/, "");
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
 const PROVIDER_NAME = process.env.GEMINI_PROVIDER_NAME || "Google Gemini";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "AIzaSyA0MwERRiDFuO-kuMsF-BmJWdQaIIO8F1k";
 
-const hasApiKey = () => Boolean(process.env.GEMINI_API_KEY);
+const hasApiKey = () => Boolean(GEMINI_API_KEY);
 
 export const getAgentStatus = () => ({
   ready: hasApiKey(),
@@ -105,7 +106,7 @@ const buildMessages = ({ snapshot, insightText, history = [] }) => {
 };
 
 export const runReasoningAgent = async ({ snapshot, insightText, history, apiKeyOverride }) => {
-  const apiKey = apiKeyOverride || process.env.GEMINI_API_KEY;
+  const apiKey = apiKeyOverride || GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("Missing Gemini API key");
   }
