@@ -1,15 +1,84 @@
 const MAX_HISTORY_MESSAGES = parseInt(process.env.ASSISTANT_HISTORY_LIMIT || "12", 10);
 const GEMINI_BASE_URL = (process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta").replace(/\/$/, "");
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash-latest";
+const normalizeModelName = (name = "") => name.replace(/^models\//, "").replace(/-latest$/, "");
+const GEMINI_MODEL = normalizeModelName(process.env.GEMINI_MODEL || "gemini-1.5-flash");
 const PROVIDER_NAME = process.env.GEMINI_PROVIDER_NAME || "Google Gemini";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "AIzaSyA0MwERRiDFuO-kuMsF-BmJWdQaIIO8F1k";
 
 const hasApiKey = () => Boolean(GEMINI_API_KEY);
 
+let resolvedModelName = null;
+let resolvingModelPromise = null;
+
+const parseModelVersion = (name = "") => {
+  const match = name.match(/gemini-(\d+(?:\.\d+)?)/);
+  return match ? Number(match[1]) : 0;
+};
+
+const resolveModelName = async (apiKey) => {
+  const fallback = GEMINI_MODEL;
+
+  try {
+    const response = await fetch(`${GEMINI_BASE_URL}/models?key=${apiKey}`);
+
+    if (!response.ok) {
+      return fallback;
+    }
+
+    const data = await response.json();
+    const models = Array.isArray(data?.models) ? data.models : [];
+
+    const supportsGenerateContent = (model = {}) =>
+      Array.isArray(model.supportedMethods) && model.supportedMethods.includes("generateContent");
+
+    const simplified = models
+      .filter((model) => model?.name)
+      .map((model) => ({
+        ...model,
+        simpleName: normalizeModelName(model.name),
+      }))
+      .filter((model) => supportsGenerateContent(model));
+
+    if (simplified.some((model) => model.simpleName === fallback)) {
+      return fallback;
+    }
+
+    const flashModels = simplified.filter((model) => model.simpleName.includes("-flash"));
+
+    if (!flashModels.length) {
+      return fallback;
+    }
+
+    flashModels.sort((a, b) => parseModelVersion(b.simpleName) - parseModelVersion(a.simpleName));
+    return flashModels[0].simpleName || fallback;
+  } catch (error) {
+    return fallback;
+  }
+};
+
+const getModelName = async (apiKey) => {
+  if (resolvedModelName) {
+    return resolvedModelName;
+  }
+
+  if (!resolvingModelPromise) {
+    resolvingModelPromise = resolveModelName(apiKey)
+      .then((name) => {
+        resolvedModelName = name || GEMINI_MODEL;
+        return resolvedModelName;
+      })
+      .finally(() => {
+        resolvingModelPromise = null;
+      });
+  }
+
+  return resolvingModelPromise;
+};
+
 export const getAgentStatus = () => ({
   ready: hasApiKey(),
   provider: PROVIDER_NAME,
-  model: hasApiKey() ? GEMINI_MODEL : null,
+  model: hasApiKey() ? resolvedModelName || GEMINI_MODEL : null,
   reason: hasApiKey()
     ? null
     : "Set the GEMINI_API_KEY environment variable to enable the adaptive AI companion.",
@@ -111,6 +180,8 @@ export const runReasoningAgent = async ({ snapshot, insightText, history, apiKey
     throw new Error("Missing Gemini API key");
   }
 
+  const modelName = await getModelName(apiKey);
+
   const { systemInstruction, contents } = buildMessages({ snapshot, insightText, history });
 
   const payload = {
@@ -138,7 +209,7 @@ export const runReasoningAgent = async ({ snapshot, insightText, history, apiKey
   };
 
   const response = await fetch(
-    `${GEMINI_BASE_URL}/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent?key=${apiKey}`,
+    `${GEMINI_BASE_URL}/models/${encodeURIComponent(modelName)}:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: {
@@ -169,7 +240,7 @@ export const runReasoningAgent = async ({ snapshot, insightText, history, apiKey
     meta: {
       ready: true,
       provider: PROVIDER_NAME,
-      model: GEMINI_MODEL,
+      model: modelName,
       reason: null,
       usage: data?.usage || null,
       updatedAt: new Date().toISOString(),
