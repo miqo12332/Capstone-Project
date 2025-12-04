@@ -1,19 +1,35 @@
 // Routes for AI reasoning requests. Wraps the Claude agent behind a server-only API.
 import express from "express";
-import rateLimit from "express-rate-limit";
 
 import { runReasoningAgent, getAgentStatus } from "../services/claudeAgent.js";
 
 const router = express.Router();
 
 // Optional rate limiting to prevent abuse of the AI endpoint.
-const aiLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many AI requests. Please try again shortly." },
-});
+// A lightweight in-memory limiter avoids an external dependency and keeps the
+// endpoint available even in constrained environments (e.g., during offline CI
+// runs). It enforces a rolling one-minute window per IP.
+const WINDOW_MS = 60 * 1000
+const MAX_REQUESTS = 5
+const requestLog = new Map()
+
+const aiLimiter = (req, res, next) => {
+  const now = Date.now()
+  const ip = req.ip || req.connection?.remoteAddress || "global"
+  const windowStart = now - WINDOW_MS
+
+  const recent = (requestLog.get(ip) || []).filter((ts) => ts > windowStart)
+  recent.push(now)
+  requestLog.set(ip, recent)
+
+  if (recent.length > MAX_REQUESTS) {
+    return res
+      .status(429)
+      .json({ error: "Too many AI requests. Please try again shortly." })
+  }
+
+  next()
+}
 
 const validateRequest = (body = {}) => {
   const { snapshot, history } = body;
