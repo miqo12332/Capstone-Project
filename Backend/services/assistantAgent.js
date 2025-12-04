@@ -1,9 +1,12 @@
+import { ChatAnthropic } from "@langchain/anthropic"
+import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages"
+
 // ai/claudeAgent.js  (or whatever path you use)
 
 const MAX_HISTORY_MESSAGES = parseInt(process.env.ASSISTANT_HISTORY_LIMIT || "12", 10)
 
 const CLAUDE_BASE_URL = (
-  process.env.CLAUDE_BASE_URL || "https://api.anthropic.com/v1"
+  process.env.CLAUDE_BASE_URL || "https://api.anthropic.com"
 ).replace(/\/$/, "")
 
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-3-5-sonnet-latest"
@@ -117,10 +120,13 @@ const buildMessages = ({ snapshot, insightText, history = [] }) => {
 
   const contextBlock = describeSnapshot(snapshot, insightText)
 
-  const formattedHistory = limitHistory(history).map((entry) => ({
-    role: entry.role === "assistant" ? "assistant" : "user",
-    content: entry.content,
-  }))
+  const formattedHistory = limitHistory(history)
+    .filter((entry) => Boolean(entry?.content))
+    .map((entry) =>
+      entry.role === "assistant"
+        ? new AIMessage(entry.content)
+        : new HumanMessage(entry.content)
+    )
 
   return {
     systemInstruction: `${systemPrompt}\n\n${contextBlock}`,
@@ -147,48 +153,33 @@ export const runReasoningAgent = async ({
     history,
   })
 
-  const payload = {
+  const chat = new ChatAnthropic({
+    anthropicApiKey: apiKey,
+    anthropicApiUrl: `${CLAUDE_BASE_URL}/v1`,
     model: CLAUDE_MODEL,
-    system: systemInstruction,
     temperature: 0.7,
-    top_p: 0.95,
-    max_tokens: 1024,
-    messages:
-      contents && contents.length
-        ? contents
-        : [
-            {
-              role: "user",
-              content:
-                "Provide tailored guidance based on the system instruction and any available context.",
-            },
-          ],
-  }
-
-  const url = `${CLAUDE_BASE_URL}/messages`
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify(payload),
+    topP: 0.95,
+    maxTokens: 1024,
   })
 
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Claude request failed: ${response.status} ${errorText}`)
-  }
+  const replyMessage = await chat.invoke([
+    new SystemMessage(systemInstruction),
+    ...(contents && contents.length
+      ? contents
+      : [
+          new HumanMessage(
+            "Provide tailored guidance based on the system instruction and any available context."
+          ),
+        ]),
+  ])
 
-  const data = await response.json()
-
-  const reply = data?.content
-    ?.map((part) => part.text)
-    .filter(Boolean)
-    .join("\n")
-    ?.trim()
+  const reply = typeof replyMessage.content === "string"
+    ? replyMessage.content.trim()
+    : replyMessage.content
+        ?.map((part) => part?.text)
+        .filter(Boolean)
+        .join("\n")
+        ?.trim()
 
   if (!reply) {
     throw new Error("Claude response missing content")
@@ -201,7 +192,7 @@ export const runReasoningAgent = async ({
       provider: PROVIDER_NAME,
       model: CLAUDE_MODEL,
       reason: null,
-      usage: data?.usage || null,
+      usage: replyMessage?.response_metadata?.usage || null,
       updatedAt: new Date().toISOString(),
     },
   }
