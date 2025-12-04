@@ -9,7 +9,10 @@ const CLAUDE_BASE_URL = (
   process.env.CLAUDE_BASE_URL || "https://api.anthropic.com"
 ).replace(/\/$/, "")
 
-const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-3-5-sonnet-latest"
+// Use a pinned Claude model version by default to avoid MODEL_NOT_FOUND errors
+// that can occur if "-latest" aliases are unavailable in a given environment.
+const CLAUDE_MODEL =
+  process.env.CLAUDE_MODEL || "claude-3-5-sonnet-20241022"
 
 // Just a label, for UI / status
 const PROVIDER_NAME = process.env.CLAUDE_PROVIDER_NAME || "Anthropic Claude"
