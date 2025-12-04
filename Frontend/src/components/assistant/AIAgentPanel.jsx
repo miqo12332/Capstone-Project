@@ -1,0 +1,90 @@
+import React, { useState } from "react";
+import PropTypes from "prop-types";
+
+// Simple UI wrapper that calls the /ai/reason endpoint and renders the responses.
+// Pass in the latest snapshot and optional insight text to ground the AI companion.
+const AIAgentPanel = ({ snapshot, insightText = "", initialHistory = [] }) => {
+  const [history, setHistory] = useState(initialHistory);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [meta, setMeta] = useState(null);
+
+  const sendMessage = async () => {
+    if (!input.trim() || loading) return;
+
+    const trimmed = input.trim();
+    const nextHistory = [...history, { role: "user", content: trimmed }];
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("/ai/reason", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snapshot, insightText, history: nextHistory }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(errorBody?.error || "Unable to reach the AI service.");
+      }
+
+      const result = await response.json();
+      setHistory([...nextHistory, { role: "assistant", content: result.reply }]);
+      if (result?.meta) setMeta(result.meta);
+      setInput("");
+    } catch (err) {
+      setError(err.message || "Unexpected error contacting the AI service.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="ai-agent-panel">
+      <div className="ai-agent-panel__history">
+        {history.map((message, index) => (
+          <div
+            key={`${message.role}-${index}`}
+            className={`ai-agent-panel__message ai-agent-panel__message--${message.role}`}
+          >
+            <strong>{message.role === "assistant" ? "AI" : "You"}:</strong> {" "}
+            <span>{message.content}</span>
+          </div>
+        ))}
+      </div>
+
+      {error && <div className="ai-agent-panel__error">{error}</div>}
+
+      <div className="ai-agent-panel__input">
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask the StepHabit AI companion anything about your habits..."
+          rows={3}
+        />
+        <button type="button" onClick={sendMessage} disabled={loading}>
+          {loading ? "Thinking..." : "Send"}
+        </button>
+      </div>
+
+      {meta?.usage && (
+        <div className="ai-agent-panel__meta">
+          <small>
+            Tokens used: prompt {meta.usage.input_tokens} / completion {meta.usage.output_tokens}
+          </small>
+        </div>
+      )}
+    </div>
+  );
+};
+
+AIAgentPanel.propTypes = {
+  snapshot: PropTypes.object.isRequired,
+  insightText: PropTypes.string,
+  initialHistory: PropTypes.array,
+};
+
+export default AIAgentPanel;
