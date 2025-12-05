@@ -8,7 +8,7 @@ import 'simplebar-react/dist/simplebar.min.css'
 import { CBadge, CNavLink, CNavTitle, CSidebarNav } from '@coreui/react'
 
 export const AppSidebarNav = ({ items }) => {
-  const navLink = (name, icon, badge, indent = false) => {
+  const navLink = (name, icon, badge, subtitle, indent = false) => {
     return (
       <div className="nav-glow d-flex align-items-center gap-3 w-100">
         <div className="nav-glow__icon">
@@ -22,6 +22,7 @@ export const AppSidebarNav = ({ items }) => {
         </div>
         <div className="d-flex flex-column">
           {name && <span className="fw-semibold nav-glow__label">{name}</span>}
+          {subtitle && <small className="nav-glow__subtitle">{subtitle}</small>}
           {badge && (
             <CBadge color={badge.color} className="ms-0 mt-1 align-self-start" size="sm">
               {badge.text}
@@ -34,7 +35,7 @@ export const AppSidebarNav = ({ items }) => {
   }
 
   const navItem = (item, index, indent = false) => {
-    const { component, name, badge, icon, ...rest } = item
+    const { component, name, badge, icon, subtitle, ...rest } = item
     const Component = component
     const hasLink = Boolean(rest.to || rest.href)
 
@@ -55,10 +56,10 @@ export const AppSidebarNav = ({ items }) => {
             {...rest}
             className={`nav-glow-link ${rest.className ?? ''}`}
           >
-            {navLink(name, icon, badge, indent)}
+            {navLink(name, icon, badge, subtitle, indent)}
           </CNavLink>
         ) : (
-          navLink(name, icon, badge, indent)
+          navLink(name, icon, badge, subtitle, indent)
         )}
       </Component>
     )
