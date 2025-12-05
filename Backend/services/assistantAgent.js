@@ -123,6 +123,7 @@ export const runReasoningAgent = async ({ snapshot, insightText, history, apiKey
 
   let replyMessage;
   let modelUsed = modelsToTry[0];
+  let degradedReason = null;
 
   for (const modelName of modelsToTry) {
     try {
@@ -155,14 +156,19 @@ export const runReasoningAgent = async ({ snapshot, insightText, history, apiKey
       ? replyMessage.content.trim()
       : replyMessage.content.map(p => p.text).filter(Boolean).join("\n").trim();
 
-  if (!reply) throw new Error("Claude returned no content.");
+  if (!reply) {
+    degradedReason = "AI summary was empty; using your stored insights instead.";
+  }
+
+  const safeReply = reply || insightText || describeSnapshot(snapshot, insightText);
 
   return {
-    reply,
+    reply: safeReply,
     meta: {
-      ready: true,
+      ready: !degradedReason,
       provider: PROVIDER_NAME,
       model: modelUsed,
+      reason: degradedReason,
       updatedAt: new Date().toISOString(),
     },
   };
