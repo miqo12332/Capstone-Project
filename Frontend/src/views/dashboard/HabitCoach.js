@@ -19,8 +19,6 @@ import {
   CFormTextarea,
   CInputGroup,
   CInputGroupText,
-  CListGroup,
-  CListGroupItem,
   CRow,
   CSpinner,
 } from "@coreui/react";
@@ -91,6 +89,53 @@ const InsightSection = ({ title, icon, description, items, empty }) => (
     </CCardBody>
   </CCard>
 );
+
+const CoachSummaryCard = ({ summary }) => {
+  const focusArea = summary?.profile?.focusArea || "Choose a focus";
+  const nextHabit = summary?.upcoming?.[0]?.habitTitle || "Add an upcoming session";
+  const completionRate = summary?.progress?.completionRate ?? 0;
+
+  return (
+    <div className="mb-3 p-3 p-md-4 rounded-4 border bg-body-tertiary">
+      <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+          <div className="text-uppercase small text-body-secondary fw-semibold mb-1">
+            Coach at a glance
+          </div>
+          <h6 className="mb-0">
+            {summary?.profile?.goal || "Set a goal to personalize your chat"}
+          </h6>
+          <small className="text-medium-emphasis">{focusArea}</small>
+        </div>
+        <CBadge color="primary" className="px-3 py-2 bg-opacity-15 text-primary">
+          {completionRate}% completion
+        </CBadge>
+      </div>
+      <div className="d-flex flex-wrap gap-3">
+        <div className="d-flex align-items-center gap-2">
+          <CAvatar color="primary" textColor="white" size="md">
+            <CIcon icon={cilLightbulb} />
+          </CAvatar>
+          <div>
+            <div className="fw-semibold">Next focus</div>
+            <small className="text-medium-emphasis">{nextHabit}</small>
+          </div>
+        </div>
+        <div className="d-flex align-items-center gap-2">
+          <CAvatar color="info" textColor="white" size="md">
+            <CIcon icon={cilCalendar} />
+          </CAvatar>
+          <div>
+            <div className="fw-semibold">Recent wins</div>
+            <small className="text-medium-emphasis">
+              {summary?.progress?.completed ?? 0} logged · {summary?.progress?.missed ?? 0} missed
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const HabitCoach = () => {
   const { user } = useContext(AuthContext);
@@ -194,30 +239,27 @@ const HabitCoach = () => {
     const avatarColor = avatarColors[isAssistant ? "assistant" : "user"];
 
     return (
-      <CListGroupItem
-        key={entry.id}
-        className={`border-0 px-3 py-3 ${
-          isAssistant ? "bg-body-secondary" : "bg-transparent"
-        }`}
-      >
-        <div className="d-flex gap-3">
-          <CAvatar color={avatarColor} textColor="white">
-            <CIcon icon={isAssistant ? cilLightbulb : cilChatBubble} />
-          </CAvatar>
-          <div className="flex-grow-1">
-            <div className="d-flex justify-content-between align-items-center">
+      <div key={entry.id} className="d-flex gap-3 align-items-start mb-3">
+        <CAvatar color={avatarColor} textColor="white">
+          <CIcon icon={isAssistant ? cilLightbulb : cilChatBubble} />
+        </CAvatar>
+        <div className="flex-grow-1">
+          <div
+            className={`p-3 rounded-4 border ${
+              isAssistant ? "bg-body-secondary" : "bg-white shadow-sm"
+            }`}
+          >
+            <div className="d-flex justify-content-between align-items-center gap-3">
               <span className="fw-semibold text-capitalize">
                 {isAssistant ? "StepHabit Coach" : summary?.profile?.name || "You"}
               </span>
-              <small className="text-medium-emphasis">
-                {formatTime(entry.createdAt)}
-              </small>
+              <small className="text-medium-emphasis">{formatTime(entry.createdAt)}</small>
             </div>
             <div className="mt-2 text-break" style={{ whiteSpace: "pre-wrap" }}>
               {entry.content}
             </div>
             {entry.keywords?.keywords && entry.keywords.keywords.length > 0 && (
-              <div className="mt-2 d-flex flex-wrap gap-2">
+              <div className="mt-3 d-flex flex-wrap gap-2">
                 {entry.keywords.keywords.map((keyword, index) => (
                   <CBadge color="light" textColor="dark" key={`${entry.id}-${index}`}>
                     #{keyword.keyword || keyword}
@@ -227,7 +269,7 @@ const HabitCoach = () => {
             )}
           </div>
         </div>
-      </CListGroupItem>
+      </div>
     );
   };
 
@@ -280,18 +322,21 @@ const HabitCoach = () => {
               </CAlert>
             )}
 
+            <CoachSummaryCard summary={summary} />
+
             <div className="mb-3">
-              <div className="d-flex flex-wrap gap-2">
+              <div className="d-flex flex-wrap gap-2 align-items-center">
+                <small className="text-medium-emphasis me-1">Try asking:</small>
                 {quickPrompts.map((prompt) => (
-                  <CBadge
+                  <CButton
                     key={prompt}
-                    color="primary"
-                    className="bg-opacity-10 text-primary py-2 px-3"
-                    role="button"
+                    color="light"
+                    className="text-start rounded-pill px-3 py-2"
+                    size="sm"
                     onClick={() => applyPrompt(prompt)}
                   >
                     {prompt}
-                  </CBadge>
+                  </CButton>
                 ))}
               </div>
             </div>
@@ -302,10 +347,10 @@ const HabitCoach = () => {
                   <CSpinner color="primary" />
                 </div>
               ) : history.length ? (
-                <CListGroup className="border-0">
+                <div>
                   {history.map((entry) => renderMessage(entry))}
                   <div ref={bottomRef} />
-                </CListGroup>
+                </div>
               ) : (
                 <div className="text-center text-medium-emphasis py-5">
                   <CIcon icon={cilLightbulb} size="2xl" className="mb-3" />
@@ -344,6 +389,9 @@ const HabitCoach = () => {
                   <span>{loading ? "Thinking" : "Send"}</span>
                 </CButton>
               </CInputGroup>
+              <small className="d-block mt-2 text-medium-emphasis">
+                Keep it simple—share how your day is going, and the coach will respond with one clear next step.
+              </small>
             </CForm>
           </CCardBody>
         </CCard>
