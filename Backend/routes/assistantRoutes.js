@@ -630,7 +630,7 @@ router.get("/history", async (req, res) => {
     ]);
 
     const insightPayload = ensureObject(insightRecord?.keywords);
-    const keywordCounts = insightPayload.keywordCounts || {};
+    let keywordCounts = insightPayload.keywordCounts || {};
     const topKeywords = Object.entries(keywordCounts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 6)
@@ -687,8 +687,8 @@ router.get("/summary", async (req, res) => {
       }),
     ]);
 
-    const insightPayload = ensureObject(insightRecord?.keywords);
-    const keywordCounts = insightPayload.keywordCounts || {};
+      const insightPayload = ensureObject(insightRecord?.keywords);
+      let keywordCounts = insightPayload.keywordCounts || {};
     const history = mapHistory(historyRecords);
     const agentStatus = getAgentStatus();
 
@@ -709,14 +709,19 @@ router.get("/summary", async (req, res) => {
         agent = {
           ...agentStatus,
           ready: false,
-          reason: "AI summary temporarily unavailable; showing a quick snapshot instead.",
+          reason: "AI summary temporarily unavailable; using your stored insights instead.",
         };
       }
     }
 
-    if (!summaryText) {
+    if (!agent.ready) {
       const insight = await updateInsightMemory(userId, snapshot, keywordCounts);
       summaryText = insight.summaryText;
+      keywordCounts = insight.aggregate;
+    } else if (!summaryText) {
+      const insight = await updateInsightMemory(userId, snapshot, keywordCounts);
+      summaryText = insight.summaryText;
+      keywordCounts = insight.aggregate;
     }
 
     return res.json({
