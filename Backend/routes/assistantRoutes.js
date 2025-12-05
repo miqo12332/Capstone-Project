@@ -140,6 +140,13 @@ const normalizeHabitText = (text) =>
 const capitalize = (text) =>
   text.length ? text.charAt(0).toUpperCase() + text.slice(1) : text;
 
+const shouldCreateHabit = (message) => {
+  if (!message) return false;
+  const text = message.toLowerCase();
+  const wantsToAddHabit = /\b(add|create|start|begin|set up|setup|make|track)\b/.test(text);
+  return wantsToAddHabit || text.includes("habit");
+};
+
 const rewriteHabitIdea = (message) => {
   if (!looksLikeHabitIdea(message)) return null;
 
@@ -792,6 +799,27 @@ router.post("/chat", async (req, res) => {
     const snapshot = await buildUserSnapshot(userId);
     const { counts } = extractKeywords(message);
     const habitSuggestion = rewriteHabitIdea(message);
+    let createdHabit = null;
+
+    if (habitSuggestion && shouldCreateHabit(message)) {
+      const duplicateHabit = snapshot.habits.find(
+        (habit) => habit.title?.toLowerCase() === habitSuggestion.title.toLowerCase()
+      );
+
+      if (!duplicateHabit) {
+        const newHabit = await Habit.create({
+          user_id: userId,
+          title: habitSuggestion.title,
+          description: habitSuggestion.description,
+          category: habitSuggestion.category,
+          target_reps: habitSuggestion.targetReps,
+          is_daily_goal: habitSuggestion.isDailyGoal,
+        });
+
+        createdHabit = newHabit.get({ plain: true });
+        snapshot.habits.push(createdHabit);
+      }
+    }
 
     await AssistantMemory.create({
       user_id: userId,
@@ -851,6 +879,10 @@ router.post("/chat", async (req, res) => {
       reply = reply ? `${reply}\n\n${suggestionText}` : suggestionText;
     }
 
+    if (createdHabit) {
+      reply = `${reply}\n\nI added "${createdHabit.title}" to your habits so you can track it.`.trim();
+    }
+
     await AssistantMemory.create({
       user_id: userId,
       role: "assistant",
@@ -860,6 +892,7 @@ router.post("/chat", async (req, res) => {
         messageKeywords: counts,
         agent: agentMeta,
         habitSuggestion,
+        createdHabit,
       },
     });
 
@@ -892,6 +925,7 @@ router.post("/chat", async (req, res) => {
       },
       agent: agentMeta,
       habitSuggestion,
+      createdHabit,
     });
   } catch (error) {
     console.error("Assistant chat failed", error);
