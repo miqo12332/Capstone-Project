@@ -709,7 +709,7 @@ router.get("/summary", async (req, res) => {
         agent = {
           ...agentStatus,
           ready: false,
-          reason: err.message || "LLM summary unavailable",
+          reason: "AI summary temporarily unavailable; showing a quick snapshot instead.",
         };
       }
     }
