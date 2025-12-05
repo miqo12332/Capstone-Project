@@ -66,6 +66,126 @@ const ensureObject = (maybeJSON) => {
   return maybeJSON;
 };
 
+const HABIT_KEYWORDS = [
+  "walk",
+  "run",
+  "exercise",
+  "workout",
+  "gym",
+  "yoga",
+  "meditate",
+  "journal",
+  "read",
+  "study",
+  "drink",
+  "water",
+  "hydrate",
+  "sleep",
+  "stretch",
+  "cook",
+  "meal",
+  "healthy",
+  "clean",
+  "organize",
+  "practice",
+  "learn",
+  "call",
+  "write",
+  "gratitude",
+];
+
+const HABIT_CATEGORIES = [
+  { name: "Fitness", keywords: ["walk", "run", "exercise", "gym", "workout", "cardio", "lift", "yoga", "pilates"] },
+  { name: "Wellness", keywords: ["meditate", "mindful", "gratitude", "journal", "breath", "therapy", "stress"] },
+  { name: "Productivity", keywords: ["read", "study", "learn", "write", "plan", "organize", "clean", "declutter"] },
+  { name: "Nutrition", keywords: ["eat", "meal", "cook", "water", "hydrate", "sugar", "vegetable", "protein"] },
+  { name: "Sleep", keywords: ["sleep", "bed", "wind down", "rest"] },
+  { name: "Relationships", keywords: ["call", "text", "connect", "family", "friend"] },
+  { name: "Finance", keywords: ["budget", "spend", "save", "money"] },
+];
+
+const looksLikeHabitIdea = (message) => {
+  if (!message) return false;
+  const text = message.toLowerCase();
+  if (text.includes("?")) return false;
+  return HABIT_KEYWORDS.some((keyword) => text.includes(keyword)) || text.includes("habit");
+};
+
+const inferCategory = (message) => {
+  const text = message.toLowerCase();
+  for (const { name, keywords } of HABIT_CATEGORIES) {
+    if (keywords.some((keyword) => text.includes(keyword))) {
+      return name;
+    }
+  }
+  return "General";
+};
+
+const parseTargetReps = (message) => {
+  const match = message.match(/(\d{1,3})\s*(x|times?|reps?|minutes?|mins?)/i);
+  if (match) {
+    const value = parseInt(match[1], 10);
+    return Number.isFinite(value) ? value : null;
+  }
+  return null;
+};
+
+const normalizeHabitText = (text) =>
+  text
+    .replace(/^\s*(i\s+(want|need|will|plan|should)\s+to)\s+/i, "")
+    .replace(/^to\s+/i, "")
+    .replace(/^(please|help me)\s+/i, "")
+    .trim();
+
+const capitalize = (text) =>
+  text.length ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+
+const rewriteHabitIdea = (message) => {
+  if (!looksLikeHabitIdea(message)) return null;
+
+  const normalized = normalizeHabitText(message);
+  if (!normalized) return null;
+
+  const category = inferCategory(message);
+  const targetReps = parseTargetReps(message);
+  const isDailyGoal = /daily|every day|each day|morning|evening|nightly/i.test(message);
+
+  const titleCandidate = normalized.replace(/[.!?]+$/, "");
+  const title = capitalize(titleCandidate.split(" ").slice(0, 10).join(" ")) || "New habit";
+
+  const descriptionParts = [`${capitalize(normalized)}${isDailyGoal ? " each day" : ""}`];
+  if (targetReps) {
+    descriptionParts.push(`Aim for ${targetReps} reps or minutes per session.`);
+  } else {
+    descriptionParts.push("Keep it measurable so you can track progress.");
+  }
+
+  return {
+    title,
+    description: descriptionParts.join(" "),
+    category,
+    isDailyGoal: Boolean(isDailyGoal),
+    targetReps: targetReps || null,
+  };
+};
+
+const formatHabitSuggestion = (suggestion) => {
+  if (!suggestion) return "";
+  const lines = [
+    "Suggested habit to add:",
+    `• Title: ${suggestion.title}`,
+    `• Description: ${suggestion.description}`,
+    `• Category: ${suggestion.category}`,
+    `• Daily goal: ${suggestion.isDailyGoal ? "Yes" : "No"}`,
+  ];
+
+  if (suggestion.targetReps) {
+    lines.push(`• Repetition: ${suggestion.targetReps}`);
+  }
+
+  return lines.join("\n");
+};
+
 const extractKeywords = (message) => {
   if (!message) {
     return { list: [], counts: {} };
@@ -671,12 +791,13 @@ router.post("/chat", async (req, res) => {
   try {
     const snapshot = await buildUserSnapshot(userId);
     const { counts } = extractKeywords(message);
+    const habitSuggestion = rewriteHabitIdea(message);
 
     await AssistantMemory.create({
       user_id: userId,
       role: "user",
       content: message,
-      keywords: { keywords: Object.keys(counts), counts },
+      keywords: { keywords: Object.keys(counts), counts, habitSuggestion },
     });
 
     const insight = await updateInsightMemory(userId, snapshot, counts);
@@ -725,6 +846,11 @@ router.post("/chat", async (req, res) => {
       }
     }
 
+    if (habitSuggestion) {
+      const suggestionText = formatHabitSuggestion(habitSuggestion);
+      reply = reply ? `${reply}\n\n${suggestionText}` : suggestionText;
+    }
+
     await AssistantMemory.create({
       user_id: userId,
       role: "assistant",
@@ -733,6 +859,7 @@ router.post("/chat", async (req, res) => {
         keywords: insight.topKeywords,
         messageKeywords: counts,
         agent: agentMeta,
+        habitSuggestion,
       },
     });
 
@@ -764,6 +891,7 @@ router.post("/chat", async (req, res) => {
         insightText: insight.summaryText,
       },
       agent: agentMeta,
+      habitSuggestion,
     });
   } catch (error) {
     console.error("Assistant chat failed", error);
