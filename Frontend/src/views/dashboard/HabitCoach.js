@@ -19,8 +19,6 @@ import {
   CFormTextarea,
   CInputGroup,
   CInputGroupText,
-  CListGroup,
-  CListGroupItem,
   CRow,
   CSpinner,
 } from "@coreui/react";
@@ -91,6 +89,51 @@ const InsightSection = ({ title, icon, description, items, empty }) => (
     </CCardBody>
   </CCard>
 );
+
+const CoachSummaryCard = ({ summary }) => {
+  const focusArea = summary?.profile?.focusArea || "Choose a focus";
+  const nextHabit = summary?.upcoming?.[0]?.habitTitle || "Add an upcoming session";
+  const completionRate = summary?.progress?.completionRate ?? 0;
+
+  return (
+    <div className="mb-3 p-3 rounded-4 border bg-body-tertiary">
+      <div className="d-flex flex-wrap align-items-center gap-3 justify-content-between">
+        <div className="d-flex align-items-center gap-2">
+          <CAvatar color="primary" textColor="white">
+            <CIcon icon={cilLightbulb} />
+          </CAvatar>
+          <div>
+            <div className="text-uppercase small text-body-secondary fw-semibold">
+              Focus
+            </div>
+            <div className="fw-semibold">{focusArea}</div>
+            <small className="text-medium-emphasis">{nextHabit}</small>
+          </div>
+        </div>
+        <div className="d-flex align-items-center gap-2">
+          <CAvatar color="info" textColor="white">
+            <CIcon icon={cilCalendar} />
+          </CAvatar>
+          <div>
+            <div className="text-uppercase small text-body-secondary fw-semibold">
+              Goal
+            </div>
+            <div className="fw-semibold">
+              {summary?.profile?.goal || "Set a goal to personalize your chat"}
+            </div>
+            <small className="text-medium-emphasis">{summary?.profile?.name || "Your coach"}</small>
+          </div>
+        </div>
+        <CBadge
+          color="primary"
+          className="px-3 py-2 bg-opacity-15 text-primary text-center rounded-pill"
+        >
+          {completionRate}% complete
+        </CBadge>
+      </div>
+    </div>
+  );
+};
 
 const HabitCoach = () => {
   const { user } = useContext(AuthContext);
@@ -194,30 +237,27 @@ const HabitCoach = () => {
     const avatarColor = avatarColors[isAssistant ? "assistant" : "user"];
 
     return (
-      <CListGroupItem
-        key={entry.id}
-        className={`border-0 px-3 py-3 ${
-          isAssistant ? "bg-body-secondary" : "bg-transparent"
-        }`}
-      >
-        <div className="d-flex gap-3">
-          <CAvatar color={avatarColor} textColor="white">
-            <CIcon icon={isAssistant ? cilLightbulb : cilChatBubble} />
-          </CAvatar>
-          <div className="flex-grow-1">
-            <div className="d-flex justify-content-between align-items-center">
+      <div key={entry.id} className="d-flex gap-3 align-items-start mb-3">
+        <CAvatar color={avatarColor} textColor="white">
+          <CIcon icon={isAssistant ? cilLightbulb : cilChatBubble} />
+        </CAvatar>
+        <div className="flex-grow-1">
+          <div
+            className={`p-3 rounded-4 border ${
+              isAssistant ? "bg-body-secondary" : "bg-white shadow-sm"
+            }`}
+          >
+            <div className="d-flex justify-content-between align-items-center gap-3">
               <span className="fw-semibold text-capitalize">
                 {isAssistant ? "StepHabit Coach" : summary?.profile?.name || "You"}
               </span>
-              <small className="text-medium-emphasis">
-                {formatTime(entry.createdAt)}
-              </small>
+              <small className="text-medium-emphasis">{formatTime(entry.createdAt)}</small>
             </div>
             <div className="mt-2 text-break" style={{ whiteSpace: "pre-wrap" }}>
               {entry.content}
             </div>
             {entry.keywords?.keywords && entry.keywords.keywords.length > 0 && (
-              <div className="mt-2 d-flex flex-wrap gap-2">
+              <div className="mt-3 d-flex flex-wrap gap-2">
                 {entry.keywords.keywords.map((keyword, index) => (
                   <CBadge color="light" textColor="dark" key={`${entry.id}-${index}`}>
                     #{keyword.keyword || keyword}
@@ -227,7 +267,7 @@ const HabitCoach = () => {
             )}
           </div>
         </div>
-      </CListGroupItem>
+      </div>
     );
   };
 
@@ -244,166 +284,215 @@ const HabitCoach = () => {
   }
 
   return (
-    <CRow className="g-4">
-      <CCol xs={12} xl={8}>
-        <CCard className="shadow-sm h-100">
-          <CCardHeader className="d-flex justify-content-between align-items-center">
+    <>
+      <div className="mb-4">
+        <div className="p-4 p-md-5 rounded-4 border bg-body-tertiary">
+          <div className="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
             <div>
-              <h5 className="mb-0">Habit Coach</h5>
-              <small className="text-medium-emphasis">
-                Personal guidance that adapts to your routines and reflections.
-              </small>
+              <p className="text-uppercase text-primary fw-semibold small mb-1">
+                HabitCoach
+              </p>
+              <h4 className="mb-2">Chat with your coach in a focused space</h4>
+              <p className="text-medium-emphasis mb-0">
+                Bring the conversation to the center—share what you need, reflect, and plan without distractions.
+              </p>
             </div>
-            {initialLoading && <CSpinner size="sm" color="primary" />}
-          </CCardHeader>
-          <CCardBody className="d-flex flex-column">
-            {coach && (
-              <CAlert
-                color={coach.ready ? "primary" : "warning"}
-                className="mb-3"
-              >
-                {coach.ready ? (
-                  <>
-                    Powered by {coach.provider || "our coaching engine"}
-                    {coach.model ? ` (${coach.model})` : ""}. I analyse your
-                    journey before every reply.
-                  </>
-                ) : (
-                  coach.reason ||
-                  "Live coaching is momentarily offline. You're seeing our smart guidance instead."
-                )}
-              </CAlert>
-            )}
-            {error && (
-              <CAlert color="danger" className="mb-3">
-                {error}
-              </CAlert>
-            )}
+            <CBadge color="light" textColor="dark" className="px-3 py-2 rounded-pill">
+              {summary?.profile?.goal ? `Goal: ${summary.profile.goal}` : "Set your goal"}
+            </CBadge>
+          </div>
+        </div>
+      </div>
 
-            <div className="mb-3">
-              <div className="d-flex flex-wrap gap-2">
-                {quickPrompts.map((prompt) => (
-                  <CBadge
-                    key={prompt}
-                    color="primary"
-                    className="bg-opacity-10 text-primary py-2 px-3"
-                    role="button"
-                    onClick={() => applyPrompt(prompt)}
-                  >
-                    {prompt}
+      <CRow className="justify-content-center g-4">
+        <CCol xs={12} lg={10} xl={9}>
+          <CCard className="shadow-lg border-0 overflow-hidden">
+            <CCardHeader className="bg-white border-0 py-4">
+              <div className="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div className="d-flex align-items-center gap-3">
+                  <CAvatar color="primary" textColor="white" size="lg">
+                    <CIcon icon={cilLightbulb} />
+                  </CAvatar>
+                  <div>
+                    <h5 className="mb-0">Habit Coach</h5>
+                    <small className="text-medium-emphasis">
+                      A centered chat built for easy back-and-forth.
+                    </small>
+                  </div>
+                </div>
+                <div className="d-flex align-items-center gap-2">
+                  {initialLoading && <CSpinner size="sm" color="primary" />}
+                  <CBadge color={coach?.ready ? "success" : "warning"} className="rounded-pill px-3 py-2">
+                    {coach?.ready ? "Live" : "Standby"}
                   </CBadge>
-                ))}
+                </div>
               </div>
-            </div>
+            </CCardHeader>
 
-            <div className="flex-grow-1 overflow-auto mb-3" style={{ maxHeight: "520px" }}>
-              {initialLoading ? (
-                <div className="d-flex justify-content-center align-items-center h-100">
-                  <CSpinner color="primary" />
-                </div>
-              ) : history.length ? (
-                <CListGroup className="border-0">
-                  {history.map((entry) => renderMessage(entry))}
-                  <div ref={bottomRef} />
-                </CListGroup>
-              ) : (
-                <div className="text-center text-medium-emphasis py-5">
-                  <CIcon icon={cilLightbulb} size="2xl" className="mb-3" />
-                  <h6 className="fw-semibold">Start the conversation</h6>
-                  <p className="mb-0">
-                    Share what you need help with today and I will guide your next
-                    steps.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <CForm onSubmit={handleSubmit} className="mt-auto">
-              <CInputGroup className="align-items-start">
-                <CInputGroupText className="bg-body-secondary">
-                  <CIcon icon={cilChatBubble} />
-                </CInputGroupText>
-                <CFormTextarea
-                  rows={2}
-                  placeholder="Ask for coaching, planning help, or quick motivation..."
-                  value={message}
-                  onChange={(event) => setMessage(event.target.value)}
-                  disabled={loading}
-                />
-                <CButton
-                  type="submit"
-                  color="primary"
-                  disabled={loading || !message.trim()}
-                  className="d-flex align-items-center gap-2"
-                >
-                  {loading ? (
-                    <CSpinner size="sm" />
+            <CCardBody className="bg-body-tertiary p-4 d-flex flex-column gap-3">
+              {coach && (
+                <CAlert color={coach.ready ? "primary" : "warning"} className="mb-0 border-0 shadow-sm">
+                  {coach.ready ? (
+                    <>
+                      Powered by {coach.provider || "our coaching engine"}
+                      {coach.model ? ` (${coach.model})` : ""}. I analyse your journey before every reply.
+                    </>
                   ) : (
-                    <CIcon icon={cilSend} />
+                    coach.reason ||
+                    "Live coaching is momentarily offline. You're seeing our smart guidance instead."
                   )}
-                  <span>{loading ? "Thinking" : "Send"}</span>
-                </CButton>
-              </CInputGroup>
-            </CForm>
-          </CCardBody>
-        </CCard>
-      </CCol>
+                </CAlert>
+              )}
 
-      <CCol xs={12} xl={4}>
-        <InsightSection
-          title="Personal Snapshot"
-          icon={cilChartLine}
-          description="Updated every time you chat so the coach keeps learning."
-          items={summary ? [
-            {
-              title: summary.profile?.goal || "Set your primary goal to tailor support",
-              subtitle: `Focus area: ${summary.profile?.focusArea || "Not specified"}`,
-              badges: [
-                summary.profile?.commitment
-                  ? `${summary.profile.commitment} daily`
-                  : "Set a commitment",
-                summary.profile?.supportPreference || "Choose support style",
-              ],
-            },
-            {
-              title: `Completion rate: ${summary.progress?.completionRate || 0}%`,
-              subtitle: `${summary.progress?.completed || 0} wins · ${summary.progress?.missed || 0} misses recently`,
-              badges: summary.topKeywords?.slice(0, 3).map((item) => `#${item.keyword}`),
-            },
-          ] : []}
-          empty="Share a few thoughts to begin building your personal profile."
-        />
+              {error && (
+                <CAlert color="danger" className="mb-0 border-0 shadow-sm">
+                  {error}
+                </CAlert>
+              )}
 
-        <InsightSection
-          title="Habit Highlights"
-          icon={cilStar}
-          description="Where you're thriving and where we can focus next."
-          items={summary?.progress?.habitSummaries?.slice(0, 3).map((habit) => ({
-            title: habit.title,
-            subtitle: `${habit.completionRate}% success · ${habit.completed} wins · ${habit.missed} misses`,
-            badges: [
-              `${habit.activeDays} active days`,
-              habit.category || "Habit",
-            ],
-          }))}
-          empty="Log progress to unlock habit-specific coaching."
-        />
+              <CoachSummaryCard summary={summary} />
 
-        <InsightSection
-          title="Upcoming Focus"
-          icon={cilCalendar}
-          description="We'll nudge you ahead of key moments."
-          items={summary?.upcoming?.map((item) => ({
-            title: item.habitTitle,
-            subtitle: `${item.day} · ${item.starttime}${
-              item.endtime ? ` — ${item.endtime}` : ""
-            } (${item.repeat})`,
-            badges: item.notes ? [item.notes] : undefined,
-          }))}
-          empty="No upcoming sessions planned. Ask for scheduling tips!"
-        />
-      </CCol>
-    </CRow>
+              <div className="d-flex flex-column gap-2">
+                <div className="d-flex justify-content-between align-items-center">
+                  <small className="text-uppercase text-medium-emphasis fw-semibold">Quick prompts</small>
+                  <small className="text-medium-emphasis">Tap to drop into the composer</small>
+                </div>
+                <div className="d-flex flex-wrap gap-2">
+                  {quickPrompts.map((prompt) => (
+                    <CButton
+                      key={prompt}
+                      color="light"
+                      className="text-start rounded-pill px-3 py-2 shadow-sm"
+                      size="sm"
+                      onClick={() => applyPrompt(prompt)}
+                    >
+                      {prompt}
+                    </CButton>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-3 p-md-4 bg-white rounded-4 border shadow-sm">
+                <div className="rounded-4 border bg-body-tertiary p-3" style={{ minHeight: "60vh" }}>
+                  {initialLoading ? (
+                    <div className="d-flex justify-content-center align-items-center h-100">
+                      <CSpinner color="primary" />
+                    </div>
+                  ) : history.length ? (
+                    <div className="overflow-auto" style={{ maxHeight: "60vh" }}>
+                      {history.map((entry) => renderMessage(entry))}
+                      <div ref={bottomRef} />
+                    </div>
+                  ) : (
+                    <div className="text-center text-medium-emphasis py-5">
+                      <CIcon icon={cilLightbulb} size="2xl" className="mb-3" />
+                      <h6 className="fw-semibold">Start the conversation</h6>
+                      <p className="mb-0">
+                        Share what you need help with today and I will guide your next steps.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <CForm onSubmit={handleSubmit} className="mt-3">
+                  <CInputGroup className="align-items-start">
+                    <CInputGroupText className="bg-body-secondary">
+                      <CIcon icon={cilChatBubble} />
+                    </CInputGroupText>
+                    <CFormTextarea
+                      rows={2}
+                      placeholder="Ask for coaching, planning help, or quick motivation..."
+                      value={message}
+                      onChange={(event) => setMessage(event.target.value)}
+                      disabled={loading}
+                    />
+                    <CButton
+                      type="submit"
+                      color="primary"
+                      disabled={loading || !message.trim()}
+                      className="d-flex align-items-center gap-2"
+                    >
+                      {loading ? (
+                        <CSpinner size="sm" />
+                      ) : (
+                        <CIcon icon={cilSend} />
+                      )}
+                      <span>{loading ? "Thinking" : "Send"}</span>
+                    </CButton>
+                  </CInputGroup>
+                  <small className="d-block mt-2 text-medium-emphasis">
+                    Keep it simple—share how your day is going, and the coach will respond with one clear next step.
+                  </small>
+                </CForm>
+              </div>
+            </CCardBody>
+          </CCard>
+        </CCol>
+      </CRow>
+
+      <CRow className="g-4 justify-content-center mt-1">
+        <CCol xs={12} lg={10} xl={9}>
+          <CRow className="g-4">
+            <CCol xs={12} md={6}>
+              <InsightSection
+                title="Personal Snapshot"
+                icon={cilChartLine}
+                description="Updated every time you chat so the coach keeps learning."
+                items={summary ? [
+                  {
+                    title: summary.profile?.goal || "Set your primary goal to tailor support",
+                    subtitle: `Focus area: ${summary.profile?.focusArea || "Not specified"}`,
+                    badges: [
+                      summary.profile?.commitment
+                        ? `${summary.profile.commitment} daily`
+                        : "Set a commitment",
+                      summary.profile?.supportPreference || "Choose support style",
+                    ],
+                  },
+                  {
+                    title: `Completion rate: ${summary.progress?.completionRate || 0}%`,
+                    subtitle: `${summary.progress?.completed || 0} wins · ${summary.progress?.missed || 0} misses recently`,
+                    badges: summary.topKeywords?.slice(0, 3).map((item) => `#${item.keyword}`),
+                  },
+                ] : []}
+                empty="Share a few thoughts to begin building your personal profile."
+              />
+            </CCol>
+            <CCol xs={12} md={6}>
+              <InsightSection
+                title="Habit Highlights"
+                icon={cilStar}
+                description="Where you're thriving and where we can focus next."
+                items={summary?.progress?.habitSummaries?.slice(0, 3).map((habit) => ({
+                  title: habit.title,
+                  subtitle: `${habit.completionRate}% success · ${habit.completed} wins · ${habit.missed} misses`,
+                  badges: [
+                    `${habit.activeDays} active days`,
+                    habit.category || "Habit",
+                  ],
+                }))}
+                empty="Log progress to unlock habit-specific coaching."
+              />
+            </CCol>
+            <CCol xs={12}>
+              <InsightSection
+                title="Upcoming Focus"
+                icon={cilCalendar}
+                description="We'll nudge you ahead of key moments."
+                items={summary?.upcoming?.map((item) => ({
+                  title: item.habitTitle,
+                  subtitle: `${item.day} · ${item.starttime}${
+                    item.endtime ? ` — ${item.endtime}` : ""
+                  } (${item.repeat})`,
+                  badges: item.notes ? [item.notes] : undefined,
+                }))}
+                empty="No upcoming sessions planned. Ask for scheduling tips!"
+              />
+            </CCol>
+          </CRow>
+        </CCol>
+      </CRow>
+    </>
   );
 };
 
