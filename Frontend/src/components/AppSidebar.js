@@ -58,7 +58,7 @@ const AppSidebar = () => {
           <small className="text-white-50">All systems synced</small>
           <CSidebarToggler
             className="text-white"
-            onClick={() => dispatch({ type: 'set', sidebarUnfoldable: !unfoldable })}
+            onClick={() => dispatch({ type: 'set', sidebarShow: false })}
           />
         </div>
       </CSidebarFooter>
