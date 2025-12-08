@@ -80,6 +80,11 @@ const UserProfile = () => {
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [settingsBaseline, setSettingsBaseline] = useState({})
   const fileInputRef = useRef(null)
+  const loginRef = useRef(login)
+
+  useEffect(() => {
+    loginRef.current = login
+  }, [login])
 
   useEffect(() => {
     if (location.state?.tab) {
@@ -103,19 +108,21 @@ const UserProfile = () => {
 
   useEffect(() => {
     const controller = new AbortController()
+    let isActive = true
 
     const loadProfile = async () => {
       if (!user?.id) {
-        setLoading(false)
+        if (isActive) setLoading(false)
         return
       }
 
       try {
-        setLoading(true)
+        if (isActive) setLoading(true)
         const { user: payload } = await fetchUserSettings(user.id, {
           signal: controller.signal,
           timeout: 8000,
         })
+        if (!isActive) return
         setProfile({
           name: payload.name || "",
           email: payload.email || "",
@@ -143,22 +150,25 @@ const UserProfile = () => {
             : "/uploads/default-avatar.png"
         )
         setError("")
-        if (typeof login === "function") {
-          login(payload)
+        if (typeof loginRef.current === "function") {
+          loginRef.current(payload)
         }
       } catch (err) {
-        if (err.name === "CanceledError") return
+        if (!isActive || err.name === "CanceledError") return
         console.error(err)
         setError("We couldn't load your profile details. Please try again.")
       } finally {
-        setLoading(false)
+        if (isActive) setLoading(false)
       }
     }
 
     loadProfile()
 
-    return () => controller.abort()
-  }, [user?.id, login])
+    return () => {
+      isActive = false
+      controller.abort()
+    }
+  }, [user?.id])
 
   useEffect(() => {
     const loadAnalytics = async () => {

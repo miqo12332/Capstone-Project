@@ -44,3 +44,43 @@
 .subtle-bg {
   background: linear-gradient(145deg, #f7f9fc, #ffffff);
 }
+
+:root[data-coreui-theme='dark'] .community-shell {
+  background: radial-gradient(circle at 20% 10%, rgba(88, 115, 255, 0.16), transparent 30%),
+    radial-gradient(circle at 85% 0%, rgba(83, 230, 163, 0.12), transparent 26%),
+    var(--cui-body-bg);
+}
+
+:root[data-coreui-theme='dark'] .compact-hero {
+  background: linear-gradient(180deg, rgba(35, 42, 52, 0.92), rgba(25, 31, 40, 0.95));
+  border: 1px solid var(--cui-border-color);
+}
+
+:root[data-coreui-theme='dark'] .stat-chip {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--cui-border-color);
+}
+
+:root[data-coreui-theme='dark'] .community-tabs .nav-link {
+  color: var(--cui-body-color);
+}
+
+:root[data-coreui-theme='dark'] .community-tabs .nav-link:hover:not(.active) {
+  background: rgba(99, 123, 255, 0.12);
+  color: var(--cui-primary);
+}
+
+:root[data-coreui-theme='dark'] .community-tabs .nav-link.active {
+  background: linear-gradient(120deg, #4f46e5, #14b8a6);
+  color: #fff;
+}
+
+:root[data-coreui-theme='dark'] .community-section-card {
+  background: rgba(28, 33, 42, 0.9);
+  border-color: var(--cui-border-color);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+:root[data-coreui-theme='dark'] .subtle-bg {
+  background: linear-gradient(145deg, rgba(28, 33, 42, 0.9), rgba(19, 23, 31, 0.94));
+}

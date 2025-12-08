@@ -285,6 +285,28 @@ body {
   .footer {
     --cui-footer-bg: var(--cui-body-bg);
   }
+
+  .dashboard-page {
+    background: radial-gradient(circle at 20% 20%, rgba(88, 115, 255, 0.12), transparent 26%),
+      radial-gradient(circle at 80% 0%, rgba(46, 184, 92, 0.12), transparent 22%),
+      var(--cui-body-bg);
+  }
+
+  .dashboard-hero {
+    background: linear-gradient(135deg, rgba(69, 56, 201, 0.5), rgba(57, 153, 255, 0.28));
+    border-color: rgba(99, 123, 255, 0.32);
+  }
+
+  .hero-card,
+  .elevated-card {
+    background: var(--cui-body-bg);
+    border-color: var(--cui-border-color);
+    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.18);
+  }
+
+  .soft-progress {
+    background: rgba(57, 153, 255, 0.2);
+  }
 }
 
 // ===== Enhanced surfaces =====
@@ -538,9 +560,37 @@ body {
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.04);
 }
 
-.challenge-card .card-body {
-  background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.25), transparent 55%),
-    linear-gradient(135deg, rgba(63, 94, 251, 0.08), rgba(70, 252, 167, 0.05));
+.challenge-card {
+  .card-header {
+    background: linear-gradient(135deg, #1f3165, #3f5efb) !important;
+    color: #fff;
+    text-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+
+    .text-uppercase {
+      color: rgba(255, 255, 255, 0.92);
+      letter-spacing: 0.08em;
+    }
+  }
+
+  .card-body {
+    background: radial-gradient(
+        circle at 20% 20%,
+        color-mix(in srgb, var(--cui-body-bg) 75%, transparent),
+        transparent 55%
+      ),
+      linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--cui-primary) 8%, transparent),
+        color-mix(in srgb, var(--cui-success) 6%, transparent)
+      );
+    border-top: 1px solid var(--cui-border-color-translucent);
+    color: var(--cui-body-color);
+
+    .text-muted,
+    .text-body-secondary {
+      color: color-mix(in srgb, var(--cui-body-color) 82%, transparent);
+    }
+  }
 }
 
 .habits-section {
