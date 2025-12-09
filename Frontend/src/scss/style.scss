@@ -593,9 +593,19 @@ body {
   box-shadow: 0 12px 35px rgba(0, 0, 0, 0.05);
 
   @include color-mode(dark) {
-    background: color-mix(in srgb, var(--cui-body-bg) 78%, rgba(63, 94, 251, 0.16));
-    border-color: color-mix(in srgb, var(--cui-border-color), rgba(63, 94, 251, 0.34));
-    box-shadow: 0 16px 45px rgba(0, 0, 0, 0.65);
+    background: linear-gradient(
+        165deg,
+        color-mix(in srgb, var(--cui-primary) 24%, transparent) 12%,
+        color-mix(in srgb, var(--cui-success) 20%, transparent)
+      ),
+      color-mix(in srgb, #060914 75%, var(--cui-body-bg) 25%);
+    border-color: color-mix(in srgb, rgba(255, 255, 255, 0.18), var(--cui-border-color) 35%);
+    box-shadow: 0 18px 70px rgba(0, 0, 0, 0.82), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    color: var(--cui-body-color);
+
+    .text-muted {
+      color: color-mix(in srgb, var(--cui-body-color) 80%, rgba(255, 255, 255, 0.6));
+    }
   }
 }
 
@@ -847,9 +857,11 @@ body {
   backdrop-filter: blur(6px);
 
   @include color-mode(dark) {
-    background: color-mix(in srgb, var(--cui-body-bg) 82%, rgba(12, 16, 28, 0.92));
-    border-color: color-mix(in srgb, var(--cui-border-color), rgba(99, 123, 255, 0.22));
-    box-shadow: 0 18px 55px rgba(0, 0, 0, 0.6);
+    background: linear-gradient(135deg, rgba(63, 94, 251, 0.16), rgba(112, 247, 173, 0.12)),
+      color-mix(in srgb, var(--cui-body-bg) 86%, #0a0f1c);
+    border-color: color-mix(in srgb, var(--cui-border-color), rgba(99, 123, 255, 0.34));
+    box-shadow: 0 22px 60px rgba(0, 0, 0, 0.75);
+    color: var(--cui-body-color);
   }
 }
 
@@ -936,9 +948,18 @@ body {
 }
 
 :root[data-coreui-theme='dark'] .profile-content .card {
-  background: color-mix(in srgb, var(--cui-body-bg) 82%, rgba(8, 12, 24, 0.92));
-  border-color: color-mix(in srgb, var(--cui-border-color), rgba(63, 94, 251, 0.22));
-  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.5);
+  background: linear-gradient(135deg, rgba(63, 94, 251, 0.14), rgba(112, 247, 173, 0.1)),
+    color-mix(in srgb, var(--cui-body-bg) 88%, #070c18);
+  border-color: color-mix(in srgb, var(--cui-border-color), rgba(63, 94, 251, 0.28));
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.62);
+}
+
+:root[data-coreui-theme='dark'] .profile-page .glass-panel {
+  background: linear-gradient(135deg, rgba(63, 94, 251, 0.16), rgba(112, 247, 173, 0.12)),
+    color-mix(in srgb, var(--cui-body-bg) 88%, #070c18);
+  border-color: color-mix(in srgb, var(--cui-border-color), rgba(99, 123, 255, 0.34));
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.75);
+  color: var(--cui-body-color);
 }
 
 :root[data-coreui-theme='dark'] .profile-nav .profile-tab {
