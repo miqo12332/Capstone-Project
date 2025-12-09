@@ -7,6 +7,7 @@ import {
   CCardBody,
   CCardHeader,
   CCol,
+  CFormSelect,
   CFormCheck,
   CFormInput,
   CFormLabel,
@@ -634,9 +635,45 @@ const HistoryTab = ({ entries, loading, error, onRefresh }) => {
   const formatDate = (date) => new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   const formatTime = (date) => new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
+  const [selectedHabitIds, setSelectedHabitIds] = useState([])
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
+
+  const habitOptions = useMemo(() => {
+    const seen = new Map()
+    entries.forEach((entry) => {
+      const key = entry.habitId ?? entry.habit_id ?? entry.habitTitle
+      if (!key || seen.has(key)) return
+      seen.set(key, {
+        id: key,
+        label: entry.habitTitle,
+        category: entry.category,
+      })
+    })
+
+    return Array.from(seen.values()).sort((a, b) => a.label.localeCompare(b.label))
+  }, [entries])
+
+  const filteredEntries = useMemo(() => {
+    const start = startDate ? new Date(`${startDate}T00:00:00`) : null
+    const end = endDate ? new Date(`${endDate}T23:59:59`) : null
+
+    return [...entries]
+      .filter((entry) => {
+        const key = entry.habitId ?? entry.habit_id ?? entry.habitTitle
+        if (selectedHabitIds.length && !selectedHabitIds.includes(String(key))) return false
+
+        const progressDay = new Date(entry.progressDate ?? entry.createdAt)
+        if (start && progressDay < start) return false
+        if (end && progressDay > end) return false
+        return true
+      })
+      .sort((a, b) => new Date(b.createdAt ?? b.progressDate) - new Date(a.createdAt ?? a.progressDate))
+  }, [entries, endDate, selectedHabitIds, startDate])
+
   const exportCsv = () => {
     const header = "habit,status,date,time,reason\n"
-    const rows = entries
+    const rows = filteredEntries
       .map((entry) => {
         const reason = entry.reason ? entry.reason.replace(/"/g, '""') : ""
         return `${entry.habitTitle},${entry.status},${entry.progressDate},${formatTime(entry.createdAt)},"${reason}"`
@@ -653,15 +690,86 @@ const HistoryTab = ({ entries, loading, error, onRefresh }) => {
 
   return (
     <div className="mt-3">
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div className="text-muted small">Latest 50 check-ins, including your missed-day notes.</div>
-        <div className="d-flex gap-2">
+      <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-3">
+        <div className="text-muted small">
+          {filteredEntries.length === entries.length
+            ? "Latest 50 check-ins, including your missed-day notes."
+            : `Showing ${filteredEntries.length} of ${entries.length} logs.`}
+        </div>
+        <div className="d-flex gap-2 flex-wrap">
           <CButton color="light" size="sm" onClick={onRefresh} disabled={loading}>
             Refresh
           </CButton>
-          <CButton color="primary" size="sm" variant="outline" onClick={exportCsv} disabled={!entries.length}>
+          <CButton color="primary" size="sm" variant="outline" onClick={exportCsv} disabled={!filteredEntries.length}>
             Export CSV
           </CButton>
+        </div>
+      </div>
+
+      <div className="d-flex flex-wrap gap-3 mb-3">
+        <div className="flex-grow-1" style={{ minWidth: 220 }}>
+          <CFormLabel htmlFor="history-habit-filter" className="small fw-semibold text-uppercase text-body-secondary">
+            Filter by habit
+          </CFormLabel>
+          <CFormSelect
+            id="history-habit-filter"
+            multiple
+            size={Math.min(6, Math.max(3, habitOptions.length))}
+            value={selectedHabitIds}
+            onChange={(e) =>
+              setSelectedHabitIds(Array.from(e.target.selectedOptions).map((option) => option.value))
+            }
+          >
+            <option value="" disabled>
+              Select one or more habits
+            </option>
+            {habitOptions.map((habit) => (
+              <option key={habit.id} value={habit.id}>
+                {habit.label} {habit.category ? `(${habit.category})` : ""}
+              </option>
+            ))}
+          </CFormSelect>
+        </div>
+
+        <div className="d-flex flex-wrap gap-3 align-items-end">
+          <div>
+            <CFormLabel htmlFor="history-start-date" className="small fw-semibold text-uppercase text-body-secondary">
+              From
+            </CFormLabel>
+            <CFormInput
+              id="history-start-date"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+          </div>
+          <div>
+            <CFormLabel htmlFor="history-end-date" className="small fw-semibold text-uppercase text-body-secondary">
+              To
+            </CFormLabel>
+            <CFormInput
+              id="history-end-date"
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+          </div>
+          <div className="d-flex gap-2 align-items-center mb-2">
+            <CButton
+              color="light"
+              size="sm"
+              variant="ghost"
+              className="mt-1"
+              onClick={() => {
+                setSelectedHabitIds([])
+                setStartDate("")
+                setEndDate("")
+              }}
+              disabled={!selectedHabitIds.length && !startDate && !endDate}
+            >
+              Clear filters
+            </CButton>
+          </div>
         </div>
       </div>
 
@@ -671,11 +779,13 @@ const HistoryTab = ({ entries, loading, error, onRefresh }) => {
         <div className="d-flex justify-content-center my-4">
           <CSpinner color="primary" />
         </div>
-      ) : entries.length === 0 ? (
-        <div className="text-center text-body-secondary py-4">Log your first habit to see history.</div>
+      ) : filteredEntries.length === 0 ? (
+        <div className="text-center text-body-secondary py-4">
+          {entries.length ? "No history matches your filters yet." : "Log your first habit to see history."}
+        </div>
       ) : (
         <CListGroup flush>
-          {entries.map((entry) => (
+          {filteredEntries.map((entry) => (
             <CListGroupItem key={entry.id} className="py-3">
               <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap">
                 <div className="d-flex flex-column gap-1">
