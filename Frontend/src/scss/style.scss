@@ -593,11 +593,19 @@ body {
   box-shadow: 0 12px 35px rgba(0, 0, 0, 0.05);
 
   @include color-mode(dark) {
-    background: linear-gradient(135deg, rgba(63, 94, 251, 0.18), rgba(70, 252, 167, 0.08)),
-      color-mix(in srgb, var(--cui-body-bg) 70%, #0f1324);
-    border-color: color-mix(in srgb, var(--cui-border-color), rgba(255, 255, 255, 0.16));
-    box-shadow: 0 16px 45px rgba(0, 0, 0, 0.7);
+    background: linear-gradient(
+        140deg,
+        color-mix(in srgb, var(--cui-primary) 25%, transparent),
+        color-mix(in srgb, var(--cui-success) 20%, transparent)
+      ),
+      color-mix(in srgb, var(--cui-body-bg) 60%, #0b0f1f);
+    border-color: color-mix(in srgb, var(--cui-border-color), rgba(255, 255, 255, 0.22));
+    box-shadow: 0 16px 55px rgba(0, 0, 0, 0.72);
     color: var(--cui-body-color);
+
+    .text-muted {
+      color: color-mix(in srgb, var(--cui-body-color), rgba(255, 255, 255, 0.35));
+    }
   }
 }
 
