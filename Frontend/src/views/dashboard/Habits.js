@@ -50,6 +50,7 @@ import { logHabitProgress, getProgressHistory } from "../../services/progress"
 import { promptMissedReflection } from "../../utils/reflection"
 import { getDailyChallengeSummary } from "../../services/dailyChallenge"
 import { getProgressAnalytics, formatPercent } from "../../services/analytics"
+import { emitDataRefresh, REFRESH_SCOPES, useDataRefresh } from "../../utils/refreshBus"
 
 const createEditDraft = (habit) => ({
   id: habit?.id,
@@ -162,6 +163,14 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
     loadChallenge()
   }, [loadChallenge, loadHabits])
 
+  useDataRefresh(
+    [REFRESH_SCOPES.HABITS, REFRESH_SCOPES.PROGRESS],
+    useCallback(() => {
+      loadHabits()
+      loadChallenge()
+    }, [loadChallenge, loadHabits]),
+  )
+
   useEffect(() => {
     if (!feedback) return undefined
     const t = setTimeout(() => setFeedback(null), 4000)
@@ -184,6 +193,8 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
       if (typeof onProgressLogged === "function") {
         await onProgressLogged()
       }
+      emitDataRefresh(REFRESH_SCOPES.PROGRESS, { habitId, status })
+      emitDataRefresh(REFRESH_SCOPES.ANALYTICS, { habitId, status })
       setFeedback({
         type: "success",
         message: `Logged ${status} for ${habit.title || habit.name || habit.habitName}.`,
@@ -200,6 +211,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
     try {
       await deleteHabit(habitId)
       setHabits((prev) => prev.filter((h) => h.id !== habitId))
+      emitDataRefresh(REFRESH_SCOPES.HABITS, { reason: "habit-deleted", habitId })
       setFeedback({ type: "success", message: "Habit deleted." })
     } catch (error) {
       console.error("Failed to delete", error)
@@ -233,6 +245,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
       setHabits((prev) =>
         prev.map((habit) => (habit.id === updated.id ? { ...habit, ...updated } : habit)),
       )
+      emitDataRefresh(REFRESH_SCOPES.HABITS, { reason: "habit-updated", habitId: updated.id })
       setShowEditor(false)
       setFeedback({ type: "success", message: "Habit updated." })
     } catch (error) {

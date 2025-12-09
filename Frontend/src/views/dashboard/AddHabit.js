@@ -41,6 +41,7 @@ import {
   cilStar,
 } from "@coreui/icons"
 import { getHabits, createHabit, deleteHabit } from "../../services/habits"
+import { emitDataRefresh, REFRESH_SCOPES } from "../../utils/refreshBus"
 
 const createBlankHabit = () => ({
   title: "",
@@ -185,6 +186,7 @@ const AddHabit = () => {
       setHabits((prev) => [...prev, created])
       setNewHabit(createBlankHabit())
       setSuccess("Habit added to your collection!")
+      emitDataRefresh(REFRESH_SCOPES.HABITS, { reason: "habit-added" })
     } catch {
       setErr("Failed to create habit")
     } finally {
@@ -198,6 +200,7 @@ const AddHabit = () => {
       setHabits((prev) => prev.filter((h) => h.id !== id))
       setSuccess("Habit removed")
       setErr("")
+      emitDataRefresh(REFRESH_SCOPES.HABITS, { reason: "habit-removed" })
     } catch {
       setErr("Failed to delete habit")
       setSuccess("")

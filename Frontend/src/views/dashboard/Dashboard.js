@@ -53,6 +53,7 @@ import {
   fetchAssistantSummary,
   saveAssistantProfile,
 } from "../../services/assistant";
+import { useDataRefresh, REFRESH_SCOPES } from "../../utils/refreshBus";
 
 const Dashboard = () => {
   const [habits, setHabits] = useState([]);
@@ -107,64 +108,64 @@ const Dashboard = () => {
     }
   };
 
-  useEffect(() => {
-    const loadCore = async () => {
-      try {
-        if (!user?.id) {
-          setError("Please login first");
-          setLoading(false);
-          return;
-        }
-
-        setLoading(true);
-        const [habitData, progressRows] = await Promise.all([
-          getHabits(user.id),
-          getTodayProgressLogs(user.id),
-        ]);
-
-        setHabits(habitData);
-        setTodayCounts(rowsToCounts(progressRows));
-      } catch (err) {
-        console.error("❌ Error loading dashboard essentials", err);
-        setError(err.message || "Failed to load dashboard data");
-      } finally {
+  const loadCore = useCallback(async () => {
+    try {
+      if (!user?.id) {
+        setError("Please login first");
         setLoading(false);
+        return;
       }
-    };
 
+      setLoading(true);
+      const [habitData, progressRows] = await Promise.all([
+        getHabits(user.id),
+        getTodayProgressLogs(user.id),
+      ]);
+
+      setHabits(habitData);
+      setTodayCounts(rowsToCounts(progressRows));
+    } catch (err) {
+      console.error("❌ Error loading dashboard essentials", err);
+      setError(err.message || "Failed to load dashboard data");
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
+
+  const loadAnalytics = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const data = await getProgressAnalytics(user.id);
+      setAnalytics(data);
+    } catch (err) {
+      console.error("⚠️ Failed to fetch analytics for dashboard", err);
+      setAnalyticsError("We couldn't refresh your analytics just now.");
+    }
+  }, [user?.id]);
+
+  const loadSchedules = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const [scheduleData, calendarData] = await Promise.all([
+        getSchedules(user.id),
+        fetchCalendarOverview(user.id, { days: 21 }),
+      ]);
+      setSchedules(Array.isArray(scheduleData) ? scheduleData : []);
+      setCalendarOverview(calendarData || null);
+    } catch (err) {
+      console.warn("⚠️ Unable to load schedules or calendar", err);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
     loadCore();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [loadCore]);
 
   useEffect(() => {
-    if (!user?.id) return;
-
-    const loadAnalytics = async () => {
-      try {
-        const data = await getProgressAnalytics(user.id);
-        setAnalytics(data);
-      } catch (err) {
-        console.error("⚠️ Failed to fetch analytics for dashboard", err);
-        setAnalyticsError("We couldn't refresh your analytics just now.");
-      }
-    };
-
-    const loadSchedules = async () => {
-      try {
-        const [scheduleData, calendarData] = await Promise.all([
-          getSchedules(user.id),
-          fetchCalendarOverview(user.id, { days: 21 }),
-        ]);
-        setSchedules(Array.isArray(scheduleData) ? scheduleData : []);
-        setCalendarOverview(calendarData || null);
-      } catch (err) {
-        console.warn("⚠️ Unable to load schedules or calendar", err);
-      }
-    };
-
     loadAnalytics();
     loadSchedules();
-  }, [user?.id]);
+  }, [loadAnalytics, loadSchedules]);
 
   const loadAiProfileMemory = useCallback(async () => {
     if (!user?.id) return;
@@ -182,6 +183,15 @@ const Dashboard = () => {
   useEffect(() => {
     loadAiProfileMemory();
   }, [loadAiProfileMemory]);
+
+  useDataRefresh(
+    [REFRESH_SCOPES.HABITS, REFRESH_SCOPES.SCHEDULES, REFRESH_SCOPES.PROGRESS, REFRESH_SCOPES.ANALYTICS],
+    useCallback(() => {
+      loadCore();
+      loadAnalytics();
+      loadSchedules();
+    }, [loadAnalytics, loadCore, loadSchedules]),
+  );
 
   const loadAiSummary = useCallback(async () => {
     if (!user?.id) return;
