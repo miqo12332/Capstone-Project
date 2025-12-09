@@ -5,10 +5,31 @@ import Habit from "../models/Habit.js";
 
 const router = express.Router();
 
+const normalizeDateOnly = (value) => {
+  if (!value) return null;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return date.toISOString().slice(0, 10);
+};
+
+const formatScheduleDates = (schedule) => {
+  if (!schedule) return schedule;
+
+  const plain = schedule.get ? schedule.get({ plain: true }) : schedule;
+
+  return {
+    ...plain,
+    day: normalizeDateOnly(plain.day),
+    enddate: normalizeDateOnly(plain.enddate),
+  };
+};
+
 // GET schedules for a user (joins Habit by habit_id)
 router.get("/user/:userId", async (req, res) => {
   try {
-    const schedules = await Schedule.findAll({
+    const records = await Schedule.findAll({
       where: { user_id: req.params.userId },
       include: [
         {
@@ -20,6 +41,9 @@ router.get("/user/:userId", async (req, res) => {
       ],
       order: [["day", "ASC"]],
     });
+
+    const schedules = records.map((schedule) => formatScheduleDates(schedule));
+
     res.json(schedules);
   } catch (err) {
     console.error("Error fetching schedules:", err);
@@ -73,13 +97,20 @@ router.post("/", async (req, res) => {
       }
     }
 
+    const normalizedDay = normalizeDateOnly(day);
+    const normalizedEndDate = normalizeDateOnly(enddate);
+
+    if (!normalizedDay) {
+      return res.status(400).json({ error: "day must be a valid date" });
+    }
+
     const created = await Schedule.create({
       habit_id: resolvedHabitId,
       user_id,
-      day,
+      day: normalizedDay,
       starttime,
       endtime: endtime || null,
-      enddate: enddate || null,
+      enddate: normalizedEndDate,
       repeat: repeat || "daily",
       customdays: repeat === "custom" ? customdays || null : null,
       notes: notes || null,
@@ -95,7 +126,7 @@ router.post("/", async (req, res) => {
       ],
     });
 
-    res.status(201).json(scheduleWithHabit || created);
+    res.status(201).json(formatScheduleDates(scheduleWithHabit || created));
   } catch (err) {
     console.error("❌ Error creating schedule:", err);
     res.status(500).json({ error: "Failed to add schedule", "err": err });

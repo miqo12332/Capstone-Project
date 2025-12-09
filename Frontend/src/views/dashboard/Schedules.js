@@ -63,7 +63,8 @@ const MySchedule = () => {
   }, [loadHabits])
 
   // ✅ Load user's schedules
-  const loadSchedules = async () => {
+  const loadSchedules = useCallback(async () => {
+    setLoading(true)
     try {
       const res = await fetch(`http://localhost:5001/api/schedules/user/${user.id}`)
       if (!res.ok) throw new Error("Failed to fetch schedules")
@@ -75,11 +76,11 @@ const MySchedule = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.id])
 
   useEffect(() => {
     if (user?.id) loadSchedules()
-  }, [user?.id])
+  }, [loadSchedules, user?.id])
 
   // ✅ Add new schedule
   const handleAdd = async () => {
@@ -174,6 +175,7 @@ const MySchedule = () => {
   }
 
   useDataRefresh([REFRESH_SCOPES.HABITS], loadHabits)
+  useDataRefresh([REFRESH_SCOPES.SCHEDULES], loadSchedules)
 
   return (
     <CRow className="mt-4 g-4">
