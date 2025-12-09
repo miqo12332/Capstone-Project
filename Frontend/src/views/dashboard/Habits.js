@@ -61,12 +61,16 @@ const createEditDraft = (habit) => ({
   is_daily_goal: Boolean(habit?.is_daily_goal),
 })
 
-const DailyChallengeHighlight = ({ challenge, onLog }) => {
+const DailyChallengeHighlight = ({ challenge, onLog, loggingState }) => {
   if (!challenge?.focusHabit) return null
   const focus = challenge.focusHabit
+  const focusId = focus?.id || focus?.habitId
   const progressPercent = focus.targetForToday
     ? Math.min(100, Math.round((focus.doneToday / focus.targetForToday) * 100))
     : 0
+
+  const isLoggingDone = loggingState === `${focusId}-done`
+  const isLoggingMissed = loggingState === `${focusId}-missed`
 
   return (
     <CCard className="h-100 shadow-sm border-0 habits-panel challenge-card">
@@ -102,9 +106,31 @@ const DailyChallengeHighlight = ({ challenge, onLog }) => {
           </div>
         </div>
         <div className="d-flex flex-wrap gap-2">
-          <CButton color="success" size="sm" onClick={() => onLog(focus, "done")}>Log done</CButton>
-          <CButton color="danger" size="sm" variant="outline" onClick={() => onLog(focus, "missed")}>
-            Log missed
+          <CButton
+            color="success"
+            size="sm"
+            className={`rounded-pill log-action log-done${isLoggingDone ? " is-logging" : ""}`}
+            disabled={isLoggingDone}
+            onClick={() => onLog(focus, "done")}
+          >
+            <span className="d-inline-flex align-items-center gap-2">
+              {isLoggingDone && <CSpinner size="sm" color="light" />}
+              <span>{isLoggingDone ? "Logging..." : "Log done"}</span>
+            </span>
+          </CButton>
+          <CButton
+            color="danger"
+            size="sm"
+            variant="outline"
+            className={`rounded-pill log-action log-missed${isLoggingMissed ? " is-logging" : ""}`}
+            disabled={isLoggingMissed}
+            onClick={() => onLog(focus, "missed")}
+          >
+            <span className="d-inline-flex align-items-center gap-2">
+              {isLoggingMissed && <CSpinner size="sm" color="danger" />}
+              <CIcon icon={cilClock} className="opacity-75" />
+              <span>{isLoggingMissed ? "Logging..." : "Log missed"}</span>
+            </span>
           </CButton>
         </div>
       </CCardBody>
@@ -274,7 +300,11 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
       <CRow className="g-4">
         <CCol lg={4}>
           {challengeError && <CAlert color="warning">{challengeError}</CAlert>}
-          <DailyChallengeHighlight challenge={challenge} onLog={handleLog} />
+          <DailyChallengeHighlight
+            challenge={challenge}
+            onLog={handleLog}
+            loggingState={loggingState}
+          />
         </CCol>
         <CCol lg={8}>
           <CCard className="shadow-sm border-0 h-100 habits-panel">
@@ -325,21 +355,34 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                           <CButton
                             size="sm"
                             color="success"
-                            className="rounded-pill"
+                            className={`rounded-pill log-action log-done${
+                              loggingState === `${habit.id}-done` ? " is-logging" : ""
+                            }`}
                             disabled={loggingState === `${habit.id}-done`}
                             onClick={() => handleLog(habit, "done")}
                           >
-                            {loggingState === `${habit.id}-done` ? "Logging..." : "Log done"}
+                            <span className="d-inline-flex align-items-center gap-2">
+                              {loggingState === `${habit.id}-done` && <CSpinner size="sm" color="light" />}
+                              <span>
+                                {loggingState === `${habit.id}-done` ? "Logging..." : "Log done"}
+                              </span>
+                            </span>
                           </CButton>
                           <CButton
                             size="sm"
                             color="warning"
                             variant="outline"
-                            className="rounded-pill"
+                            className={`rounded-pill log-action log-missed${loggingState === `${habit.id}-missed` ? " is-logging" : ""}`}
                             disabled={loggingState === `${habit.id}-missed`}
                             onClick={() => handleLog(habit, "missed")}
                           >
-                            {loggingState === `${habit.id}-missed` ? "Logging..." : "Log missed"}
+                            <span className="d-inline-flex align-items-center gap-2">
+                              {loggingState === `${habit.id}-missed` && <CSpinner size="sm" color="warning" />}
+                              <CIcon icon={cilClock} className="opacity-75" />
+                              <span>
+                                {loggingState === `${habit.id}-missed` ? "Logging..." : "Log missed"}
+                              </span>
+                            </span>
                           </CButton>
                           <CButton
                             size="sm"

@@ -637,6 +637,57 @@ body {
   box-shadow: 0 6px 16px rgba(63, 94, 251, 0.08);
 }
 
+.log-action {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+
+  &:active {
+    transform: translateY(1px) scale(0.99);
+  }
+
+  &.is-logging {
+    animation: pulse-logging 1s ease-in-out infinite;
+    box-shadow: 0 10px 24px rgba(63, 94, 251, 0.16);
+  }
+
+  .spinner-border {
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+.log-done {
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+  border: none;
+}
+
+.log-missed {
+  border-color: rgba(255, 193, 7, 0.4) !important;
+  color: #c27c0e !important;
+  background: color-mix(in srgb, #fff9ed 90%, transparent);
+
+  &:hover {
+    background: color-mix(in srgb, #fff3c4 86%, transparent);
+    border-color: rgba(255, 193, 7, 0.75) !important;
+  }
+}
+
+@keyframes pulse-logging {
+  0% {
+    transform: translateY(0);
+    box-shadow: 0 6px 16px rgba(63, 94, 251, 0.08);
+  }
+  50% {
+    transform: translateY(-1px) scale(1.01);
+    box-shadow: 0 12px 28px rgba(63, 94, 251, 0.12);
+  }
+  100% {
+    transform: translateY(0);
+    box-shadow: 0 6px 16px rgba(63, 94, 251, 0.08);
+  }
+}
+
 .subtle-badge {
   background: rgba(63, 94, 251, 0.1) !important;
   color: var(--cui-primary) !important;
