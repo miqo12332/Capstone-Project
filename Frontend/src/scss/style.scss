@@ -553,6 +553,17 @@ body {
   overflow: hidden;
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.06);
 
+  @include color-mode(dark) {
+    background: color-mix(
+        in srgb,
+        color-mix(in srgb, var(--cui-primary) 15%, transparent) 25%,
+        color-mix(in srgb, var(--cui-success) 12%, transparent)
+      ),
+      color-mix(in srgb, var(--cui-body-bg) 90%, #0c0c16);
+    border-color: color-mix(in srgb, var(--cui-border-color), rgba(99, 123, 255, 0.2));
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  }
+
   &::after {
     content: "";
     position: absolute;
@@ -580,6 +591,12 @@ body {
   border: 1px solid var(--cui-border-color-translucent);
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 12px 35px rgba(0, 0, 0, 0.05);
+
+  @include color-mode(dark) {
+    background: color-mix(in srgb, var(--cui-body-bg) 78%, rgba(63, 94, 251, 0.16));
+    border-color: color-mix(in srgb, var(--cui-border-color), rgba(63, 94, 251, 0.34));
+    box-shadow: 0 16px 45px rgba(0, 0, 0, 0.65);
+  }
 }
 
 .mini-badge {
@@ -615,6 +632,12 @@ body {
   border: 1px solid var(--cui-border-color-translucent);
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.04);
+}
+
+:root[data-coreui-theme='dark'] .habits-panel {
+  background: color-mix(in srgb, var(--cui-body-bg) 92%, rgba(63, 94, 251, 0.06));
+  border-color: var(--cui-border-color);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
 }
 
 .challenge-card {
@@ -675,12 +698,38 @@ body {
   }
 }
 
+:root[data-coreui-theme='dark'] .habits-list .habit-item {
+  background: color-mix(in srgb, var(--cui-body-bg) 94%, rgba(63, 94, 251, 0.08));
+  border-color: var(--cui-border-color);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-coreui-theme='dark'] .habits-list .habit-item::before {
+  border-inline-start-color: rgba(99, 123, 255, 0.55);
+}
+
 .habits-list .habit-title {
   letter-spacing: -0.01em;
 }
 
 .habit-actions .btn {
   box-shadow: 0 6px 16px rgba(63, 94, 251, 0.08);
+}
+
+.schedule-preview-card {
+  background: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color-translucent);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.04);
+}
+
+.schedule-preview-card .text-muted {
+  color: var(--cui-body-secondary-color) !important;
+}
+
+:root[data-coreui-theme='dark'] .schedule-preview-card {
+  background: color-mix(in srgb, var(--cui-body-bg) 92%, rgba(255, 255, 255, 0.02));
+  border-color: var(--cui-border-color);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38);
 }
 
 .log-action {
@@ -757,6 +806,17 @@ body {
   overflow: hidden;
   padding: clamp(1.25rem, 2vw, 1.75rem);
   background: linear-gradient(135deg, rgba(63, 94, 251, 0.14), rgba(112, 247, 173, 0.12));
+
+  @include color-mode(dark) {
+    background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--cui-primary) 18%, transparent),
+        color-mix(in srgb, var(--cui-success) 12%, transparent)
+      ),
+      color-mix(in srgb, var(--cui-body-bg) 82%, #0b0f1c);
+    border: 1px solid color-mix(in srgb, var(--cui-border-color), rgba(63, 94, 251, 0.3));
+    box-shadow: 0 18px 55px rgba(0, 0, 0, 0.58);
+  }
 }
 
 .profile-hero::after {
@@ -766,6 +826,10 @@ body {
   background: radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.2), transparent 40%),
     radial-gradient(circle at 80% 50%, rgba(255, 255, 255, 0.12), transparent 30%);
   pointer-events: none;
+
+  @include color-mode(dark) {
+    opacity: 0.55;
+  }
 }
 
 .avatar-ring {
@@ -783,7 +847,9 @@ body {
   backdrop-filter: blur(6px);
 
   @include color-mode(dark) {
-    background: rgba(25, 25, 35, 0.85);
+    background: color-mix(in srgb, var(--cui-body-bg) 82%, rgba(12, 16, 28, 0.92));
+    border-color: color-mix(in srgb, var(--cui-border-color), rgba(99, 123, 255, 0.22));
+    box-shadow: 0 18px 55px rgba(0, 0, 0, 0.6);
   }
 }
 
@@ -796,6 +862,12 @@ body {
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.8);
   color: inherit;
+
+  @include color-mode(dark) {
+    background: color-mix(in srgb, var(--cui-primary) 18%, var(--cui-body-bg) 88%);
+    border-color: color-mix(in srgb, var(--cui-primary) 35%, var(--cui-border-color));
+    color: var(--cui-primary);
+  }
 }
 
 .icon-chip {
@@ -861,6 +933,23 @@ body {
 .profile-content .card:hover {
   transform: translateY(-3px);
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.08);
+}
+
+:root[data-coreui-theme='dark'] .profile-content .card {
+  background: color-mix(in srgb, var(--cui-body-bg) 82%, rgba(8, 12, 24, 0.92));
+  border-color: color-mix(in srgb, var(--cui-border-color), rgba(63, 94, 251, 0.22));
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-coreui-theme='dark'] .profile-nav .profile-tab {
+  background: color-mix(in srgb, var(--cui-body-bg) 84%, rgba(255, 255, 255, 0.04));
+  color: var(--cui-body-color);
+}
+
+:root[data-coreui-theme='dark'] .profile-nav .profile-tab.active {
+  background: color-mix(in srgb, var(--cui-primary) 22%, var(--cui-body-bg) 78%);
+  color: var(--cui-primary) !important;
+  box-shadow: 0 12px 32px rgba(63, 94, 251, 0.25);
 }
 
 .soft-alert {

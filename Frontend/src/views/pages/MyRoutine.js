@@ -276,7 +276,7 @@ const MyRoutine = ({ onSyncClick }) => {
 
       <CRow className="g-4 align-items-start">
         <CCol xs={12} lg={5}>
-          <CCard className="shadow-sm">
+          <CCard className="shadow-sm routine-calendar-card">
             <CCardHeader className="fw-semibold d-flex align-items-center">
               <CIcon icon={cilCalendar} className="me-2 text-success" /> Calendar overview
             </CCardHeader>
@@ -301,7 +301,7 @@ const MyRoutine = ({ onSyncClick }) => {
           </CCard>
 
           {summary.nextFreeDay && (
-            <CCard className="shadow-sm mt-4 border-0 bg-light">
+            <CCard className="shadow-sm mt-4 border-0 next-free-day-card">
               <CCardBody className="d-flex align-items-center gap-3">
                 <CIcon icon={cilCheckCircle} className="text-success" size="lg" />
                 <div>
@@ -382,7 +382,7 @@ const MyRoutine = ({ onSyncClick }) => {
       </CRow>
 
       <style>{`
-        .react-calendar {
+        .routine-calendar-card .react-calendar {
           width: 100%;
           border: none;
           border-radius: 12px;
@@ -397,6 +397,11 @@ const MyRoutine = ({ onSyncClick }) => {
         }
         .react-calendar__tile:hover {
           background-color: rgba(46, 184, 92, 0.2);
+        }
+        .react-calendar__tile--active,
+        .react-calendar__tile--hasActive {
+          background-color: #2eb85c;
+          color: #fff;
         }
         .today-tile {
           font-weight: 600;
@@ -472,6 +477,40 @@ const MyRoutine = ({ onSyncClick }) => {
         }
         .timeline-content {
           margin-left: 0.5rem;
+        }
+        .next-free-day-card {
+          background: rgba(46, 184, 92, 0.08);
+          border: 1px solid rgba(46, 184, 92, 0.18);
+        }
+        :root[data-coreui-theme='dark'] .routine-calendar-card .react-calendar {
+          background: color-mix(in srgb, var(--cui-body-bg) 92%, transparent);
+          box-shadow: 0 10px 28px rgba(0,0,0,0.45);
+          color: var(--cui-body-color);
+          border: 1px solid var(--cui-border-color);
+        }
+        :root[data-coreui-theme='dark'] .react-calendar__navigation button {
+          color: var(--cui-body-color);
+        }
+        :root[data-coreui-theme='dark'] .react-calendar__month-view__weekdays__weekday {
+          color: var(--cui-body-secondary-color);
+        }
+        :root[data-coreui-theme='dark'] .react-calendar__tile {
+          color: var(--cui-body-color);
+        }
+        :root[data-coreui-theme='dark'] .react-calendar__tile--now {
+          background: rgba(46, 184, 92, 0.18);
+          border: 1px solid rgba(46, 184, 92, 0.35);
+          color: var(--cui-body-color);
+        }
+        :root[data-coreui-theme='dark'] .react-calendar__tile--active,
+        :root[data-coreui-theme='dark'] .react-calendar__tile--hasActive {
+          background: color-mix(in srgb, #2eb85c 85%, var(--cui-body-bg));
+          color: #0b2513;
+        }
+        :root[data-coreui-theme='dark'] .next-free-day-card {
+          background: color-mix(in srgb, var(--cui-body-bg) 88%, rgba(46, 184, 92, 0.35));
+          border-color: rgba(46, 184, 92, 0.4);
+          color: var(--cui-body-color);
         }
       `}</style>
     </div>
