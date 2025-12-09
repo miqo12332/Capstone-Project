@@ -1,28 +1,28 @@
 // assistantAgent.js
 // Main AI reasoning engine for StepHabit
 
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatNVIDIA } from "@langchain/nvidia";
 import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 const MAX_HISTORY_MESSAGES = parseInt(process.env.ASSISTANT_HISTORY_LIMIT || "12", 10);
 
 // ---- MODEL CONFIG ----
-const CLAUDE_BASE_URL = (process.env.CLAUDE_BASE_URL || "https://api.anthropic.com").replace(/\/$/, "");
+const NEMOTRON_BASE_URL = (process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1").replace(/\/$/, "");
 
-const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "amazon.nova-2-lite-v1:0";
-const FALLBACK_CLAUDE_MODEL = process.env.CLAUDE_FALLBACK_MODEL || "amazon.nova-2-lite-v1:0";
+const NEMOTRON_MODEL = process.env.NVIDIA_MODEL || "nvidia/nemotron-nano-9b-v2:free";
+const FALLBACK_NEMOTRON_MODEL = process.env.NVIDIA_FALLBACK_MODEL || "nvidia/nemotron-nano-9b-v2:free";
 
-const PROVIDER_NAME = process.env.CLAUDE_PROVIDER_NAME || "Amazon Nova";
-const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
+const PROVIDER_NAME = process.env.NVIDIA_PROVIDER_NAME || "NVIDIA AI";
+const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || process.env.CLAUDE_API_KEY;
 
 // ---- STATUS HELPERS ----
-const hasApiKey = () => Boolean(CLAUDE_API_KEY);
+const hasApiKey = () => Boolean(NVIDIA_API_KEY);
 
 export const getAgentStatus = () => ({
   ready: hasApiKey(),
   provider: PROVIDER_NAME,
-  model: hasApiKey() ? CLAUDE_MODEL : null,
-  reason: hasApiKey() ? null : "Set the CLAUDE_API_KEY environment variable.",
+  model: hasApiKey() ? NEMOTRON_MODEL : null,
+  reason: hasApiKey() ? null : "Set the NVIDIA_API_KEY environment variable.",
   updatedAt: new Date().toISOString(),
 });
 
@@ -109,12 +109,12 @@ const buildMessages = ({ snapshot, insightText, history = [] }) => {
 
 // ---- MAIN AGENT CALL ----
 export const runReasoningAgent = async ({ snapshot, insightText, history, apiKeyOverride }) => {
-  const apiKey = apiKeyOverride || CLAUDE_API_KEY;
-  if (!apiKey) throw new Error("Missing CLAUDE_API_KEY.");
+  const apiKey = apiKeyOverride || NVIDIA_API_KEY;
+  if (!apiKey) throw new Error("Missing NVIDIA_API_KEY.");
 
   const { systemInstruction, contents } = buildMessages({ snapshot, insightText, history });
 
-  const modelsToTry = [CLAUDE_MODEL, FALLBACK_CLAUDE_MODEL];
+  const modelsToTry = [NEMOTRON_MODEL, FALLBACK_NEMOTRON_MODEL];
 
   const isModelNotFound = err =>
     err?.lc_error_code === "MODEL_NOT_FOUND" ||
@@ -129,9 +129,9 @@ export const runReasoningAgent = async ({ snapshot, insightText, history, apiKey
     try {
       console.log("Trying AI model:", modelName);
 
-      const chat = new ChatAnthropic({
-        anthropicApiKey: apiKey,
-        anthropicApiUrl: CLAUDE_BASE_URL, // IMPORTANT — DO NOT ADD /v1
+      const chat = new ChatNVIDIA({
+        apiKey,
+        baseURL: NEMOTRON_BASE_URL,
         model: modelName,
         temperature: 0.7,
         topP: 0.95,
