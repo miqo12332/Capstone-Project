@@ -320,6 +320,27 @@ body {
   }
 }
 
+:root[data-coreui-theme='dark'] {
+  /* Normalize hardcoded light surfaces in dark mode */
+  .bg-white,
+  .card-header.bg-white,
+  .card.bg-white,
+  .list-group-item.bg-white,
+  .border.bg-white {
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    color: var(--cui-body-color) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  }
+
+  .bg-white .text-muted,
+  .card-header.bg-white .text-muted,
+  .card.bg-white .text-muted,
+  .list-group-item.bg-white .text-muted {
+    color: var(--cui-body-secondary-color) !important;
+  }
+}
+
 // ===== Enhanced surfaces =====
 .dashboard-page {
   background: radial-gradient(circle at 20% 20%, rgba(99, 123, 255, 0.08), transparent 30%),

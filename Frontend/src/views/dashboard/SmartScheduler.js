@@ -36,6 +36,7 @@ import {
 } from "recharts";
 
 import { getSmartSchedulerInsights, autoPlanSmartSession } from "../../services/smartScheduler";
+import "./SmartScheduler.css";
 
 const SmartScheduler = () => {
   const user = JSON.parse(localStorage.getItem("user"));
@@ -158,7 +159,7 @@ const SmartScheduler = () => {
 
       <CCol xs={12}>
         <CCard className="border-0 shadow-sm">
-          <CCardHeader className="d-flex flex-wrap gap-3 align-items-center justify-content-between bg-gradient-info text-white">
+          <CCardHeader className="d-flex flex-wrap gap-3 align-items-center justify-content-between smart-scheduler-header">
             <div className="d-flex align-items-center gap-3">
               <CIcon icon={cilLightbulb} size="xl" />
               <div>
@@ -205,7 +206,7 @@ const SmartScheduler = () => {
           <CCardBody>
             <CRow className="g-3">
               <CCol md={3}>
-                <div className="p-3 border rounded h-100">
+                <div className="p-3 border rounded h-100 smart-scheduler-stat">
                   <div className="text-uppercase text-muted small fw-semibold">
                     Habits tracked
                   </div>
@@ -214,7 +215,7 @@ const SmartScheduler = () => {
                 </div>
               </CCol>
               <CCol md={3}>
-                <div className="p-3 border rounded h-100">
+                <div className="p-3 border rounded h-100 smart-scheduler-stat">
                   <div className="text-uppercase text-muted small fw-semibold">
                     Sessions planned
                   </div>
@@ -223,7 +224,7 @@ const SmartScheduler = () => {
                 </div>
               </CCol>
               <CCol md={3}>
-                <div className="p-3 border rounded h-100">
+                <div className="p-3 border rounded h-100 smart-scheduler-stat">
                   <div className="text-uppercase text-muted small fw-semibold">
                     Free windows
                   </div>
@@ -232,7 +233,7 @@ const SmartScheduler = () => {
                 </div>
               </CCol>
               <CCol md={3}>
-                <div className="p-3 border rounded h-100">
+                <div className="p-3 border rounded h-100 smart-scheduler-stat">
                   <div className="text-uppercase text-muted small fw-semibold">
                     Conflicts
                   </div>

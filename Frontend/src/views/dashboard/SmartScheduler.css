@@ -1,0 +1,35 @@
+.smart-scheduler-header {
+  background: linear-gradient(135deg, #3260d2 0%, #5875ff 50%, #23c7ff 100%);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+}
+
+.smart-scheduler-header .text-uppercase {
+  letter-spacing: 0.08em;
+  opacity: 0.9;
+}
+
+.smart-scheduler-stat {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: #e2e8ff;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.05);
+}
+
+:root[data-coreui-theme='dark'] .smart-scheduler-header {
+  background: linear-gradient(135deg, #1f274f 0%, #2f3f7a 55%, #0f6ea8 100%);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+:root[data-coreui-theme='dark'] .smart-scheduler-stat {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--cui-border-color);
+  color: var(--cui-body-color);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.35);
+}
+
+:root[data-coreui-theme='dark'] .smart-scheduler-stat .text-muted,
+:root[data-coreui-theme='dark'] .smart-scheduler-stat .text-body-secondary {
+  color: var(--cui-body-secondary-color) !important;
+}
