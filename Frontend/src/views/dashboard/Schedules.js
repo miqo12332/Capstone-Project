@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"
+import React, { useCallback, useEffect, useState } from "react"
 import {
   CCard,
   CCardBody,
@@ -23,6 +23,7 @@ import {
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
 import { cilClock, cilCalendar, cilLoopCircular, cilPlus, cilNotes } from "@coreui/icons"
+import { emitDataRefresh, REFRESH_SCOPES, useDataRefresh } from "../../utils/refreshBus"
 
 const MySchedule = () => {
   const user = JSON.parse(localStorage.getItem("user"))
@@ -44,20 +45,22 @@ const MySchedule = () => {
   })
 
   // ✅ Load user's habits
-  useEffect(() => {
-    const loadHabits = async () => {
-      try {
-        const res = await fetch(`http://localhost:5001/api/habits/user/${user.id}`)
-        if (!res.ok) throw new Error("Failed to fetch habits")
-        const data = await res.json()
-        setHabits(data)
-      } catch (err) {
-        console.error("❌ Failed to load habits:", err)
-        setError("Failed to load habits")
-      }
+  const loadHabits = useCallback(async () => {
+    if (!user?.id) return
+    try {
+      const res = await fetch(`http://localhost:5001/api/habits/user/${user.id}`)
+      if (!res.ok) throw new Error("Failed to fetch habits")
+      const data = await res.json()
+      setHabits(data)
+    } catch (err) {
+      console.error("❌ Failed to load habits:", err)
+      setError("Failed to load habits")
     }
-    if (user?.id) loadHabits()
   }, [user?.id])
+
+  useEffect(() => {
+    loadHabits()
+  }, [loadHabits])
 
   // ✅ Load user's schedules
   const loadSchedules = async () => {
@@ -121,6 +124,7 @@ const MySchedule = () => {
       if (!res.ok) throw new Error("Failed to add schedule")
 
       await loadSchedules()
+      emitDataRefresh(REFRESH_SCOPES.SCHEDULES, { reason: "schedule-added" })
       setNewSchedule({
         type: "habit",
         habit_id: "",
@@ -162,11 +166,14 @@ const MySchedule = () => {
       const res = await fetch(`http://localhost:5001/api/schedules/${id}`, { method: "DELETE" })
       if (!res.ok) throw new Error("Failed to delete schedule")
       setSchedules((prev) => prev.filter((s) => s.id !== id))
+      emitDataRefresh(REFRESH_SCOPES.SCHEDULES, { reason: "schedule-deleted", scheduleId: id })
     } catch (err) {
       console.error("❌ Failed to delete schedule:", err)
       setError("Failed to delete schedule")
     }
   }
+
+  useDataRefresh([REFRESH_SCOPES.HABITS], loadHabits)
 
   return (
     <CRow className="mt-4 g-4">

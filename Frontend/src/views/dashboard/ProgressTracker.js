@@ -36,6 +36,7 @@ import {
   updateHabitProgressCount,
 } from "../../services/progress";
 import { promptMissedReflection } from "../../utils/reflection";
+import { useDataRefresh, REFRESH_SCOPES } from "../../utils/refreshBus";
 
 const CountAdjuster = ({
   label,
@@ -111,23 +112,24 @@ const ProgressTracker = () => {
     []
   );
 
-  useEffect(() => {
+  const loadHabits = useCallback(async () => {
     if (!userId) {
       setErr("Please login to track progress");
       return;
     }
-
-    (async () => {
-      try {
-        const data = await getHabits(userId);
-        setHabits(data);
-        setErr("");
-      } catch (error) {
-        console.error("Failed to load habits", error);
-        setErr("Failed to load habits");
-      }
-    })();
+    try {
+      const data = await getHabits(userId);
+      setHabits(data);
+      setErr("");
+    } catch (error) {
+      console.error("Failed to load habits", error);
+      setErr("Failed to load habits");
+    }
   }, [userId]);
+
+  useEffect(() => {
+    loadHabits();
+  }, [loadHabits]);
 
   const loadAnalytics = useCallback(
     async (options = { showSpinner: true }) => {
@@ -188,6 +190,15 @@ const ProgressTracker = () => {
   useEffect(() => {
     loadTodayCounts();
   }, [loadTodayCounts]);
+
+  useDataRefresh(
+    [REFRESH_SCOPES.HABITS, REFRESH_SCOPES.PROGRESS, REFRESH_SCOPES.ANALYTICS],
+    useCallback(() => {
+      loadHabits();
+      loadAnalytics({ showSpinner: false });
+      loadTodayCounts();
+    }, [loadAnalytics, loadHabits, loadTodayCounts]),
+  );
 
   const habitStatsMap = useMemo(() => {
     if (!analytics?.habits) return {};
