@@ -593,9 +593,11 @@ body {
   box-shadow: 0 12px 35px rgba(0, 0, 0, 0.05);
 
   @include color-mode(dark) {
-    background: color-mix(in srgb, var(--cui-body-bg) 78%, rgba(63, 94, 251, 0.16));
-    border-color: color-mix(in srgb, var(--cui-border-color), rgba(63, 94, 251, 0.34));
-    box-shadow: 0 16px 45px rgba(0, 0, 0, 0.65);
+    background: linear-gradient(135deg, rgba(63, 94, 251, 0.18), rgba(70, 252, 167, 0.08)),
+      color-mix(in srgb, var(--cui-body-bg) 70%, #0f1324);
+    border-color: color-mix(in srgb, var(--cui-border-color), rgba(255, 255, 255, 0.16));
+    box-shadow: 0 16px 45px rgba(0, 0, 0, 0.7);
+    color: var(--cui-body-color);
   }
 }
 
@@ -847,9 +849,11 @@ body {
   backdrop-filter: blur(6px);
 
   @include color-mode(dark) {
-    background: color-mix(in srgb, var(--cui-body-bg) 82%, rgba(12, 16, 28, 0.92));
-    border-color: color-mix(in srgb, var(--cui-border-color), rgba(99, 123, 255, 0.22));
-    box-shadow: 0 18px 55px rgba(0, 0, 0, 0.6);
+    background: linear-gradient(135deg, rgba(63, 94, 251, 0.12), rgba(112, 247, 173, 0.06)),
+      color-mix(in srgb, var(--cui-body-bg) 72%, #0e1220);
+    border-color: color-mix(in srgb, var(--cui-border-color), rgba(99, 123, 255, 0.28));
+    box-shadow: 0 18px 55px rgba(0, 0, 0, 0.7);
+    color: var(--cui-body-color);
   }
 }
 
