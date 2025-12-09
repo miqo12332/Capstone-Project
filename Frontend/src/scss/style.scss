@@ -593,14 +593,9 @@ body {
   box-shadow: 0 12px 35px rgba(0, 0, 0, 0.05);
 
   @include color-mode(dark) {
-    background: linear-gradient(
-        165deg,
-        color-mix(in srgb, var(--cui-primary) 24%, transparent) 12%,
-        color-mix(in srgb, var(--cui-success) 20%, transparent)
-      ),
-      color-mix(in srgb, #060914 75%, var(--cui-body-bg) 25%);
-    border-color: color-mix(in srgb, rgba(255, 255, 255, 0.18), var(--cui-border-color) 35%);
-    box-shadow: 0 18px 70px rgba(0, 0, 0, 0.82), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    background: color-mix(in srgb, var(--cui-body-bg) 65%, rgba(255, 255, 255, 0.14));
+    border-color: color-mix(in srgb, rgba(255, 255, 255, 0.26), var(--cui-border-color) 35%);
+    box-shadow: 0 18px 70px rgba(0, 0, 0, 0.82), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     color: var(--cui-body-color);
 
     .text-muted {
