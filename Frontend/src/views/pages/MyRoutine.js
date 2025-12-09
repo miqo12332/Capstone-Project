@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   CRow,
@@ -24,8 +24,15 @@ import "react-calendar/dist/Calendar.css";
 
 import { getSchedules } from "../../services/schedules";
 import { fetchCalendarOverview } from "../../services/calendar";
+import { REFRESH_SCOPES, useDataRefresh } from "../../utils/refreshBus";
 
-const toDateKey = (date) => date?.toISOString().split("T")[0];
+const toDateKey = (date) => {
+  if (!date) return null;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const formatTimeRange = (entry) => {
   if (entry.allDay) return "All day";
@@ -46,31 +53,33 @@ const MyRoutine = ({ onSyncClick }) => {
   const user = JSON.parse(localStorage.getItem("user"));
   const userId = user?.id;
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!userId) {
-        setError("Please log in to view your routine.");
-        setLoading(false);
-        return;
-      }
+  const loadData = useCallback(async () => {
+    if (!userId) {
+      setError("Please log in to view your routine.");
+      setLoading(false);
+      return;
+    }
 
-      try {
-        setLoading(true);
-        const [scheduleData, calendarData] = await Promise.all([
-          getSchedules(userId),
-          fetchCalendarOverview(userId, { days: 60 }),
-        ]);
-        setSchedules(Array.isArray(scheduleData) ? scheduleData : []);
-        setCalendarOverview(calendarData || null);
-      } catch (err) {
-        setError(err.message || "Unable to load routine details.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
+    try {
+      setLoading(true);
+      const [scheduleData, calendarData] = await Promise.all([
+        getSchedules(userId),
+        fetchCalendarOverview(userId, { days: 60 }),
+      ]);
+      setSchedules(Array.isArray(scheduleData) ? scheduleData : []);
+      setCalendarOverview(calendarData || null);
+    } catch (err) {
+      setError(err.message || "Unable to load routine details.");
+    } finally {
+      setLoading(false);
+    }
   }, [userId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useDataRefresh([REFRESH_SCOPES.SCHEDULES], loadData);
 
   const calendarEvents = useMemo(
     () =>
