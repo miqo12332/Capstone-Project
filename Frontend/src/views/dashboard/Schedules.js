@@ -388,7 +388,7 @@ const MySchedule = () => {
               </CButton>
             </CForm>
 
-            <CCard className="border-0 bg-light mt-4">
+            <CCard className="border-0 schedule-preview-card mt-4">
               <CCardBody>
                 <div className="d-flex justify-content-between align-items-center mb-2">
                   <span className="fw-semibold">Preview</span>

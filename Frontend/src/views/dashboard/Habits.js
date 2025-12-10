@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
 import {
   CAlert,
   CBadge,
@@ -508,7 +509,7 @@ const InsightsTab = ({ analytics, historyEntries, loading, error, onRefresh }) =
       const completion = day.completed + day.missed
       const percent = completion ? Math.round((day.completed / completion) * 100) : 0
       const label = new Date(`${day.date}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short' })
-      return { label, chance: percent }
+      return { label, chance: percent, date: day.date }
     })
   }, [summary?.dailyTrend])
 
@@ -670,7 +671,7 @@ const InsightsTab = ({ analytics, historyEntries, loading, error, onRefresh }) =
               <CCardBody className="d-flex flex-column gap-3">
                 {forecast.length === 0 && <span className="text-muted">Keep logging to see a forecast.</span>}
                 {forecast.map((day) => (
-                  <div key={day.label}>
+                  <div key={day.date || day.label}>
                     <div className="d-flex justify-content-between align-items-center">
                       <span className="text-muted">{day.label}</span>
                       <span className="fw-semibold">{day.chance}%</span>
@@ -1025,7 +1026,30 @@ const RewardsTab = ({ summary, loading }) => {
 }
 
 const Habits = () => {
-  const [activeTab, setActiveTab] = useState("my-habits")
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  const tabFromPath = useCallback((pathname) => {
+    if (pathname.includes("/addhabit")) return "add"
+    if (pathname.includes("/habit-library")) return "library"
+    if (pathname.includes("/progress-tracker")) return "progress"
+    return "my-habits"
+  }, [])
+
+  const pathForTab = useCallback((tab) => {
+    switch (tab) {
+      case "add":
+        return "/addhabit"
+      case "library":
+        return "/habit-library"
+      case "progress":
+        return "/progress-tracker"
+      default:
+        return "/habits"
+    }
+  }, [])
+
+  const [activeTab, setActiveTab] = useState(() => tabFromPath(location.pathname))
   const [analytics, setAnalytics] = useState(null)
   const [historyEntries, setHistoryEntries] = useState([])
   const [signalsLoading, setSignalsLoading] = useState(false)
@@ -1056,6 +1080,29 @@ const Habits = () => {
     refreshSignals()
   }, [refreshSignals])
 
+  useEffect(() => {
+    const nextTab = tabFromPath(location.pathname)
+    setActiveTab(nextTab)
+  }, [location.pathname, tabFromPath])
+
+  const handleTabChange = useCallback(
+    (tab) => {
+      setActiveTab(tab)
+      navigate(pathForTab(tab))
+    },
+    [navigate, pathForTab],
+  )
+
+  const goToAddTab = useCallback(() => {
+    handleTabChange("add")
+    requestAnimationFrame(() => {
+      const addSection = document.getElementById("add-habit-section")
+      if (addSection) {
+        addSection.scrollIntoView({ behavior: "smooth", block: "start" })
+      }
+    })
+  }, [handleTabChange])
+
   const summary = analytics?.summary
 
   const heroStats = useMemo(
@@ -1081,11 +1128,8 @@ const Habits = () => {
             and ready for momentum.
           </p>
           <div className="d-flex gap-2 flex-wrap mt-1">
-            <CButton color="primary" size="sm" className="rounded-pill" onClick={() => setActiveTab("add")}>
-              <CIcon icon={cilPlus} className="me-2" /> Add new habit
-            </CButton>
-            <CButton color="light" size="sm" className="rounded-pill">
-              View quick wins
+            <CButton color="primary" size="sm" className="rounded-pill" onClick={goToAddTab}>
+              <CIcon icon={cilPlus} className="me-2" /> Add habit
             </CButton>
           </div>
         </div>
@@ -1104,18 +1148,22 @@ const Habits = () => {
 
       <CNav variant="tabs" role="tablist" className="mb-3 habits-nav">
         <CNavItem>
-          <CNavLink active={activeTab === "my-habits"} onClick={() => setActiveTab("my-habits")}>My Habits</CNavLink>
+          <CNavLink active={activeTab === "my-habits"} onClick={() => handleTabChange("my-habits")}>
+            My Habits
+          </CNavLink>
         </CNavItem>
         <CNavItem>
-          <CNavLink active={activeTab === "add"} onClick={() => setActiveTab("add")}>Add Habit</CNavLink>
+          <CNavLink active={activeTab === "add"} onClick={goToAddTab}>
+            Add Habit
+          </CNavLink>
         </CNavItem>
         <CNavItem>
-          <CNavLink active={activeTab === "library"} onClick={() => setActiveTab("library")}>
+          <CNavLink active={activeTab === "library"} onClick={() => handleTabChange("library")}>
             Habit Library
           </CNavLink>
         </CNavItem>
         <CNavItem>
-          <CNavLink active={activeTab === "progress"} onClick={() => setActiveTab("progress")}>
+          <CNavLink active={activeTab === "progress"} onClick={() => handleTabChange("progress")}>
             Progress
           </CNavLink>
         </CNavItem>
@@ -1145,10 +1193,10 @@ const Habits = () => {
 
       <CTabContent>
         <CTabPane visible={activeTab === "my-habits"}>
-          <MyHabitsTab onAddClick={() => setActiveTab("add")} onProgressLogged={refreshSignals} />
+          <MyHabitsTab onAddClick={goToAddTab} onProgressLogged={refreshSignals} />
         </CTabPane>
         <CTabPane visible={activeTab === "add"}>
-          <div className="mt-3">
+          <div className="mt-3" id="add-habit-section">
             <AddHabit />
           </div>
         </CTabPane>
@@ -1158,32 +1206,38 @@ const Habits = () => {
           </div>
         </CTabPane>
         <CTabPane visible={activeTab === "progress"}>
-          <div className="mt-3">
-            <ProgressTracker />
-          </div>
+          {activeTab === "progress" && (
+            <div className="mt-3">
+              <ProgressTracker />
+            </div>
+          )}
         </CTabPane>
         <CTabPane visible={activeTab === "insights"}>
-          <InsightsTab
-            analytics={analytics}
-            historyEntries={historyEntries}
-            loading={signalsLoading}
-            error={signalsError}
-            onRefresh={refreshSignals}
-          />
+          {activeTab === "insights" && (
+            <InsightsTab
+              analytics={analytics}
+              historyEntries={historyEntries}
+              loading={signalsLoading}
+              error={signalsError}
+              onRefresh={refreshSignals}
+            />
+          )}
         </CTabPane>
         <CTabPane visible={activeTab === "history"}>
-          <HistoryTab
-            entries={historyEntries}
-            loading={signalsLoading}
-            error={signalsError}
-            onRefresh={refreshSignals}
-          />
+          {activeTab === "history" && (
+            <HistoryTab
+              entries={historyEntries}
+              loading={signalsLoading}
+              error={signalsError}
+              onRefresh={refreshSignals}
+            />
+          )}
         </CTabPane>
         <CTabPane visible={activeTab === "automation"}>
-          <AutomationTab summary={summary} loading={signalsLoading} />
+          {activeTab === "automation" && <AutomationTab summary={summary} loading={signalsLoading} />}
         </CTabPane>
         <CTabPane visible={activeTab === "rewards"}>
-          <RewardsTab summary={summary} loading={signalsLoading} />
+          {activeTab === "rewards" && <RewardsTab summary={summary} loading={signalsLoading} />}
         </CTabPane>
       </CTabContent>
 

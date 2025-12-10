@@ -176,6 +176,23 @@
   box-shadow: 0 12px 30px rgba(99, 123, 255, 0.2);
 }
 
+:root[data-coreui-theme='dark'] .drag-source-column {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--cui-border-color);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+:root[data-coreui-theme='dark'] .drag-card {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--cui-border-color);
+  color: var(--cui-body-color);
+}
+
+:root[data-coreui-theme='dark'] .drag-card-active {
+  border-color: rgba(99, 123, 255, 0.65);
+  box-shadow: 0 12px 30px rgba(99, 123, 255, 0.25);
+}
+
 .drag-source-column {
   width: 320px;
   max-width: 100%;

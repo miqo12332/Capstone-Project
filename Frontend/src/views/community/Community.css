@@ -54,11 +54,23 @@
 :root[data-coreui-theme='dark'] .compact-hero {
   background: linear-gradient(180deg, rgba(35, 42, 52, 0.92), rgba(25, 31, 40, 0.95));
   border: 1px solid var(--cui-border-color);
+  color: var(--cui-body-color);
 }
 
 :root[data-coreui-theme='dark'] .stat-chip {
   background: rgba(255, 255, 255, 0.04);
   border-color: var(--cui-border-color);
+  color: var(--cui-body-color);
+}
+
+:root[data-coreui-theme='dark'] .community-shell .bg-white {
+  background-color: rgba(22, 27, 36, 0.94);
+  border-color: var(--cui-border-color);
+  color: var(--cui-body-color);
+}
+
+:root[data-coreui-theme='dark'] .community-shell .text-body-secondary {
+  color: var(--cui-secondary-color) !important;
 }
 
 :root[data-coreui-theme='dark'] .community-tabs .nav-link {

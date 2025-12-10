@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   CRow,
@@ -24,8 +24,15 @@ import "react-calendar/dist/Calendar.css";
 
 import { getSchedules } from "../../services/schedules";
 import { fetchCalendarOverview } from "../../services/calendar";
+import { useDataRefresh, REFRESH_SCOPES } from "../../utils/refreshBus";
 
-const toDateKey = (date) => date?.toISOString().split("T")[0];
+const toDateKey = (date) => {
+  if (!date) return null;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const formatTimeRange = (entry) => {
   if (entry.allDay) return "All day";
@@ -46,31 +53,34 @@ const MyRoutine = ({ onSyncClick }) => {
   const user = JSON.parse(localStorage.getItem("user"));
   const userId = user?.id;
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!userId) {
-        setError("Please log in to view your routine.");
-        setLoading(false);
-        return;
-      }
+  const loadData = useCallback(async () => {
+    if (!userId) {
+      setError("Please log in to view your routine.");
+      setLoading(false);
+      return;
+    }
 
-      try {
-        setLoading(true);
-        const [scheduleData, calendarData] = await Promise.all([
-          getSchedules(userId),
-          fetchCalendarOverview(userId, { days: 60 }),
-        ]);
-        setSchedules(Array.isArray(scheduleData) ? scheduleData : []);
-        setCalendarOverview(calendarData || null);
-      } catch (err) {
-        setError(err.message || "Unable to load routine details.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
+    try {
+      setError(null);
+      setLoading(true);
+      const [scheduleData, calendarData] = await Promise.all([
+        getSchedules(userId),
+        fetchCalendarOverview(userId, { days: 60 }),
+      ]);
+      setSchedules(Array.isArray(scheduleData) ? scheduleData : []);
+      setCalendarOverview(calendarData || null);
+    } catch (err) {
+      setError(err.message || "Unable to load routine details.");
+    } finally {
+      setLoading(false);
+    }
   }, [userId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useDataRefresh([REFRESH_SCOPES.SCHEDULES], loadData);
 
   const calendarEvents = useMemo(
     () =>
@@ -266,7 +276,7 @@ const MyRoutine = ({ onSyncClick }) => {
 
       <CRow className="g-4 align-items-start">
         <CCol xs={12} lg={5}>
-          <CCard className="shadow-sm">
+          <CCard className="shadow-sm routine-calendar-card">
             <CCardHeader className="fw-semibold d-flex align-items-center">
               <CIcon icon={cilCalendar} className="me-2 text-success" /> Calendar overview
             </CCardHeader>
@@ -291,7 +301,7 @@ const MyRoutine = ({ onSyncClick }) => {
           </CCard>
 
           {summary.nextFreeDay && (
-            <CCard className="shadow-sm mt-4 border-0 bg-light">
+            <CCard className="shadow-sm mt-4 border-0 next-free-day-card">
               <CCardBody className="d-flex align-items-center gap-3">
                 <CIcon icon={cilCheckCircle} className="text-success" size="lg" />
                 <div>
@@ -372,7 +382,7 @@ const MyRoutine = ({ onSyncClick }) => {
       </CRow>
 
       <style>{`
-        .react-calendar {
+        .routine-calendar-card .react-calendar {
           width: 100%;
           border: none;
           border-radius: 12px;
@@ -387,6 +397,11 @@ const MyRoutine = ({ onSyncClick }) => {
         }
         .react-calendar__tile:hover {
           background-color: rgba(46, 184, 92, 0.2);
+        }
+        .react-calendar__tile--active,
+        .react-calendar__tile--hasActive {
+          background-color: #2eb85c;
+          color: #fff;
         }
         .today-tile {
           font-weight: 600;
@@ -462,6 +477,40 @@ const MyRoutine = ({ onSyncClick }) => {
         }
         .timeline-content {
           margin-left: 0.5rem;
+        }
+        .next-free-day-card {
+          background: rgba(46, 184, 92, 0.08);
+          border: 1px solid rgba(46, 184, 92, 0.18);
+        }
+        :root[data-coreui-theme='dark'] .routine-calendar-card .react-calendar {
+          background: color-mix(in srgb, var(--cui-body-bg) 92%, transparent);
+          box-shadow: 0 10px 28px rgba(0,0,0,0.45);
+          color: var(--cui-body-color);
+          border: 1px solid var(--cui-border-color);
+        }
+        :root[data-coreui-theme='dark'] .react-calendar__navigation button {
+          color: var(--cui-body-color);
+        }
+        :root[data-coreui-theme='dark'] .react-calendar__month-view__weekdays__weekday {
+          color: var(--cui-body-secondary-color);
+        }
+        :root[data-coreui-theme='dark'] .react-calendar__tile {
+          color: var(--cui-body-color);
+        }
+        :root[data-coreui-theme='dark'] .react-calendar__tile--now {
+          background: rgba(46, 184, 92, 0.18);
+          border: 1px solid rgba(46, 184, 92, 0.35);
+          color: var(--cui-body-color);
+        }
+        :root[data-coreui-theme='dark'] .react-calendar__tile--active,
+        :root[data-coreui-theme='dark'] .react-calendar__tile--hasActive {
+          background: color-mix(in srgb, #2eb85c 85%, var(--cui-body-bg));
+          color: #0b2513;
+        }
+        :root[data-coreui-theme='dark'] .next-free-day-card {
+          background: color-mix(in srgb, var(--cui-body-bg) 88%, rgba(46, 184, 92, 0.35));
+          border-color: rgba(46, 184, 92, 0.4);
+          color: var(--cui-body-color);
         }
       `}</style>
     </div>
