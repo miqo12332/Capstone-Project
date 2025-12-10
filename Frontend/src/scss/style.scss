@@ -534,6 +534,30 @@ body {
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.06);
   border-radius: 18px;
   padding: clamp(1rem, 2vw, 1.5rem);
+
+  @include color-mode(dark) {
+    background: #212631;
+    border: 1px solid rgba(99, 123, 255, 0.12);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.06);
+    color: #e4e9f7;
+
+    .eyebrow {
+      color: color-mix(in srgb, #9fb3ff 70%, var(--cui-secondary-color));
+    }
+
+    .hero-title {
+      color: #f5f7ff;
+    }
+
+    .hero-subtitle,
+    .auth-highlights li {
+      color: color-mix(in srgb, #d8deea 82%, var(--cui-secondary-color));
+    }
+
+    .auth-highlights li::before {
+      color: #b3c5ff;
+    }
+  }
 }
 
 .auth-highlights {
