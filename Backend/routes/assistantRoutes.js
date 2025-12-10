@@ -687,8 +687,8 @@ router.get("/summary", async (req, res) => {
       }),
     ]);
 
-      const insightPayload = ensureObject(insightRecord?.keywords);
-      let keywordCounts = insightPayload.keywordCounts || {};
+    const insightPayload = ensureObject(insightRecord?.keywords);
+    let keywordCounts = insightPayload.keywordCounts || {};
     const history = mapHistory(historyRecords);
     const agentStatus = getAgentStatus();
 
@@ -722,6 +722,17 @@ router.get("/summary", async (req, res) => {
       const insight = await updateInsightMemory(userId, snapshot, keywordCounts);
       summaryText = insight.summaryText;
       keywordCounts = insight.aggregate;
+    }
+
+    if (!summaryText) {
+      const insight = await updateInsightMemory(userId, snapshot, keywordCounts);
+      summaryText = insight.summaryText;
+      keywordCounts = insight.aggregate;
+      agent = {
+        ...getCoachStatus(),
+        ready: false,
+        reason: agent?.reason || "AI summary unavailable; using stored insights instead.",
+      };
     }
 
     return res.json({

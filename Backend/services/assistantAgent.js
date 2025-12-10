@@ -127,29 +127,47 @@ export const runReasoningAgent = async ({ snapshot, insightText, history, apiKey
   let modelUsed = modelsToTry[0];
   let degradedReason = null;
 
-  for (const modelName of modelsToTry) {
-    try {
-      console.log("Trying Claude model:", modelName);
+  const tryClaude = async (messages) => {
+    for (const modelName of modelsToTry) {
+      try {
+        console.log("Trying Claude model:", modelName);
 
-      const chat = new ChatAnthropic({
-        anthropicApiKey: apiKey,
-        anthropicApiUrl: CLAUDE_BASE_URL, // No /v1
-        model: modelName,
-        temperature: 0.7,   // Claude 4.x does not allow both temperature + topP
-        maxTokens: 1024,
-      });
+        const chat = new ChatAnthropic({
+          anthropicApiKey: apiKey,
+          anthropicApiUrl: CLAUDE_BASE_URL, // No /v1
+          model: modelName,
+          temperature: 0.7,   // Claude 4.x does not allow both temperature + topP
+          maxTokens: 1024,
+        });
 
-      replyMessage = await chat.invoke([
-        new SystemMessage(systemInstruction),
-        ...(contents.length ? contents : [new HumanMessage("Summarize my progress.")]),
-      ]);
-
-      modelUsed = modelName;
-      break; // Success
-    } catch (err) {
-      console.error("Model failed:", modelName, err?.error || err?.message);
-      if (!isModelNotFound(err) || modelName === modelsToTry.at(-1)) throw err;
+        const result = await chat.invoke(messages);
+        return { result, modelName };
+      } catch (err) {
+        console.error("Model failed:", modelName, err?.error || err?.message);
+        if (!isModelNotFound(err) || modelName === modelsToTry.at(-1)) throw err;
+      }
     }
+    return { result: null, modelName: null };
+  };
+
+  ({ result: replyMessage, modelName: modelUsed } = await tryClaude([
+    new SystemMessage(systemInstruction),
+    ...(contents.length ? contents : [new HumanMessage("Summarize my progress.")]),
+  ]));
+
+  // If Claude returned an empty response, regenerate with an explicit fallback prompt
+  if (!replyMessage) {
+    const fallbackPrompt = new SystemMessage(
+      `${systemInstruction}\n\nYour first reply was empty. Provide a concise, encouraging summary of the user's progress and next steps.`
+    );
+    const fallbackUser = new HumanMessage(
+      `Write a short AI summary of this journey:\n${describeSnapshot(snapshot, insightText)}`
+    );
+
+    ({ result: replyMessage, modelName: modelUsed } = await tryClaude([fallbackPrompt, fallbackUser]));
+    degradedReason = replyMessage
+      ? "AI summary regenerated with a fallback prompt."
+      : "AI summary was empty; using your stored insights instead.";
   }
 
   const reply =
