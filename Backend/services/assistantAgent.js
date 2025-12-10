@@ -9,18 +9,16 @@ const MAX_HISTORY_MESSAGES = parseInt(process.env.ASSISTANT_HISTORY_LIMIT || "12
 // ---- MODEL CONFIG ----
 const NEMOTRON_BASE_URL = (process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1").replace(/\/$/, "");
 
-const NEMOTRON_MODEL = process.env.NVIDIA_MODEL || "nvidia/nemotron-nano-9b-v2:free";
-const FALLBACK_NEMOTRON_MODEL = process.env.NVIDIA_FALLBACK_MODEL || "nvidia/nemotron-nano-9b-v2:free";
+const NEMOTRON_MODEL = (process.env.NVIDIA_MODEL || "nvidia/nemotron-nano-9b-v2:free").trim();
 
-const PROVIDER_NAME = process.env.NVIDIA_PROVIDER_NAME || "NVIDIA AI";
-const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || process.env.CLAUDE_API_KEY;
+const NVIDIA_API_KEY = (process.env.NVIDIA_API_KEY || process.env.CLAUDE_API_KEY || "").trim();
 
 // ---- STATUS HELPERS ----
 const hasApiKey = () => Boolean(NVIDIA_API_KEY);
 
 export const getAgentStatus = () => ({
   ready: hasApiKey(),
-  provider: PROVIDER_NAME,
+  endpoint: NEMOTRON_BASE_URL,
   model: hasApiKey() ? NEMOTRON_MODEL : null,
   reason: hasApiKey() ? null : "Set the NVIDIA_API_KEY environment variable.",
   updatedAt: new Date().toISOString(),
@@ -111,44 +109,30 @@ const buildMessages = ({ snapshot, insightText, history = [] }) => {
 export const runReasoningAgent = async ({ snapshot, insightText, history, apiKeyOverride }) => {
   const apiKey = apiKeyOverride || NVIDIA_API_KEY;
   if (!apiKey) throw new Error("Missing NVIDIA_API_KEY.");
+  if (!NEMOTRON_MODEL) throw new Error("Missing NVIDIA_MODEL.");
 
   const { systemInstruction, contents } = buildMessages({ snapshot, insightText, history });
 
-  const modelsToTry = [NEMOTRON_MODEL, FALLBACK_NEMOTRON_MODEL];
-
-  const isModelNotFound = err =>
-    err?.lc_error_code === "MODEL_NOT_FOUND" ||
-    err?.status === 404 ||
-    err?.error?.error?.type === "not_found_error";
-
   let replyMessage;
-  let modelUsed = modelsToTry[0];
   let degradedReason = null;
 
-  for (const modelName of modelsToTry) {
-    try {
-      console.log("Trying AI model:", modelName);
+  try {
+    const chat = new ChatNVIDIA({
+      apiKey,
+      baseURL: NEMOTRON_BASE_URL,
+      model: NEMOTRON_MODEL,
+      temperature: 0.7,
+      topP: 0.95,
+      maxTokens: 1024,
+    });
 
-      const chat = new ChatNVIDIA({
-        apiKey,
-        baseURL: NEMOTRON_BASE_URL,
-        model: modelName,
-        temperature: 0.7,
-        topP: 0.95,
-        maxTokens: 1024,
-      });
-
-      replyMessage = await chat.invoke([
-        new SystemMessage(systemInstruction),
-        ...(contents.length ? contents : [new HumanMessage("Summarize my progress.")]),
-      ]);
-
-      modelUsed = modelName;
-      break; // success
-    } catch (err) {
-      console.error("Model failed:", modelName, err?.error || err?.message);
-      if (!isModelNotFound(err) || modelName === modelsToTry.at(-1)) throw err;
-    }
+    replyMessage = await chat.invoke([
+      new SystemMessage(systemInstruction),
+      ...(contents.length ? contents : [new HumanMessage("Summarize my progress.")]),
+    ]);
+  } catch (err) {
+    console.error("Model failed:", NEMOTRON_MODEL, err?.error || err?.message);
+    throw err;
   }
 
   const reply =
@@ -166,8 +150,8 @@ export const runReasoningAgent = async ({ snapshot, insightText, history, apiKey
     reply: safeReply,
     meta: {
       ready: !degradedReason,
-      provider: PROVIDER_NAME,
-      model: modelUsed,
+      endpoint: NEMOTRON_BASE_URL,
+      model: NEMOTRON_MODEL,
       reason: degradedReason,
       updatedAt: new Date().toISOString(),
     },
