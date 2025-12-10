@@ -244,18 +244,17 @@ body {
 }
 
 .nav-glow {
-  padding: 0.85rem 1rem;
+  padding: 0.85rem 1.25rem;
 }
 
 .nav-glow__icon {
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
-  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
   display: grid;
   place-items: center;
-  background: var(--cui-body-secondary-bg);
-  border: 1px solid var(--cui-border-color-translucent);
+  background: transparent;
+  border: none;
   color: var(--cui-primary);
   font-size: 1rem;
   position: relative;

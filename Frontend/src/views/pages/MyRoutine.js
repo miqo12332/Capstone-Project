@@ -149,12 +149,31 @@ const MyRoutine = ({ onSyncClick }) => {
     return key && entriesByDate[key] ? entriesByDate[key] : [];
   }, [entriesByDate, selectedDate]);
 
+  const nextFreeDay = useMemo(() => {
+    const today = new Date();
+    const lookaheadDays = 90;
+
+    for (let offset = 0; offset <= lookaheadDays; offset += 1) {
+      const candidate = new Date(today);
+      candidate.setDate(today.getDate() + offset);
+
+      const key = toDateKey(candidate);
+      const entries = entriesByDate[key] || [];
+
+      if (entries.length === 0) {
+        return candidate.toISOString();
+      }
+    }
+
+    return null;
+  }, [entriesByDate]);
+
   const summary = {
     timeBlocks: routineEntries.length,
     importedEvents: calendarEvents.length,
     integrationCount: calendarOverview?.summary?.integrationCount || 0,
     hoursScheduled: calendarOverview?.summary?.hoursScheduled || 0,
-    nextFreeDay: calendarOverview?.summary?.nextFreeDay || null,
+    nextFreeDay: nextFreeDay || calendarOverview?.summary?.nextFreeDay || null,
   };
 
   const tileClassName = ({ date, view }) => {

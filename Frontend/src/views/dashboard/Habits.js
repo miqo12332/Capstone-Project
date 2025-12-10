@@ -509,7 +509,7 @@ const InsightsTab = ({ analytics, historyEntries, loading, error, onRefresh }) =
       const completion = day.completed + day.missed
       const percent = completion ? Math.round((day.completed / completion) * 100) : 0
       const label = new Date(`${day.date}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short' })
-      return { label, chance: percent }
+      return { label, chance: percent, date: day.date }
     })
   }, [summary?.dailyTrend])
 
@@ -671,7 +671,7 @@ const InsightsTab = ({ analytics, historyEntries, loading, error, onRefresh }) =
               <CCardBody className="d-flex flex-column gap-3">
                 {forecast.length === 0 && <span className="text-muted">Keep logging to see a forecast.</span>}
                 {forecast.map((day) => (
-                  <div key={day.label}>
+                  <div key={day.date || day.label}>
                     <div className="d-flex justify-content-between align-items-center">
                       <span className="text-muted">{day.label}</span>
                       <span className="fw-semibold">{day.chance}%</span>
@@ -1093,6 +1093,16 @@ const Habits = () => {
     [navigate, pathForTab],
   )
 
+  const goToAddTab = useCallback(() => {
+    handleTabChange("add")
+    requestAnimationFrame(() => {
+      const addSection = document.getElementById("add-habit-section")
+      if (addSection) {
+        addSection.scrollIntoView({ behavior: "smooth", block: "start" })
+      }
+    })
+  }, [handleTabChange])
+
   const summary = analytics?.summary
 
   const heroStats = useMemo(
@@ -1118,7 +1128,7 @@ const Habits = () => {
             and ready for momentum.
           </p>
           <div className="d-flex gap-2 flex-wrap mt-1">
-            <CButton color="primary" size="sm" className="rounded-pill" onClick={() => handleTabChange("add")}>
+            <CButton color="primary" size="sm" className="rounded-pill" onClick={goToAddTab}>
               <CIcon icon={cilPlus} className="me-2" /> Add habit
             </CButton>
           </div>
@@ -1143,7 +1153,7 @@ const Habits = () => {
           </CNavLink>
         </CNavItem>
         <CNavItem>
-          <CNavLink active={activeTab === "add"} onClick={() => handleTabChange("add")}>
+          <CNavLink active={activeTab === "add"} onClick={goToAddTab}>
             Add Habit
           </CNavLink>
         </CNavItem>
@@ -1183,10 +1193,10 @@ const Habits = () => {
 
       <CTabContent>
         <CTabPane visible={activeTab === "my-habits"}>
-          <MyHabitsTab onAddClick={() => handleTabChange("add")} onProgressLogged={refreshSignals} />
+          <MyHabitsTab onAddClick={goToAddTab} onProgressLogged={refreshSignals} />
         </CTabPane>
         <CTabPane visible={activeTab === "add"}>
-          <div className="mt-3">
+          <div className="mt-3" id="add-habit-section">
             <AddHabit />
           </div>
         </CTabPane>
@@ -1196,32 +1206,38 @@ const Habits = () => {
           </div>
         </CTabPane>
         <CTabPane visible={activeTab === "progress"}>
-          <div className="mt-3">
-            <ProgressTracker />
-          </div>
+          {activeTab === "progress" && (
+            <div className="mt-3">
+              <ProgressTracker />
+            </div>
+          )}
         </CTabPane>
         <CTabPane visible={activeTab === "insights"}>
-          <InsightsTab
-            analytics={analytics}
-            historyEntries={historyEntries}
-            loading={signalsLoading}
-            error={signalsError}
-            onRefresh={refreshSignals}
-          />
+          {activeTab === "insights" && (
+            <InsightsTab
+              analytics={analytics}
+              historyEntries={historyEntries}
+              loading={signalsLoading}
+              error={signalsError}
+              onRefresh={refreshSignals}
+            />
+          )}
         </CTabPane>
         <CTabPane visible={activeTab === "history"}>
-          <HistoryTab
-            entries={historyEntries}
-            loading={signalsLoading}
-            error={signalsError}
-            onRefresh={refreshSignals}
-          />
+          {activeTab === "history" && (
+            <HistoryTab
+              entries={historyEntries}
+              loading={signalsLoading}
+              error={signalsError}
+              onRefresh={refreshSignals}
+            />
+          )}
         </CTabPane>
         <CTabPane visible={activeTab === "automation"}>
-          <AutomationTab summary={summary} loading={signalsLoading} />
+          {activeTab === "automation" && <AutomationTab summary={summary} loading={signalsLoading} />}
         </CTabPane>
         <CTabPane visible={activeTab === "rewards"}>
-          <RewardsTab summary={summary} loading={signalsLoading} />
+          {activeTab === "rewards" && <RewardsTab summary={summary} loading={signalsLoading} />}
         </CTabPane>
       </CTabContent>
 
