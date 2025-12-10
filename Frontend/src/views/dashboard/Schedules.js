@@ -593,8 +593,13 @@ const MySchedule = () => {
                 <CFormLabel className="text-uppercase text-muted fw-semibold small mb-1">
                   Or upload a .ics file
                 </CFormLabel>
-                <div className="d-flex align-items-center gap-2 flex-wrap">
-                  <CButton color="secondary" variant="outline" onClick={handleChooseCalendarFile}>
+                <div className="d-flex align-items-center gap-2 flex-wrap position-relative">
+                  <CButton
+                    type="button"
+                    color="secondary"
+                    variant="outline"
+                    onClick={handleChooseCalendarFile}
+                  >
                     Choose file
                   </CButton>
                   <CFormInput
@@ -602,7 +607,7 @@ const MySchedule = () => {
                     accept=".ics,text/calendar"
                     onChange={handleCalendarFile}
                     ref={calendarFileInputRef}
-                    className="d-none"
+                    className="visually-hidden position-absolute"
                   />
                   {calendarFileName && (
                     <div className="small text-success">Selected: {calendarFileName}</div>
