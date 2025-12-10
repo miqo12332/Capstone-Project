@@ -40,10 +40,15 @@ export default defineConfig(() => {
       extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json', '.scss'],
     },
     server: {
-      port: 3000,
+      host: 'stephabit.local',
+      port: 4000,
       proxy: {
         // https://vitejs.dev/config/server-options.html
       },
+    },
+    preview: {
+      host: 'stephabit.local',
+      port: 4001,
     },
   }
 })
