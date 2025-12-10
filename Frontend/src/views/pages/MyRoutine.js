@@ -25,6 +25,7 @@ import "react-calendar/dist/Calendar.css";
 import { getSchedules } from "../../services/schedules";
 import { fetchCalendarOverview } from "../../services/calendar";
 import { useDataRefresh, REFRESH_SCOPES } from "../../utils/refreshBus";
+import { formatISODateOnly } from "../../utils/date";
 
 const toDateKey = (date) => {
   if (!date) return null;
@@ -307,7 +308,7 @@ const MyRoutine = ({ onSyncClick }) => {
                 <div>
                   <div className="fw-semibold">Next light day</div>
                   <div className="text-body-secondary">
-                    {new Date(summary.nextFreeDay).toLocaleDateString(undefined, {
+                    {formatISODateOnly(summary.nextFreeDay, {
                       weekday: "long",
                       month: "long",
                       day: "numeric",

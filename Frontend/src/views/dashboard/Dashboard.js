@@ -48,6 +48,7 @@ import {
 import { formatPercent, getProgressAnalytics } from "../../services/analytics";
 import { fetchCalendarOverview } from "../../services/calendar";
 import { promptMissedReflection } from "../../utils/reflection";
+import { formatISODateOnly } from "../../utils/date";
 import {
   fetchAssistantProfile,
   fetchAssistantSummary,
@@ -991,7 +992,7 @@ const Dashboard = () => {
                   {calendarOverview?.summary?.nextFreeDay && (
                     <div className="small text-body-secondary mt-3">
                       Next light day: {" "}
-                      {new Date(calendarOverview.summary.nextFreeDay).toLocaleDateString()}
+                      {formatISODateOnly(calendarOverview.summary.nextFreeDay)}
                     </div>
                   )}
                 </CCardBody>

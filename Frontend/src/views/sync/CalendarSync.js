@@ -34,6 +34,7 @@ import {
   syncCalendar,
   disconnectIntegration,
 } from "../../services/calendar";
+import { formatISODateOnly } from "../../utils/date";
 
 const providerDefaults = {
   google: "Google Calendar",
@@ -450,7 +451,7 @@ const CalendarSync = () => {
             {overview?.summary?.nextFreeDay && (
               <CCallout color="success" className="mt-3">
                 <CIcon icon={cilCheckCircle} className="me-2" />
-                Next quiet day: {new Date(overview.summary.nextFreeDay).toLocaleDateString()}
+                Next quiet day: {formatISODateOnly(overview.summary.nextFreeDay)}
               </CCallout>
             )}
           </CCardBody>
