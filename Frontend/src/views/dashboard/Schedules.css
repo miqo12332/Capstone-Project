@@ -1,0 +1,38 @@
+.schedules-shell .saved-busy-card {
+  overflow: hidden;
+}
+
+.saved-busy-header {
+  background-color: var(--cui-card-cap-bg, var(--bs-card-cap-bg));
+  color: var(--cui-body-color);
+}
+
+.calendar-import-panel {
+  background: #f8fafc;
+  color: var(--cui-body-color);
+}
+
+:root[data-coreui-theme='dark'] .schedules-shell .saved-busy-card {
+  background-color: var(--cui-card-bg);
+  color: var(--cui-body-color);
+}
+
+:root[data-coreui-theme='dark'] .schedules-shell .saved-busy-card .saved-busy-header {
+  background-color: rgba(22, 27, 36, 0.94);
+  border-color: var(--cui-border-color);
+  color: var(--cui-body-color);
+}
+
+:root[data-coreui-theme='dark'] .schedules-shell .saved-busy-card .calendar-import-panel {
+  background: rgba(28, 33, 42, 0.92);
+  border-color: var(--cui-border-color);
+  color: var(--cui-body-color);
+}
+
+:root[data-coreui-theme='dark']
+  .schedules-shell
+  .saved-busy-card
+  .calendar-import-panel
+  .text-body-secondary {
+  color: var(--cui-secondary-color) !important;
+}

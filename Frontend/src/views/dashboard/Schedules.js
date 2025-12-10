@@ -26,6 +26,7 @@ import { cilClock, cilCalendar, cilLoopCircular, cilPlus, cilNotes } from "@core
 import { emitDataRefresh, REFRESH_SCOPES, useDataRefresh } from "../../utils/refreshBus"
 import { API_BASE } from "../../utils/apiConfig"
 import { fetchCalendarOverview, syncCalendar } from "../../services/calendar"
+import "./Schedules.css"
 
 const MySchedule = () => {
   const user = JSON.parse(localStorage.getItem("user"))
@@ -300,7 +301,7 @@ const MySchedule = () => {
   useDataRefresh([REFRESH_SCOPES.HABITS], loadHabits)
 
   return (
-    <CRow className="mt-4 g-4">
+    <CRow className="mt-4 g-4 schedules-shell">
       <CCol xs={12}>{error && <CAlert color="danger">{error}</CAlert>}</CCol>
       <CCol xs={12}>{calendarError && <CAlert color="warning">{calendarError}</CAlert>}</CCol>
 
@@ -540,10 +541,10 @@ const MySchedule = () => {
       </CCol>
 
       <CCol lg={7}>
-        <CCard className="shadow-sm border-0 h-100">
-          <CCardHeader className="bg-white fw-semibold">Saved busy times</CCardHeader>
+        <CCard className="shadow-sm border-0 h-100 saved-busy-card">
+          <CCardHeader className="fw-semibold saved-busy-header">Saved busy times</CCardHeader>
           <CCardBody className="p-0">
-            <div className="p-3 border-bottom bg-light">
+            <div className="p-3 border-bottom calendar-import-panel">
               <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
                 <div>
                   <div className="fw-semibold">Pull from Google Calendar</div>
