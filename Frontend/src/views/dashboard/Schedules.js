@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   CCard,
   CCardBody,
@@ -43,6 +43,7 @@ const MySchedule = () => {
   const [calendarSourceUrl, setCalendarSourceUrl] = useState("")
   const [calendarFileName, setCalendarFileName] = useState("")
   const [calendarFileText, setCalendarFileText] = useState("")
+  const calendarFileInputRef = useRef(null)
 
   const formattedCalendarEvents = useMemo(() => {
     const sorted = [...calendarEvents].sort((a, b) => {
@@ -226,6 +227,9 @@ const MySchedule = () => {
       })
       setCalendarFileName("")
       setCalendarFileText("")
+      if (calendarFileInputRef.current) {
+        calendarFileInputRef.current.value = ""
+      }
     } catch (err) {
       console.error("❌ Failed to sync Google Calendar:", err)
       setCalendarError(err?.message || "Could not sync Google Calendar")
@@ -234,7 +238,9 @@ const MySchedule = () => {
   }
 
   const handleCalendarFile = (event) => {
-    const file = event.target.files?.[0]
+    setCalendarError("")
+    const inputElement = event.target
+    const file = inputElement?.files?.[0]
     if (!file) {
       setCalendarFileName("")
       setCalendarFileText("")
@@ -246,11 +252,17 @@ const MySchedule = () => {
       const text = e.target?.result || ""
       setCalendarFileName(file.name)
       setCalendarFileText(typeof text === "string" ? text : "")
+      if (inputElement) {
+        inputElement.value = ""
+      }
     }
     reader.onerror = () => {
       setCalendarError("Couldn't read the uploaded calendar file")
       setCalendarFileName("")
       setCalendarFileText("")
+      if (calendarFileInputRef.current) {
+        calendarFileInputRef.current.value = ""
+      }
     }
     reader.readAsText(file)
   }
@@ -574,7 +586,12 @@ const MySchedule = () => {
                 <CFormLabel className="text-uppercase text-muted fw-semibold small mb-1">
                   Or upload a .ics file
                 </CFormLabel>
-                <CFormInput type="file" accept=".ics,text/calendar" onChange={handleCalendarFile} />
+                <CFormInput
+                  type="file"
+                  accept=".ics,text/calendar"
+                  onChange={handleCalendarFile}
+                  inputRef={calendarFileInputRef}
+                />
                 {calendarFileName && (
                   <div className="small text-success mt-1">Selected: {calendarFileName}</div>
                 )}
