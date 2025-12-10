@@ -5,7 +5,6 @@ import {
   CButton,
   CCard,
   CCardBody,
-  CCardGroup,
   CCol,
   CContainer,
   CForm,
@@ -13,17 +12,12 @@ import {
   CFormTextarea,
   CInputGroup,
   CInputGroupText,
-  CListGroup,
-  CListGroupItem,
   CProgress,
   CProgressBar,
   CRow,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
 import {
-  cilArrowRight,
-  cilBolt,
-  cilCheckCircle,
   cilClock,
   cilCompass,
   cilFlagAlt,
@@ -200,13 +194,6 @@ const Register = () => {
     }
   }
 
-  const selectedHighlights = [
-    form.primaryGoal || "Choose a goal that inspires you",
-    form.focusArea || "Pick a focus area to spotlight",
-    form.dailyCommitment || "Decide how much time you’ll invest",
-    form.supportPreference || "Select how we can support you",
-  ]
-
   const renderOptionButtons = (options, field) => (
     <CRow className="g-3">
       {options.map((option) => {
@@ -353,102 +340,61 @@ const Register = () => {
     <div className="min-vh-100 d-flex flex-row align-items-center bg-light">
       <CContainer>
         <CRow className="justify-content-center">
-          <CCol lg={10} xl={9}>
-            <CCardGroup>
-              <CCard className="text-white bg-gradient p-4 d-none d-lg-flex"
-                style={{
-                  background: "linear-gradient(135deg, #321fdb 0%, #9f7aea 100%)",
-                }}
-              >
-                <CCardBody className="d-flex flex-column justify-content-between">
-                  <div>
-                    <div className="d-inline-flex align-items-center gap-2 bg-white bg-opacity-25 rounded-pill px-3 py-2 mb-4">
-                      <CIcon icon={cilBolt} />
-                      <span className="fw-semibold">Kickstart your step-by-step success</span>
+          <CCol lg={7} xl={6}>
+            <CCard className="p-4 shadow-sm border-0">
+              <CCardBody>
+                <CForm onSubmit={handleSubmit}>
+                  <div className="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                      <h3 className="mb-1">{steps[step].title}</h3>
+                      <p className="text-medium-emphasis mb-0">{steps[step].description}</p>
                     </div>
-                    <h2 className="fw-bold">Design a ritual that feels like you</h2>
-                    <p className="lead opacity-75">
-                      A few mindful choices today help us craft a dashboard, reminders, and challenges
-                      that match your energy. Your answers stay flexible—you can tweak everything later.
-                    </p>
-                  </div>
-                  <div className="mt-4">
-                    <h6 className="text-uppercase opacity-75">Your launch plan</h6>
-                    <CListGroup flush className="bg-transparent text-white">
-                      {selectedHighlights.map((highlight, index) => (
-                        <CListGroupItem
-                          key={`${highlight}-${index}`}
-                          className="bg-transparent border-0 px-0 d-flex align-items-start gap-3 text-white"
-                        >
-                          <CIcon icon={cilCheckCircle} className="mt-1" />
-                          <span className="fw-semibold">{highlight}</span>
-                        </CListGroupItem>
-                      ))}
-                    </CListGroup>
-                    <div className="d-flex align-items-center gap-2 mt-4 small opacity-75">
-                      <CIcon icon={cilArrowRight} />
-                      All selections sync to your profile so we can celebrate the wins that matter to you.
+                    <div className="text-end small text-medium-emphasis">
+                      Step {step + 1} of {steps.length}
                     </div>
                   </div>
-                </CCardBody>
-              </CCard>
-              <CCard className="p-4">
-                <CCardBody>
-                  <CForm onSubmit={handleSubmit}>
-                    <div className="d-flex justify-content-between align-items-start mb-3">
-                      <div>
-                        <h3 className="mb-1">{steps[step].title}</h3>
-                        <p className="text-medium-emphasis mb-0">{steps[step].description}</p>
-                      </div>
-                      <div className="text-end small text-medium-emphasis">
-                        Step {step + 1} of {steps.length}
-                      </div>
-                    </div>
-                    <CProgress className="mb-4" height={6}>
-                      <CProgressBar value={progressValue} color="primary" />
-                    </CProgress>
+                  <CProgress className="mb-4" height={6}>
+                    <CProgressBar value={progressValue} color="primary" />
+                  </CProgress>
 
-                    {renderStepContent()}
+                  {renderStepContent()}
 
-                    {message && (
-                      <CAlert color={message.type} className="mt-4">
-                        {message.text}
-                      </CAlert>
+                  {message && (
+                    <CAlert color={message.type} className="mt-4">
+                      {message.text}
+                    </CAlert>
+                  )}
+
+                  <div className="d-flex justify-content-between align-items-center mt-4">
+                    <CButton
+                      color="secondary"
+                      variant="outline"
+                      type="button"
+                      disabled={step === 0}
+                      onClick={handleBack}
+                    >
+                      Back
+                    </CButton>
+                    {isLastStep ? (
+                      <CButton color="success" type="submit" disabled={submitting}>
+                        <CIcon icon={cilHeart} className="me-2" />
+                        {submitting ? "Creating..." : "Start my journey"}
+                      </CButton>
+                    ) : (
+                      <CButton color="primary" type="button" onClick={handleNext}>
+                        Continue
+                      </CButton>
                     )}
+                  </div>
 
-                    <div className="d-flex justify-content-between align-items-center mt-4">
-                      <CButton
-                        color="secondary"
-                        variant="outline"
-                        type="button"
-                        disabled={step === 0}
-                        onClick={handleBack}
-                      >
-                        Back
-                      </CButton>
-                      {isLastStep ? (
-                        <CButton color="success" type="submit" disabled={submitting}>
-                          <CIcon icon={cilHeart} className="me-2" />
-                          {submitting ? "Creating..." : "Start my journey"}
-                        </CButton>
-                      ) : (
-                        <CButton color="primary" type="button" onClick={handleNext}>
-                          Continue
-                        </CButton>
-                      )}
-                    </div>
-
-                    <div className="text-center mt-3">
-                      <CButton color="link" className="px-0" onClick={() => navigate("/login")}
-                        disabled={submitting}
-                      >
-                        Already have an account? Log in
-                      </CButton>
-                    </div>
-                  </CForm>
-                </CCardBody>
-              </CCard>
-            </CCardGroup>
+                  <div className="text-center mt-3">
+                    <CButton color="link" className="px-0" onClick={() => navigate("/login")} disabled={submitting}>
+                      Already have an account? Log in
+                    </CButton>
+                  </div>
+                </CForm>
+              </CCardBody>
+            </CCard>
           </CCol>
         </CRow>
       </CContainer>
