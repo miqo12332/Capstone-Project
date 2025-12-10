@@ -40,14 +40,14 @@ export default defineConfig(() => {
       extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json', '.scss'],
     },
     server: {
-      host: 'stephabit.local',
+      host: process.env.VITE_DEV_HOST || '0.0.0.0',
       port: 4000,
       proxy: {
         // https://vitejs.dev/config/server-options.html
       },
     },
     preview: {
-      host: 'stephabit.local',
+      host: process.env.VITE_PREVIEW_HOST || '0.0.0.0',
       port: 4001,
     },
   }

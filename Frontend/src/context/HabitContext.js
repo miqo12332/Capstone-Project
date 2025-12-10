@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
 import { AuthContext } from "./AuthContext";
+import { API_BASE } from "../utils/apiConfig";
 
 export const HabitContext = createContext();
 
@@ -13,7 +14,7 @@ useEffect(() => {
   const fetchHabits = async () => {
     if (!user || !user.id) return; // ensure user is loaded
     try {
-const res = await fetch(`http://stephabit.local:5001/api/habits?user_id=${user.id}`);
+const res = await fetch(`${API_BASE}/habits?user_id=${user.id}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       setHabits(data);
@@ -31,7 +32,7 @@ const res = await fetch(`http://stephabit.local:5001/api/habits?user_id=${user.i
     if (!user) return;
 
     try {
-      const res = await fetch("http://stephabit.local:5001/api/habits", {
+      const res = await fetch(`${API_BASE}/habits`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: habitName, description, user_id: user.id }),

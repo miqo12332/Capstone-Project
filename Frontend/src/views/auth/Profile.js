@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { API_BASE } from "../../utils/apiConfig";
 
 const Profile = () => {
   const [profile, setProfile] = useState(null);
@@ -6,7 +7,7 @@ const Profile = () => {
 
   useEffect(() => {
     if (userId) {
-      fetch(`http://stephabit.local:5001/api/users/profile/${userId}`)
+      fetch(`${API_BASE}/users/profile/${userId}`)
         .then((res) => res.json())
         .then((data) => setProfile(data))
         .catch(() => setProfile(null));

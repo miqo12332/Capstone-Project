@@ -83,18 +83,18 @@ $ yarn install
 ### Basic usage
 
 ``` bash
-# dev server with hot reload at http://stephabit.local:4000
-$ npm start 
+# dev server with hot reload at http://localhost:4000
+$ npm start
 ```
 
-or 
+or
 
 ``` bash
-# dev server with hot reload at http://stephabit.local:4000
+# dev server with hot reload at http://localhost:4000
 $ yarn start
 ```
 
-Navigate to [http://stephabit.local:4000](http://stephabit.local:4000). The app will automatically reload if you change any of the source files.
+Navigate to [http://localhost:4000](http://localhost:4000). You can also set a custom host with the `VITE_DEV_HOST` env var if you have one configured in your hosts file. The app will automatically reload if you change any of the source files.
 
 #### Build
 

@@ -1,6 +1,7 @@
 import React, { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../../context/AuthContext";
+import { API_BASE } from "../utils/apiConfig";
 
 const Login = () => {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -15,7 +16,7 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://stephabit.local:5001/api/users/login", {
+      const res = await fetch(`${API_BASE}/users/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),

@@ -24,6 +24,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../../context/AuthContext";
 import { HabitContext } from "../../context/HabitContext";
+import { API_BASE, ASSET_BASE } from "../../utils/apiConfig";
 
 const AppHeaderDropdown = () => {
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ const AppHeaderDropdown = () => {
 
   const [user, setUser] = useState(authUser || {});
   const [avatarUrl, setAvatarUrl] = useState(
-    user?.avatar ? `http://stephabit.local:5001${user.avatar}` : "/uploads/default-avatar.png"
+    user?.avatar ? `${ASSET_BASE}${user.avatar}` : "/uploads/default-avatar.png"
   );
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -42,19 +43,13 @@ const AppHeaderDropdown = () => {
   useEffect(() => {
     if (authUser) {
       setUser(authUser);
-      setAvatarUrl(
-        authUser.avatar
-          ? `http://stephabit.local:5001${authUser.avatar}`
-          : "/uploads/default-avatar.png"
-      );
+      setAvatarUrl(authUser.avatar ? `${ASSET_BASE}${authUser.avatar}` : "/uploads/default-avatar.png");
     } else {
       const localUser = JSON.parse(localStorage.getItem("user"));
       if (localUser) {
         setUser(localUser);
         setAvatarUrl(
-          localUser.avatar
-            ? `http://stephabit.local:5001${localUser.avatar}`
-            : "/uploads/default-avatar.png"
+          localUser.avatar ? `${ASSET_BASE}${localUser.avatar}` : "/uploads/default-avatar.png"
         );
       }
     }
@@ -70,14 +65,12 @@ const AppHeaderDropdown = () => {
     try {
       setUploading(true);
       setUploadError("");
-      const res = await axios.post(
-        `http://stephabit.local:5001/api/avatar/${user.id}`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
+      const res = await axios.post(`${API_BASE}/avatar/${user.id}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
       if (res.data.success) {
-        const newAvatar = `http://stephabit.local:5001${res.data.imagePath}`;
+        const newAvatar = `${ASSET_BASE}${res.data.imagePath}`;
         setAvatarUrl(newAvatar);
 
         const updatedUser = { ...user, avatar: res.data.imagePath };

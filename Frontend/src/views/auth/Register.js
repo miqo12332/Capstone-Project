@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { API_BASE } from "../../utils/apiConfig"
 import {
   CAlert,
   CButton,
@@ -157,7 +158,7 @@ const Register = () => {
     try {
       setSubmitting(true)
       setMessage(null)
-      const response = await fetch("http://stephabit.local:5001/api/users/register", {
+      const response = await fetch(`${API_BASE}/users/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

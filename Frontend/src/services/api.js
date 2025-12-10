@@ -1,7 +1,8 @@
 import axios from "axios";
+import { API_BASE } from "../utils/apiConfig";
 
 const api = axios.create({
-  baseURL: "http://stephabit.local:5001/api",
+  baseURL: API_BASE,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -14,8 +15,6 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
-
-const API_BASE = "http://stephabit.local:5001/api";
 
 export const apiGet = async (url) => {
   const res = await fetch(`${API_BASE}${url}`);

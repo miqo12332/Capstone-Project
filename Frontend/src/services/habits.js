@@ -1,5 +1,7 @@
 // /src/services/habits.js
-const BASE_URL = "http://stephabit.local:5001/api/habits";
+import { API_BASE } from "../utils/apiConfig";
+
+const BASE_URL = `${API_BASE}/habits`;
 
 export const getHabits = async (userId) => {
   const res = await fetch(`${BASE_URL}/user/${userId}`);

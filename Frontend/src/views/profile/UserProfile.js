@@ -47,6 +47,7 @@ import { AuthContext } from "../../context/AuthContext"
 import { HabitContext } from "../../context/HabitContext"
 import { fetchUserSettings, saveUserSettings } from "../../services/settings"
 import { getProgressAnalytics } from "../../services/analytics"
+import { API_BASE, ASSET_BASE } from "../../utils/apiConfig"
 
 const UserProfile = () => {
   const { user, login } = useContext(AuthContext)
@@ -101,9 +102,7 @@ const UserProfile = () => {
       gender: user.gender || "",
     })
 
-    setAvatarUrl(
-      user.avatar ? `http://stephabit.local:5001${user.avatar}` : "/uploads/default-avatar.png"
-    )
+    setAvatarUrl(user.avatar ? `${ASSET_BASE}${user.avatar}` : "/uploads/default-avatar.png")
   }, [user])
 
   useEffect(() => {
@@ -144,11 +143,7 @@ const UserProfile = () => {
           appleCalendar: Boolean(settings.appleCalendar ?? false),
           fitnessSync: Boolean(settings.fitnessSync ?? false),
         })
-        setAvatarUrl(
-          payload.avatar
-            ? `http://stephabit.local:5001${payload.avatar}`
-            : "/uploads/default-avatar.png"
-        )
+        setAvatarUrl(payload.avatar ? `${ASSET_BASE}${payload.avatar}` : "/uploads/default-avatar.png")
         setError("")
         if (typeof loginRef.current === "function") {
           loginRef.current(payload)
@@ -218,14 +213,12 @@ const UserProfile = () => {
 
     try {
       setAvatarUploading(true)
-      const res = await axios.post(
-        `http://stephabit.local:5001/api/avatar/${user.id}`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      )
+      const res = await axios.post(`${API_BASE}/avatar/${user.id}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
 
       if (res.data.success) {
-        const newAvatar = `http://stephabit.local:5001${res.data.imagePath}`
+        const newAvatar = `${ASSET_BASE}${res.data.imagePath}`
         setAvatarUrl(newAvatar)
         const updatedUser = { ...user, avatar: res.data.imagePath }
         localStorage.setItem("user", JSON.stringify(updatedUser))
