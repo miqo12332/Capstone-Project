@@ -41,6 +41,8 @@ const MySchedule = () => {
   })
   const [calendarEvents, setCalendarEvents] = useState([])
   const [calendarSourceUrl, setCalendarSourceUrl] = useState("")
+  const [calendarFileName, setCalendarFileName] = useState("")
+  const [calendarFileText, setCalendarFileText] = useState("")
 
   const formattedCalendarEvents = useMemo(() => {
     const sorted = [...calendarEvents].sort((a, b) => {
@@ -199,10 +201,16 @@ const MySchedule = () => {
       setCalendarError("")
       setCalendarStatus((prev) => ({ ...prev, syncing: true }))
 
+      if (!calendarSourceUrl && !calendarFileText) {
+        setCalendarStatus((prev) => ({ ...prev, syncing: false }))
+        return setCalendarError("Provide an iCal URL or upload a .ics file to sync")
+      }
+
       const payload = {
         provider: "google",
         label: "Google Calendar",
         sourceUrl: calendarSourceUrl || undefined,
+        icsText: calendarFileText || undefined,
         days: 45,
       }
 
@@ -216,11 +224,35 @@ const MySchedule = () => {
         lastSync: result?.overview?.summary?.lastSync || null,
         integrationLabel: result?.integration?.label || "Google Calendar",
       })
+      setCalendarFileName("")
+      setCalendarFileText("")
     } catch (err) {
       console.error("❌ Failed to sync Google Calendar:", err)
       setCalendarError(err?.message || "Could not sync Google Calendar")
       setCalendarStatus((prev) => ({ ...prev, syncing: false }))
     }
+  }
+
+  const handleCalendarFile = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      setCalendarFileName("")
+      setCalendarFileText("")
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const text = e.target?.result || ""
+      setCalendarFileName(file.name)
+      setCalendarFileText(typeof text === "string" ? text : "")
+    }
+    reader.onerror = () => {
+      setCalendarError("Couldn't read the uploaded calendar file")
+      setCalendarFileName("")
+      setCalendarFileText("")
+    }
+    reader.readAsText(file)
   }
 
   const repeatOptions = [
@@ -538,6 +570,16 @@ const MySchedule = () => {
                   placeholder="https://calendar.google.com/calendar/ical/..."
                 />
               </CInputGroup>
+              <div className="mt-3">
+                <CFormLabel className="text-uppercase text-muted fw-semibold small mb-1">
+                  Or upload a .ics file
+                </CFormLabel>
+                <CFormInput type="file" accept=".ics,text/calendar" onChange={handleCalendarFile} />
+                {calendarFileName && (
+                  <div className="small text-success mt-1">Selected: {calendarFileName}</div>
+                )}
+                <CFormText>We'll import events from the uploaded file if provided.</CFormText>
+              </div>
             </div>
             {loading ? (
               <div className="d-flex justify-content-center my-4">
