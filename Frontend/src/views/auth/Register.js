@@ -350,16 +350,12 @@ const Register = () => {
   }
 
   return (
-    <div className="min-vh-100 d-flex flex-row align-items-center bg-light">
+    <div className="auth-page">
       <CContainer>
         <CRow className="justify-content-center">
           <CCol lg={10} xl={9}>
             <CCardGroup>
-              <CCard className="text-white bg-gradient p-4 d-none d-lg-flex"
-                style={{
-                  background: "linear-gradient(135deg, #321fdb 0%, #9f7aea 100%)",
-                }}
-              >
+              <CCard className="auth-gradient-card text-white p-4 d-none d-lg-flex">
                 <CCardBody className="d-flex flex-column justify-content-between">
                   <div>
                     <div className="d-inline-flex align-items-center gap-2 bg-white bg-opacity-25 rounded-pill px-3 py-2 mb-4">
