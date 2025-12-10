@@ -535,7 +535,7 @@ body {
 }
 
 .auth-hero {
-  --auth-hero-bg: rgba(255, 255, 255, 0.52);
+  --auth-hero-bg: #ffffff;
   --auth-hero-border: rgba(99, 123, 255, 0.12);
   --auth-hero-text: var(--cui-body-color);
   --auth-hero-subtle: var(--cui-secondary-color);
@@ -568,7 +568,14 @@ body {
     --auth-hero-subtle: color-mix(in srgb, #cfd6e8 82%, #a9b4cc);
     --auth-hero-highlight: #b3c5ff;
 
+    background: #212631;
+    border-color: var(--auth-hero-border);
+    color: var(--auth-hero-text);
     box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+
+    .hero-title {
+      color: var(--auth-hero-text);
+    }
   }
 }
 
