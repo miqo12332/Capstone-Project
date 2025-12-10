@@ -1093,6 +1093,16 @@ const Habits = () => {
     [navigate, pathForTab],
   )
 
+  const goToAddTab = useCallback(() => {
+    handleTabChange("add")
+    requestAnimationFrame(() => {
+      const addSection = document.getElementById("add-habit-section")
+      if (addSection) {
+        addSection.scrollIntoView({ behavior: "smooth", block: "start" })
+      }
+    })
+  }, [handleTabChange])
+
   const summary = analytics?.summary
 
   const heroStats = useMemo(
@@ -1118,7 +1128,7 @@ const Habits = () => {
             and ready for momentum.
           </p>
           <div className="d-flex gap-2 flex-wrap mt-1">
-            <CButton color="primary" size="sm" className="rounded-pill" onClick={() => handleTabChange("add")}>
+            <CButton color="primary" size="sm" className="rounded-pill" onClick={goToAddTab}>
               <CIcon icon={cilPlus} className="me-2" /> Add habit
             </CButton>
           </div>
@@ -1143,7 +1153,7 @@ const Habits = () => {
           </CNavLink>
         </CNavItem>
         <CNavItem>
-          <CNavLink active={activeTab === "add"} onClick={() => handleTabChange("add")}>
+          <CNavLink active={activeTab === "add"} onClick={goToAddTab}>
             Add Habit
           </CNavLink>
         </CNavItem>
@@ -1183,10 +1193,10 @@ const Habits = () => {
 
       <CTabContent>
         <CTabPane visible={activeTab === "my-habits"}>
-          <MyHabitsTab onAddClick={() => handleTabChange("add")} onProgressLogged={refreshSignals} />
+          <MyHabitsTab onAddClick={goToAddTab} onProgressLogged={refreshSignals} />
         </CTabPane>
         <CTabPane visible={activeTab === "add"}>
-          <div className="mt-3">
+          <div className="mt-3" id="add-habit-section">
             <AddHabit />
           </div>
         </CTabPane>
