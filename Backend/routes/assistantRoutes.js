@@ -176,6 +176,30 @@ const rewriteHabitIdea = (message) => {
   };
 };
 
+const persistSuggestedHabit = async ({ userId, suggestion, existingHabits }) => {
+  if (!suggestion) return null;
+
+  const normalizedTitle = suggestion.title?.trim().toLowerCase();
+  const alreadyHaveHabit = existingHabits.find(
+    (habit) => habit.title?.trim().toLowerCase() === normalizedTitle
+  );
+
+  if (alreadyHaveHabit) {
+    return alreadyHaveHabit;
+  }
+
+  const newHabit = await Habit.create({
+    user_id: userId,
+    title: suggestion.title,
+    description: suggestion.description,
+    category: suggestion.category,
+    target_reps: suggestion.targetReps,
+    is_daily_goal: suggestion.isDailyGoal,
+  });
+
+  return newHabit.get({ plain: true });
+};
+
 const formatHabitSuggestion = (suggestion) => {
   if (!suggestion) return "";
   const lines = [
@@ -835,21 +859,13 @@ router.post("/chat", async (req, res) => {
     let createdHabit = null;
 
     if (habitSuggestion && shouldCreateHabit(message)) {
-      const duplicateHabit = snapshot.habits.find(
-        (habit) => habit.title?.toLowerCase() === habitSuggestion.title.toLowerCase()
-      );
+      createdHabit = await persistSuggestedHabit({
+        userId,
+        suggestion: habitSuggestion,
+        existingHabits: snapshot.habits,
+      });
 
-      if (!duplicateHabit) {
-        const newHabit = await Habit.create({
-          user_id: userId,
-          title: habitSuggestion.title,
-          description: habitSuggestion.description,
-          category: habitSuggestion.category,
-          target_reps: habitSuggestion.targetReps,
-          is_daily_goal: habitSuggestion.isDailyGoal,
-        });
-
-        createdHabit = newHabit.get({ plain: true });
+      if (createdHabit && !snapshot.habits.find((habit) => habit.id === createdHabit.id)) {
         snapshot.habits.push(createdHabit);
       }
     }

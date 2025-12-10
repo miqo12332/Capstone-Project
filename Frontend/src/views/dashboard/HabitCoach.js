@@ -147,6 +147,7 @@ const HabitCoach = () => {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [createdHabitNotice, setCreatedHabitNotice] = useState(null);
   const bottomRef = useRef(null);
 
   const loadHistory = useCallback(async () => {
@@ -204,6 +205,7 @@ const HabitCoach = () => {
     if (!user?.id || !message.trim()) return;
 
     setError(null);
+    setCreatedHabitNotice(null);
     setLoading(true);
     const optimisticHistory = [
       ...history,
@@ -222,6 +224,12 @@ const HabitCoach = () => {
       setHistory(data.history || []);
       setSummary(data.summary || null);
       setCoach(data.agent || null);
+      if (data.createdHabit) {
+        setCreatedHabitNotice({
+          title: data.createdHabit.title,
+          category: data.createdHabit.category,
+        });
+      }
     } catch (err) {
       console.error("Coach reply failed", err);
       setError("I couldn't reach the coach. Try again in a moment.");
@@ -446,6 +454,13 @@ const HabitCoach = () => {
                     coach.reason ||
                     "Live coaching is momentarily offline. You're seeing our smart guidance instead."
                   )}
+                </CAlert>
+              )}
+              {createdHabitNotice && (
+                <CAlert color="success" className="mb-0 border-0 shadow-sm">
+                  Added <strong>{createdHabitNotice.title}</strong> to your habits
+                  {createdHabitNotice.category ? ` · ${createdHabitNotice.category}` : ""}. You can review and adjust it in
+                  the Habits module anytime.
                 </CAlert>
               )}
               {error && (
