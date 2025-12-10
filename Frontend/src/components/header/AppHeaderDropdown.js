@@ -33,7 +33,7 @@ const AppHeaderDropdown = () => {
 
   const [user, setUser] = useState(authUser || {});
   const [avatarUrl, setAvatarUrl] = useState(
-    user?.avatar ? `http://localhost:5001${user.avatar}` : "/uploads/default-avatar.png"
+    user?.avatar ? `http://stephabit.local:5001${user.avatar}` : "/uploads/default-avatar.png"
   );
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -44,7 +44,7 @@ const AppHeaderDropdown = () => {
       setUser(authUser);
       setAvatarUrl(
         authUser.avatar
-          ? `http://localhost:5001${authUser.avatar}`
+          ? `http://stephabit.local:5001${authUser.avatar}`
           : "/uploads/default-avatar.png"
       );
     } else {
@@ -53,7 +53,7 @@ const AppHeaderDropdown = () => {
         setUser(localUser);
         setAvatarUrl(
           localUser.avatar
-            ? `http://localhost:5001${localUser.avatar}`
+            ? `http://stephabit.local:5001${localUser.avatar}`
             : "/uploads/default-avatar.png"
         );
       }
@@ -71,13 +71,13 @@ const AppHeaderDropdown = () => {
       setUploading(true);
       setUploadError("");
       const res = await axios.post(
-        `http://localhost:5001/api/avatar/${user.id}`,
+        `http://stephabit.local:5001/api/avatar/${user.id}`,
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
 
       if (res.data.success) {
-        const newAvatar = `http://localhost:5001${res.data.imagePath}`;
+        const newAvatar = `http://stephabit.local:5001${res.data.imagePath}`;
         setAvatarUrl(newAvatar);
 
         const updatedUser = { ...user, avatar: res.data.imagePath };

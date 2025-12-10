@@ -48,7 +48,7 @@ const MySchedule = () => {
   const loadHabits = useCallback(async () => {
     if (!user?.id) return
     try {
-      const res = await fetch(`http://localhost:5001/api/habits/user/${user.id}`)
+      const res = await fetch(`http://stephabit.local:5001/api/habits/user/${user.id}`)
       if (!res.ok) throw new Error("Failed to fetch habits")
       const data = await res.json()
       setHabits(data)
@@ -65,7 +65,7 @@ const MySchedule = () => {
   // ✅ Load user's schedules
   const loadSchedules = async () => {
     try {
-      const res = await fetch(`http://localhost:5001/api/schedules/user/${user.id}`)
+      const res = await fetch(`http://stephabit.local:5001/api/schedules/user/${user.id}`)
       if (!res.ok) throw new Error("Failed to fetch schedules")
       const data = await res.json()
       setSchedules(Array.isArray(data) ? data : [])
@@ -115,7 +115,7 @@ const MySchedule = () => {
         notes: newSchedule.notes || null,
       }
 
-      const res = await fetch("http://localhost:5001/api/schedules", {
+      const res = await fetch("http://stephabit.local:5001/api/schedules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -163,7 +163,7 @@ const MySchedule = () => {
   // ✅ Delete schedule
   const handleDelete = async (id) => {
     try {
-      const res = await fetch(`http://localhost:5001/api/schedules/${id}`, { method: "DELETE" })
+      const res = await fetch(`http://stephabit.local:5001/api/schedules/${id}`, { method: "DELETE" })
       if (!res.ok) throw new Error("Failed to delete schedule")
       setSchedules((prev) => prev.filter((s) => s.id !== id))
       emitDataRefresh(REFRESH_SCOPES.SCHEDULES, { reason: "schedule-deleted", scheduleId: id })

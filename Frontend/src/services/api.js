@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:5001/api",
+  baseURL: "http://stephabit.local:5001/api",
   headers: { "Content-Type": "application/json" },
 });
 
@@ -15,7 +15,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-const API_BASE = "http://localhost:5001/api";
+const API_BASE = "http://stephabit.local:5001/api";
 
 export const apiGet = async (url) => {
   const res = await fetch(`${API_BASE}${url}`);

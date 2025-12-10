@@ -6,7 +6,7 @@ const Profile = () => {
 
   useEffect(() => {
     if (userId) {
-      fetch(`http://localhost:5001/api/users/profile/${userId}`)
+      fetch(`http://stephabit.local:5001/api/users/profile/${userId}`)
         .then((res) => res.json())
         .then((data) => setProfile(data))
         .catch(() => setProfile(null));

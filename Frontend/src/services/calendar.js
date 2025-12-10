@@ -1,6 +1,6 @@
 import { apiGet, apiDelete } from "./api";
 
-const API_BASE = "http://localhost:5001/api";
+const API_BASE = "http://stephabit.local:5001/api";
 
 const buildQuery = (params = {}) => {
   const search = new URLSearchParams();
