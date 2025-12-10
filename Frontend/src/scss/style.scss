@@ -521,6 +521,12 @@ body {
     radial-gradient(circle at 80% 0%, rgba(57, 153, 255, 0.14), transparent 25%),
     linear-gradient(180deg, #f7f9fb, #eef3ff);
   padding: clamp(1.5rem, 3vw, 3rem);
+
+  @include color-mode(dark) {
+    background: radial-gradient(circle at 20% 20%, rgba(46, 184, 92, 0.12), transparent 30%),
+      radial-gradient(circle at 80% 10%, rgba(99, 123, 255, 0.14), transparent 28%),
+      linear-gradient(180deg, color-mix(in srgb, #0d101a 70%, #0b0c14), #0c101b);
+  }
 }
 
 .auth-card {
@@ -529,34 +535,40 @@ body {
 }
 
 .auth-hero {
-  background: rgba(255, 255, 255, 0.52);
-  border: 1px solid rgba(99, 123, 255, 0.12);
+  --auth-hero-bg: rgba(255, 255, 255, 0.52);
+  --auth-hero-border: rgba(99, 123, 255, 0.12);
+  --auth-hero-text: var(--cui-body-color);
+  --auth-hero-subtle: var(--cui-secondary-color);
+  --auth-hero-highlight: var(--cui-primary);
+
+  background: var(--auth-hero-bg);
+  border: 1px solid var(--auth-hero-border);
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.06);
   border-radius: 18px;
   padding: clamp(1rem, 2vw, 1.5rem);
+  color: var(--auth-hero-text);
+
+  .hero-title {
+    color: color-mix(in srgb, var(--auth-hero-text) 85%, #1b1b1b);
+  }
+
+  .hero-subtitle,
+  .auth-highlights li {
+    color: var(--auth-hero-subtle);
+  }
+
+  .auth-highlights li::before {
+    color: var(--auth-hero-highlight);
+  }
 
   @include color-mode(dark) {
-    background: #212631;
-    border: 1px solid rgba(99, 123, 255, 0.12);
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.06);
-    color: #e4e9f7;
+    --auth-hero-bg: #212631;
+    --auth-hero-border: rgba(99, 123, 255, 0.18);
+    --auth-hero-text: #e4e9f7;
+    --auth-hero-subtle: color-mix(in srgb, #cfd6e8 82%, #a9b4cc);
+    --auth-hero-highlight: #b3c5ff;
 
-    .eyebrow {
-      color: color-mix(in srgb, #9fb3ff 70%, var(--cui-secondary-color));
-    }
-
-    .hero-title {
-      color: #f5f7ff;
-    }
-
-    .hero-subtitle,
-    .auth-highlights li {
-      color: color-mix(in srgb, #d8deea 82%, var(--cui-secondary-color));
-    }
-
-    .auth-highlights li::before {
-      color: #b3c5ff;
-    }
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
   }
 }
 
