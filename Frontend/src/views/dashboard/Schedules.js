@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useState } from "react"
 import {
   CCard,
   CCardBody,
@@ -25,6 +25,7 @@ import CIcon from "@coreui/icons-react"
 import { cilClock, cilCalendar, cilLoopCircular, cilPlus, cilNotes } from "@coreui/icons"
 import { emitDataRefresh, REFRESH_SCOPES, useDataRefresh } from "../../utils/refreshBus"
 import { API_BASE } from "../../utils/apiConfig"
+import { fetchCalendarOverview, syncCalendar } from "../../services/calendar"
 
 const MySchedule = () => {
   const user = JSON.parse(localStorage.getItem("user"))
@@ -32,6 +33,31 @@ const MySchedule = () => {
   const [schedules, setSchedules] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [calendarError, setCalendarError] = useState("")
+  const [calendarStatus, setCalendarStatus] = useState({
+    syncing: false,
+    lastSync: null,
+    integrationLabel: "",
+  })
+  const [calendarEvents, setCalendarEvents] = useState([])
+  const [calendarSourceUrl, setCalendarSourceUrl] = useState("")
+
+  const formattedCalendarEvents = useMemo(() => {
+    const sorted = [...calendarEvents].sort((a, b) => {
+      const aDate = a?.start_time ? new Date(a.start_time).getTime() : 0
+      const bDate = b?.start_time ? new Date(b.start_time).getTime() : 0
+      return aDate - bDate
+    })
+    return sorted.map((event) => ({
+      id: event.id,
+      title: event.title || "Calendar event",
+      when: event.start_time
+        ? new Date(event.start_time).toLocaleString()
+        : "Date unknown",
+      provider: event.source || event.integration?.provider || "calendar",
+      location: event.location || event.metadata?.location || "",
+    }))
+  }, [calendarEvents])
   const [newSchedule, setNewSchedule] = useState({
     type: "habit", // link to a habit or keep it as a custom busy time
     habit_id: "",
@@ -81,6 +107,29 @@ const MySchedule = () => {
   useEffect(() => {
     if (user?.id) loadSchedules()
   }, [user?.id])
+
+  // ✅ Load calendar events connected to the account (e.g. Google Calendar)
+  const loadCalendarEvents = useCallback(async () => {
+    if (!user?.id) return
+    try {
+      setCalendarError("")
+      const overview = await fetchCalendarOverview(user.id, { days: 45 })
+      setCalendarEvents(Array.isArray(overview?.events) ? overview.events : [])
+      const lastIntegration = overview?.integrations?.[0]
+      setCalendarStatus((prev) => ({
+        ...prev,
+        lastSync: overview?.summary?.lastSync || null,
+        integrationLabel: lastIntegration?.label || prev.integrationLabel,
+      }))
+    } catch (err) {
+      console.error("❌ Failed to load calendar events:", err)
+      setCalendarError("Unable to load calendar events")
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    loadCalendarEvents()
+  }, [loadCalendarEvents])
 
   // ✅ Add new schedule
   const handleAdd = async () => {
@@ -144,6 +193,36 @@ const MySchedule = () => {
     }
   }
 
+  const handleCalendarSync = async () => {
+    if (!user?.id) return
+    try {
+      setCalendarError("")
+      setCalendarStatus((prev) => ({ ...prev, syncing: true }))
+
+      const payload = {
+        provider: "google",
+        label: "Google Calendar",
+        sourceUrl: calendarSourceUrl || undefined,
+        days: 45,
+      }
+
+      const result = await syncCalendar(user.id, payload)
+      const events = Array.isArray(result?.overview?.events)
+        ? result.overview.events
+        : []
+      setCalendarEvents(events)
+      setCalendarStatus({
+        syncing: false,
+        lastSync: result?.overview?.summary?.lastSync || null,
+        integrationLabel: result?.integration?.label || "Google Calendar",
+      })
+    } catch (err) {
+      console.error("❌ Failed to sync Google Calendar:", err)
+      setCalendarError(err?.message || "Could not sync Google Calendar")
+      setCalendarStatus((prev) => ({ ...prev, syncing: false }))
+    }
+  }
+
   const repeatOptions = [
     { value: "daily", label: "Daily" },
     { value: "weekly", label: "Weekly" },
@@ -179,6 +258,7 @@ const MySchedule = () => {
   return (
     <CRow className="mt-4 g-4">
       <CCol xs={12}>{error && <CAlert color="danger">{error}</CAlert>}</CCol>
+      <CCol xs={12}>{calendarError && <CAlert color="warning">{calendarError}</CAlert>}</CCol>
 
       <CCol lg={5}>
         <CCard className="shadow-sm border-0 h-100">
@@ -419,6 +499,46 @@ const MySchedule = () => {
         <CCard className="shadow-sm border-0 h-100">
           <CCardHeader className="bg-white fw-semibold">Saved busy times</CCardHeader>
           <CCardBody className="p-0">
+            <div className="p-3 border-bottom bg-light">
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div>
+                  <div className="fw-semibold">Pull from Google Calendar</div>
+                  <div className="small text-body-secondary">
+                    Paste your secret iCal link to mirror busy events here so the assistant avoids conflicts.
+                  </div>
+                  {calendarStatus.lastSync && (
+                    <div className="small text-success mt-1">
+                      Last synced {new Date(calendarStatus.lastSync).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+                <CButton
+                  color="success"
+                  size="sm"
+                  className="text-white"
+                  disabled={calendarStatus.syncing}
+                  onClick={handleCalendarSync}
+                >
+                  {calendarStatus.syncing ? (
+                    <>
+                      <CSpinner size="sm" className="me-2" /> Syncing
+                    </>
+                  ) : (
+                    <>
+                      <CIcon icon={cilCalendar} className="me-2" /> Sync now
+                    </>
+                  )}
+                </CButton>
+              </div>
+              <CInputGroup className="mt-2">
+                <CInputGroupText>Secret iCal link</CInputGroupText>
+                <CFormInput
+                  value={calendarSourceUrl}
+                  onChange={(e) => setCalendarSourceUrl(e.target.value)}
+                  placeholder="https://calendar.google.com/calendar/ical/..."
+                />
+              </CInputGroup>
+            </div>
             {loading ? (
               <div className="d-flex justify-content-center my-4">
                 <CSpinner color="primary" />
@@ -459,6 +579,38 @@ const MySchedule = () => {
                 ))}
               </CListGroup>
             )}
+
+            <div className="p-3 border-top">
+              <div className="d-flex align-items-center gap-2 mb-2">
+                <CIcon icon={cilCalendar} className="text-primary" />
+                <span className="fw-semibold">Calendar busy events</span>
+                {calendarStatus.integrationLabel && (
+                  <CBadge color="info" shape="rounded-pill">
+                    {calendarStatus.integrationLabel}
+                  </CBadge>
+                )}
+              </div>
+              {formattedCalendarEvents.length === 0 ? (
+                <div className="text-body-secondary small">
+                  Connect Google Calendar to automatically add busy events to this view.
+                </div>
+              ) : (
+                <CListGroup flush>
+                  {formattedCalendarEvents.map((event) => (
+                    <CListGroupItem key={`${event.id}-${event.when}`} className="py-3">
+                      <div className="fw-semibold">{event.title}</div>
+                      <div className="text-muted small">{event.when}</div>
+                      {event.location && (
+                        <div className="text-muted small">{event.location}</div>
+                      )}
+                      <CBadge color="secondary" shape="rounded-pill" className="mt-2">
+                        {event.provider}
+                      </CBadge>
+                    </CListGroupItem>
+                  ))}
+                </CListGroup>
+              )}
+            </div>
           </CCardBody>
         </CCard>
       </CCol>
