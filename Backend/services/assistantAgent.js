@@ -38,7 +38,7 @@ const limitHistory = (history = []) => {
 // ---- SNAPSHOT FORMATTER ----
 const formatList = (items = []) => items.filter(Boolean).join("; ");
 
-const describeSnapshot = (snapshot = {}, insightText) => {
+const describeSnapshot = (snapshot = {}, insightText, profileMemory) => {
   const profile = snapshot.user || {};
   const progress = snapshot.progress || {};
   const schedules = snapshot.schedules?.upcoming || [];
@@ -54,6 +54,10 @@ const describeSnapshot = (snapshot = {}, insightText) => {
     `Support preference: ${profile.support_preference || "Not set"}`,
     `Average completion: ${progress.completionRate || 0}% over ${progress.total || 0} entries`,
   ];
+
+  if (profileMemory?.about) {
+    lines.push(`Personal note from user: ${profileMemory.about}`);
+  }
 
   if (topHabits.length) {
     lines.push(
@@ -87,7 +91,7 @@ const describeSnapshot = (snapshot = {}, insightText) => {
 };
 
 // ---- MESSAGE BUILDER ----
-const buildMessages = ({ snapshot, insightText, history = [] }) => {
+const buildMessages = ({ snapshot, insightText, profileMemory, history = [] }) => {
   const systemPrompt = [
     "You are StepHabit's AI companion, a motivational coach.",
     "You reason carefully about habits, schedules, and progress.",
@@ -95,7 +99,7 @@ const buildMessages = ({ snapshot, insightText, history = [] }) => {
     "Always end with a reflective or action-oriented question."
   ].join(" ");
 
-  const contextBlock = describeSnapshot(snapshot, insightText);
+  const contextBlock = describeSnapshot(snapshot, insightText, profileMemory);
 
   const formattedHistory = limitHistory(history).map(entry =>
     entry.role === "assistant"
@@ -110,11 +114,16 @@ const buildMessages = ({ snapshot, insightText, history = [] }) => {
 };
 
 // ---- MAIN AGENT CALL ----
-export const runReasoningAgent = async ({ snapshot, insightText, history, apiKeyOverride }) => {
+export const runReasoningAgent = async ({ snapshot, insightText, profileMemory, history, apiKeyOverride }) => {
   const apiKey = apiKeyOverride || CLAUDE_API_KEY;
   if (!apiKey) throw new Error("Missing CLAUDE_API_KEY.");
 
-  const { systemInstruction, contents } = buildMessages({ snapshot, insightText, history });
+  const { systemInstruction, contents } = buildMessages({
+    snapshot,
+    insightText,
+    profileMemory,
+    history,
+  });
 
   const modelsToTry = [CLAUDE_MODEL, FALLBACK_CLAUDE_MODEL];
 
@@ -161,7 +170,11 @@ export const runReasoningAgent = async ({ snapshot, insightText, history, apiKey
       `${systemInstruction}\n\nYour first reply was empty. Provide a concise, encouraging summary of the user's progress and next steps.`
     );
     const fallbackUser = new HumanMessage(
-      `Write a short AI summary of this journey:\n${describeSnapshot(snapshot, insightText)}`
+      `Write a short AI summary of this journey:\n${describeSnapshot(
+        snapshot,
+        insightText,
+        profileMemory
+      )}`
     );
 
     ({ result: replyMessage, modelName: modelUsed } = await tryClaude([fallbackPrompt, fallbackUser]));
@@ -183,7 +196,8 @@ export const runReasoningAgent = async ({ snapshot, insightText, history, apiKey
     degradedReason = "AI summary was empty; using your stored insights instead.";
   }
 
-  const safeReply = reply || insightText || describeSnapshot(snapshot, insightText);
+  const safeReply =
+    reply || insightText || describeSnapshot(snapshot, insightText, profileMemory);
 
   return {
     reply: safeReply,

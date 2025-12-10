@@ -675,7 +675,7 @@ router.get("/summary", async (req, res) => {
 
   try {
     const snapshot = await buildUserSnapshot(userId);
-    const [insightRecord, historyRecords] = await Promise.all([
+    const [insightRecord, historyRecords, profileMemory] = await Promise.all([
       AssistantMemory.findOne({
         where: { user_id: userId, role: "insight" },
         order: [["created_at", "DESC"]],
@@ -685,6 +685,7 @@ router.get("/summary", async (req, res) => {
         order: [["created_at", "ASC"]],
         limit: 14,
       }),
+      getLatestProfileMemory(userId),
     ]);
 
     const insightPayload = ensureObject(insightRecord?.keywords);
@@ -700,6 +701,7 @@ router.get("/summary", async (req, res) => {
         const { reply, meta } = await runReasoningAgent({
           snapshot,
           insightText: insightRecord?.content,
+          profileMemory,
           history,
         });
         summaryText = reply;
@@ -716,17 +718,32 @@ router.get("/summary", async (req, res) => {
 
     if (!agent.ready) {
       const insight = await updateInsightMemory(userId, snapshot, keywordCounts);
-      summaryText = insight.summaryText;
+      summaryText = [
+        insight.summaryText,
+        profileMemory?.about ? `AI memory: ${profileMemory.about}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
       keywordCounts = insight.aggregate;
     } else if (!summaryText) {
       const insight = await updateInsightMemory(userId, snapshot, keywordCounts);
-      summaryText = insight.summaryText;
+      summaryText = [
+        insight.summaryText,
+        profileMemory?.about ? `AI memory: ${profileMemory.about}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
       keywordCounts = insight.aggregate;
     }
 
     if (!summaryText) {
       const insight = await updateInsightMemory(userId, snapshot, keywordCounts);
-      summaryText = insight.summaryText;
+      summaryText = [
+        insight.summaryText,
+        profileMemory?.about ? `AI memory: ${profileMemory.about}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
       keywordCounts = insight.aggregate;
       agent = {
         ...getCoachStatus(),
@@ -846,7 +863,7 @@ router.post("/chat", async (req, res) => {
 
     const insight = await updateInsightMemory(userId, snapshot, counts);
 
-    const [agentStatus, historyRecords] = await Promise.all([
+    const [agentStatus, historyRecords, profileMemory] = await Promise.all([
       getAgentStatus(),
       AssistantMemory.findAll({
         where: {
@@ -856,6 +873,7 @@ router.post("/chat", async (req, res) => {
         order: [["created_at", "ASC"]],
         limit: 18,
       }),
+      getLatestProfileMemory(userId),
     ]);
 
     const history = mapHistory(historyRecords);
@@ -868,6 +886,7 @@ router.post("/chat", async (req, res) => {
         const result = await runReasoningAgent({
           snapshot,
           insightText: insight.summaryText,
+          profileMemory,
           history,
         });
         reply = result.reply;
