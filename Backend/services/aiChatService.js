@@ -1,5 +1,5 @@
 import { ChatAnthropic } from "@langchain/anthropic";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { QueryTypes } from "sequelize";
 
 import sequelize from "../sequelize.js";
@@ -15,10 +15,12 @@ import {
   User,
   UserSetting,
 } from "../models/index.js";
+import { getChatHistory } from "./memoryService.js";
 
 const CLAUDE_BASE_URL = (process.env.CLAUDE_BASE_URL || "https://api.anthropic.com").replace(/\/$/, "");
-const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-5-20250929";
-const FALLBACK_CLAUDE_MODEL = process.env.CLAUDE_FALLBACK_MODEL || "claude-haiku-4-5-20251001";
+const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-3-5-sonnet-20240620";
+const FALLBACK_CLAUDE_MODEL = process.env.CLAUDE_FALLBACK_MODEL || "claude-3-haiku-20240307";
+const MESSAGE_HISTORY_LIMIT = 12;
 
 const resolveApiKey = () =>
   process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.AI_API_KEY || null;
@@ -144,22 +146,60 @@ const formatTableSummary = (tables) =>
     })
     .join("\n");
 
-const fallbackReply = (message, userContext, dbOverview) => {
+const toChatMessage = (entry) => {
+  if (!entry?.content) return null;
+  return entry.role === "assistant"
+    ? new AIMessage(entry.content)
+    : new HumanMessage(entry.content);
+};
+
+const summarizeRecentTopics = (history) => {
+  const userMessages = (history || [])
+    .filter((entry) => entry.role === "user")
+    .map((entry) => entry.content);
+
+  if (!userMessages.length) return null;
+
+  const lastTwo = userMessages.slice(-2);
+  return lastTwo.join(" | ");
+};
+
+const fallbackReply = ({ message, userContext, dbOverview, history }) => {
   const habits = userContext?.habits || [];
   const habitTitles = habits.map((h) => h.title).filter(Boolean);
   const primaryGoal = userContext?.profile?.primary_goal || "your goals";
   const tablesMention = dbOverview?.length ? dbOverview.map((t) => t.name).join(", ") : "the database";
+  const recentTopics = summarizeRecentTopics(history);
 
   const habitLine = habitTitles.length
-    ? `I see you're tracking ${habitTitles.length} habits like ${habitTitles.slice(0, 3).join(", ")}.`
-    : "I can help you start or refine habits even though I don't see any yet.";
+    ? `I'm tracking ${habitTitles.length} of your habits, like ${habitTitles.slice(0, 3).join(", ")}.`
+    : "I don't see any saved habits yet, but I can help you plan the first one.";
+
+  const topicLine = recentTopics
+    ? `You recently asked about ${recentTopics}.`
+    : "We can start fresh—tell me what's on your mind.";
 
   return [
-    `You said: "${message}".`,
-    `I'm aware of tables such as ${tablesMention}, so I can connect recommendations to your saved data.`,
-    `Your primary goal appears to be ${primaryGoal}. ${habitLine}`,
-    "How would you like me to help next?",
+    `Got it: "${message}". Here's how I can help while we chat naturally:`,
+    habitLine,
+    `I'm aware of tables such as ${tablesMention} and your primary goal is ${primaryGoal}.`,
+    topicLine,
+    "What would you like to explore next?",
   ].join(" ");
+};
+
+const buildChatMessages = ({ systemInstruction, history, message }) => {
+  const conversation = (history || [])
+    .filter((entry) => ["user", "assistant"].includes(entry.role))
+    .slice(-MESSAGE_HISTORY_LIMIT)
+    .map(toChatMessage)
+    .filter(Boolean);
+
+  if (message && (!history?.length || history[history.length - 1]?.role !== "user")) {
+    conversation.push(new HumanMessage(message));
+  }
+
+  return [new SystemMessage(systemInstruction), ...conversation];
 };
 
 const callClaude = async (messages) => {
@@ -200,27 +240,28 @@ const callClaude = async (messages) => {
 };
 
 export const generateAiChatReply = async ({ userId, message }) => {
-  const [dbOverview, userContext] = await Promise.all([
+  const [dbOverview, userContext, history] = await Promise.all([
     describeTables(),
     loadUserContext(userId),
+    getChatHistory(userId, MESSAGE_HISTORY_LIMIT),
   ]);
 
   const systemInstruction = [
-    "You are an AI assistant that can answer questions about the StepHabit platform.",
-    "You have access to a database overview and the requesting user's context.",
-    "Use that knowledge to provide concise, supportive answers and next steps.",
-    "If the user asks for data-driven insights, reference the relevant tables or user fields instead of guessing.",
-    "Be clear and actionable in every reply.",
+    "You are a warm, conversational AI assistant for the StepHabit platform.",
+    "Respond with short, human-feeling paragraphs (avoid bullet lists unless requested).",
+    "You can see the database overview and the current user's context—use them naturally in conversation.",
+    "Stay encouraging and keep the chat flowing with one clear next step in each reply.",
     "Database overview:\n" + formatTableSummary(dbOverview),
     "User context:\n" + JSON.stringify(userContext || {}, null, 2),
   ].join("\n\n");
 
-  const claudeReply = await callClaude([
-    new SystemMessage(systemInstruction),
-    new HumanMessage(message),
-  ]);
+  const claudeReply = await callClaude(
+    buildChatMessages({ systemInstruction, history, message })
+  );
 
-  const reply = claudeReply || fallbackReply(message, userContext, dbOverview);
+  const reply =
+    claudeReply ||
+    fallbackReply({ message, userContext, dbOverview, history });
 
-  return { reply, context: { dbOverview, userContext } };
+  return { reply, context: { dbOverview, userContext, history } };
 };

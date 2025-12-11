@@ -55,7 +55,7 @@ const KnowledgeCard = ({ context }) => {
         <div>
           <div className="fw-semibold">AI Knowledge</div>
           <small className="text-medium-emphasis">
-            The assistant reads your user profile and every database table.
+            The assistant reads your user profile, recent chat, and every database table.
           </small>
         </div>
       </CCardHeader>
@@ -160,9 +160,9 @@ const AiChat = () => {
   };
 
   const promptExamples = [
-    "How are my habits progressing this week?",
-    "What tables store my notifications and schedules?",
-    "Summarize my goals and suggest a next action.",
+    "Catch me up on my habits and what's new.",
+    "Give me one next step based on my goals.",
+    "Look at my tables and suggest what to improve.",
   ];
 
   return (
@@ -173,7 +173,7 @@ const AiChat = () => {
             <div>
               <div className="fw-semibold">AI chat</div>
               <small className="text-medium-emphasis">
-                Ask anything — the AI can see your profile and every database table.
+                Ask anything — the AI follows your conversation and can see your profile plus every table.
               </small>
             </div>
             <CBadge color="info">Live</CBadge>
