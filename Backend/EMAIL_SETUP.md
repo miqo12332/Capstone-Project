@@ -10,7 +10,7 @@ RESEND_API_KEY=your_resend_api_key
 EMAIL_FROM=StepHabit <no-reply@yourdomain.com>
 ```
 
-`EMAIL_FROM` should be a verified sender in your Resend account. If either variable is missing in production, email delivery will fail. By default, the API now returns an error when `RESEND_API_KEY` is absent so you know email isn't configured. To keep the old log-only behavior for local development, set `ALLOW_EMAIL_LOGGING=true` in your environment (non-production only).
+`EMAIL_FROM` must be a **verified sender** in your Resend account. If either variable is missing in production, registration and resend requests will return a `503` error so you know email isn't configured. To keep the old log-only behavior for local development, set `ALLOW_EMAIL_LOGGING=true` in your environment (non-production only). With logging enabled, the payload is printed to the server console instead of being dispatched.
 
 ## Delivery notes
 - Verification codes expire after 15 minutes.

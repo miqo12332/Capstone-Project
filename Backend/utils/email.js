@@ -23,12 +23,13 @@ export const sendEmail = async ({ to, subject, text }) => {
   }
 
   const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM;
   const allowLoggingFallback = process.env.ALLOW_EMAIL_LOGGING === "true";
 
-  if (!apiKey) {
+  if (!apiKey || !from) {
     if (allowLoggingFallback && process.env.NODE_ENV !== "production") {
       console.warn(
-        "RESEND_API_KEY is not configured; logging verification email payload for local testing only"
+        "Email delivery is not configured; logging verification email payload for local testing only"
       );
       console.info({ to, subject, text });
       return { logged: true };
@@ -39,8 +40,6 @@ export const sendEmail = async ({ to, subject, text }) => {
       { code: "DELIVERY_NOT_CONFIGURED" }
     );
   }
-
-  const from = process.env.EMAIL_FROM || "StepHabit <no-reply@stephabit.app>";
 
   const response = await fetch(RESEND_API_URL, {
     method: "POST",
