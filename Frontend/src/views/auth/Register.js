@@ -70,6 +70,10 @@ const Register = () => {
   const [step, setStep] = useState(0)
   const [message, setMessage] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const [verificationRequested, setVerificationRequested] = useState(false)
+  const [verificationCode, setVerificationCode] = useState("")
+  const [verificationEmail, setVerificationEmail] = useState("")
+  const [resending, setResending] = useState(false)
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -82,7 +86,7 @@ const Register = () => {
     motivation: "",
   })
 
-  const steps = useMemo(
+  const baseSteps = useMemo(
     () => [
       {
         title: "Create your account",
@@ -100,8 +104,23 @@ const Register = () => {
     []
   )
 
+  const steps = useMemo(() => {
+    if (verificationRequested) {
+      return [
+        ...baseSteps,
+        {
+          title: "Verify your email",
+          description: `Enter the 6-digit code we sent to ${verificationEmail || form.email}.`,
+        },
+      ]
+    }
+
+    return baseSteps
+  }, [baseSteps, verificationEmail, form.email, verificationRequested])
+
   const progressValue = Math.round(((step + 1) / steps.length) * 100)
   const isLastStep = step === steps.length - 1
+  const isVerificationStep = verificationRequested && isLastStep
 
   const handleFieldChange = (event) => {
     const { name, value } = event.target
@@ -113,6 +132,15 @@ const Register = () => {
   }
 
   const validateStep = () => {
+    if (isVerificationStep) {
+      if (!/^\d{6}$/.test(verificationCode.trim())) {
+        setMessage({ type: "danger", text: "Enter the 6-digit code from your email." })
+        return false
+      }
+
+      return true
+    }
+
     if (step === 0) {
       if (!form.name.trim() || !form.email.trim() || !form.password) {
         setMessage({ type: "danger", text: "Please add your name, email, and a password to continue." })
@@ -147,6 +175,7 @@ const Register = () => {
   }
 
   const handleBack = () => {
+    if (isVerificationStep) return
     setMessage(null)
     setStep((prev) => Math.max(prev - 1, 0))
   }
@@ -154,6 +183,47 @@ const Register = () => {
   const handleSubmit = async (event) => {
     event.preventDefault()
     if (!validateStep()) return
+
+    if (isVerificationStep) {
+      try {
+        setSubmitting(true)
+        setMessage(null)
+        const targetEmail = (verificationEmail || form.email || "").trim()
+        if (!targetEmail) {
+          setSubmitting(false)
+          setMessage({ type: "danger", text: "Email address is missing. Please restart sign up." })
+          return
+        }
+        const response = await fetch(`${API_BASE}/users/verify-email`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: targetEmail,
+            code: verificationCode.trim(),
+          }),
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data?.error || "Verification failed")
+        }
+
+        setMessage({
+          type: "success",
+          text: "Email verified! Redirecting you to log in.",
+        })
+
+        setTimeout(() => navigate("/login"), 1500)
+      } catch (err) {
+        console.error("Verification error:", err)
+        setMessage({ type: "danger", text: err.message || "Verification failed." })
+      } finally {
+        setSubmitting(false)
+      }
+
+      return
+    }
 
     try {
       setSubmitting(true)
@@ -184,14 +254,49 @@ const Register = () => {
 
       setMessage({
         type: "success",
-        text: "Welcome aboard! Your plan is ready—let’s log in and get started.",
+        text: "We sent you a 6-digit code. Enter it to activate your account.",
       })
-      setTimeout(() => navigate("/login"), 1800)
+      setVerificationRequested(true)
+      setVerificationEmail((data?.email || form.email || "").trim())
+      setVerificationCode("")
+      setStep(baseSteps.length)
     } catch (err) {
       console.error("Register error:", err)
       setMessage({ type: "danger", text: err.message || "Could not connect to the server." })
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleResendCode = async () => {
+    try {
+      setResending(true)
+      setMessage(null)
+      const targetEmail = (verificationEmail || form.email || "").trim()
+      if (!targetEmail) {
+        setResending(false)
+        setMessage({ type: "danger", text: "Add your email before requesting a new code." })
+        return
+      }
+
+      const response = await fetch(`${API_BASE}/users/resend-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: targetEmail }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not resend the verification code")
+      }
+
+      setVerificationEmail(targetEmail || verificationEmail)
+      setMessage({ type: "success", text: "We sent a fresh code to your email." })
+    } catch (err) {
+      console.error("Resend code error:", err)
+      setMessage({ type: "danger", text: err.message || "Failed to resend the code." })
+    } finally {
+      setResending(false)
     }
   }
 
@@ -222,6 +327,43 @@ const Register = () => {
   )
 
   const renderStepContent = () => {
+    if (isVerificationStep) {
+      const targetEmailLabel = verificationEmail || form.email || "your email"
+
+      return (
+        <div className="d-flex flex-column gap-3">
+          <div>
+            <p className="text-body-secondary mb-1">
+              We sent a 6-digit code to {targetEmailLabel}. Enter it below to verify
+              your account.
+            </p>
+            <CFormInput
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              value={verificationCode}
+              onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="Enter 6-digit code"
+              autoFocus
+            />
+            <div className="d-flex align-items-center justify-content-between mt-2">
+              <span className="small text-body-secondary">Codes expire after 15 minutes.</span>
+              <CButton
+                color="link"
+                className="px-0"
+                type="button"
+                disabled={resending || submitting}
+                onClick={handleResendCode}
+              >
+                {resending ? "Resending..." : "Resend code"}
+              </CButton>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     if (step === 0) {
       return (
         <>
@@ -371,15 +513,21 @@ const Register = () => {
                       color="secondary"
                       variant="outline"
                       type="button"
-                      disabled={step === 0}
+                      disabled={step === 0 || isVerificationStep}
                       onClick={handleBack}
                     >
                       Back
                     </CButton>
                     {isLastStep ? (
-                      <CButton color="success" type="submit" disabled={submitting}>
-                        <CIcon icon={cilHeart} className="me-2" />
-                        {submitting ? "Creating..." : "Start my journey"}
+                      <CButton color={isVerificationStep ? "primary" : "success"} type="submit" disabled={submitting}>
+                        <CIcon icon={isVerificationStep ? cilEnvelopeClosed : cilHeart} className="me-2" />
+                        {submitting
+                          ? isVerificationStep
+                            ? "Verifying..."
+                            : "Creating..."
+                          : isVerificationStep
+                            ? "Verify email"
+                            : "Start my journey"}
                       </CButton>
                     ) : (
                       <CButton color="primary" type="button" onClick={handleNext}>
