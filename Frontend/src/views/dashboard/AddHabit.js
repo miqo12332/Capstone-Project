@@ -39,8 +39,15 @@ import {
   cilClock,
   cilBolt,
   cilStar,
+  cilPencil,
 } from "@coreui/icons"
-import { getHabits, createHabit, deleteHabit } from "../../services/habits"
+import {
+  getHabits,
+  createHabit,
+  deleteHabit,
+  generateHabitSuggestion,
+  rewriteHabitIdea,
+} from "../../services/habits"
 import { emitDataRefresh, REFRESH_SCOPES } from "../../utils/refreshBus"
 
 const createBlankHabit = () => ({
@@ -58,6 +65,11 @@ const AddHabit = () => {
   const [err, setErr] = useState("")
   const [success, setSuccess] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState("")
+  const [rewriteDraft, setRewriteDraft] = useState("")
+  const [rewriteLoading, setRewriteLoading] = useState(false)
+  const [rewriteError, setRewriteError] = useState("")
   const [showReflection, setShowReflection] = useState(false)
   const [reflectionDraft, setReflectionDraft] = useState("")
   const quickTemplates = [
@@ -123,6 +135,7 @@ const AddHabit = () => {
     setNewHabit((prev) => ({ ...prev, [field]: value }))
     if (err) setErr("")
     if (success) setSuccess("")
+    if (aiError) setAiError("")
   }
 
   const applyTemplate = (template) => {
@@ -135,6 +148,92 @@ const AddHabit = () => {
     })
     setSuccess("Template applied—adjust any fields to make it yours.")
     setErr("")
+    setAiError("")
+  }
+
+  const normalizeTargetReps = (value, previous) => {
+    if (value === null || typeof value === "undefined") return previous
+    const numeric = Number(value)
+    if (Number.isNaN(numeric)) return previous
+    return String(numeric)
+  }
+
+  const handleAutoFill = async () => {
+    if (aiLoading) return
+    if (!newHabit.title || !newHabit.title.trim()) {
+      setAiError("Add a habit title so AI knows what to draft.")
+      return
+    }
+
+    try {
+      setAiLoading(true)
+      setAiError("")
+      setErr("")
+      setSuccess("")
+
+      const suggestion = await generateHabitSuggestion(newHabit.title.trim())
+
+      setNewHabit((prev) => ({
+        ...prev,
+        description: suggestion.description || prev.description,
+        category: suggestion.category || prev.category,
+        target_reps: normalizeTargetReps(
+          suggestion.targetReps ?? suggestion.target_reps,
+          prev.target_reps
+        ),
+        is_daily_goal:
+          typeof suggestion.isDailyGoal === "boolean"
+            ? suggestion.isDailyGoal
+            : prev.is_daily_goal,
+      }))
+
+      setSuccess("AI drafted your habit details—feel free to tweak them.")
+    } catch (error) {
+      console.error("AI suggestion failed", error)
+      setAiError("We couldn't fetch AI details right now. Try again in a moment.")
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  const handleRewrite = async () => {
+    if (rewriteLoading) return
+    const idea = rewriteDraft.trim()
+
+    if (!idea) {
+      setRewriteError("Share a rough habit idea so AI can rewrite it.")
+      return
+    }
+
+    try {
+      setRewriteLoading(true)
+      setRewriteError("")
+      setAiError("")
+      setErr("")
+      setSuccess("")
+
+      const rewritten = await rewriteHabitIdea(idea)
+
+      setNewHabit((prev) => ({
+        ...prev,
+        title: rewritten.title || prev.title,
+        description: rewritten.description || prev.description,
+        category: rewritten.category || prev.category,
+        is_daily_goal:
+          typeof rewritten.isDailyGoal === "boolean"
+            ? rewritten.isDailyGoal
+            : typeof rewritten.is_daily_goal === "boolean"
+            ? rewritten.is_daily_goal
+            : prev.is_daily_goal,
+      }))
+
+      setSuccess("AI polished your habit—review the fields before saving.")
+    } catch (error) {
+      console.error("AI rewrite failed", error)
+      setRewriteError("We couldn't rewrite that habit right now. Please try again.")
+    } finally {
+      setRewriteLoading(false)
+    }
   }
 
   const loadHabits = async () => {
@@ -254,9 +353,28 @@ const AddHabit = () => {
               </div>
 
               <div>
-                <CFormLabel className="text-muted text-uppercase small fw-semibold">
-                  Description
-                </CFormLabel>
+                <div className="d-flex align-items-center justify-content-between gap-2 mb-1">
+                  <CFormLabel className="text-muted text-uppercase small fw-semibold mb-0">
+                    Description
+                  </CFormLabel>
+                  <CButton
+                    color="light"
+                    size="sm"
+                    className="text-primary d-inline-flex align-items-center gap-2"
+                    onClick={handleAutoFill}
+                    disabled={aiLoading}
+                  >
+                    {aiLoading ? (
+                      <>
+                        <CSpinner size="sm" /> Drafting with AI
+                      </>
+                    ) : (
+                      <>
+                        <CIcon icon={cilStar} /> Ask AI
+                      </>
+                    )}
+                  </CButton>
+                </div>
                 <CInputGroup>
                   <CInputGroupText>
                     <CIcon icon={cilNotes} />
@@ -268,6 +386,53 @@ const AddHabit = () => {
                     onChange={(e) => updateHabit("description", e.target.value)}
                   />
                 </CInputGroup>
+                {aiError && <CFormText className="text-danger">{aiError}</CFormText>}
+              </div>
+
+              <div className="p-3 rounded border bg-body-tertiary">
+                <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                  <div className="d-flex align-items-center gap-2">
+                    <CIcon icon={cilPencil} className="text-primary" />
+                    <div>
+                      <div className="fw-semibold">AI Habit Rewriter</div>
+                      <CFormText className="text-muted">
+                        Paste any rough idea and AI will rewrite it into a clean title, description, category, and daily goal.
+                      </CFormText>
+                    </div>
+                  </div>
+                  <CButton
+                    color="primary"
+                    variant="outline"
+                    size="sm"
+                    className="text-nowrap"
+                    onClick={handleRewrite}
+                    disabled={rewriteLoading}
+                  >
+                    {rewriteLoading ? (
+                      <span className="d-inline-flex align-items-center gap-2">
+                        <CSpinner size="sm" /> Rewriting
+                      </span>
+                    ) : (
+                      <span className="d-inline-flex align-items-center gap-2">
+                        <CIcon icon={cilBolt} /> Rewrite with AI
+                      </span>
+                    )}
+                  </CButton>
+                </div>
+                <CFormTextarea
+                  rows={2}
+                  value={rewriteDraft}
+                  placeholder="e.g. I want to run sometimes in the mornings"
+                  onChange={(e) => setRewriteDraft(e.target.value)}
+                  disabled={rewriteLoading}
+                />
+                {rewriteError ? (
+                  <CFormText className="text-danger">{rewriteError}</CFormText>
+                ) : (
+                  <CFormText className="text-muted">
+                    We'll fill the fields above with a polished habit you can tweak before saving.
+                  </CFormText>
+                )}
               </div>
 
               <div className="row g-3">

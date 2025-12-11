@@ -31,6 +31,17 @@ const aiLimiter = (req, res, next) => {
   next()
 }
 
+const resolveApiOptions = (req) => ({
+  apiKeyOverride:
+    req.headers["x-ai-api-key"] ||
+    req.headers["x-claude-api-key"] ||
+    req.body?.apiKey ||
+    req.query?.apiKey ||
+    null,
+  modelOverride: req.headers["x-ai-model"] || req.body?.model || req.query?.model || null,
+  providerOverride: req.headers["x-ai-provider"] || req.body?.provider || req.query?.provider || null,
+});
+
 const validateRequest = (body = {}) => {
   const { snapshot, history } = body;
 
@@ -45,8 +56,8 @@ const validateRequest = (body = {}) => {
   return null;
 };
 
-router.get("/status", (_req, res) => {
-  res.json(getAgentStatus());
+router.get("/status", (req, res) => {
+  res.json(getAgentStatus(resolveApiOptions(req)));
 });
 
 router.post("/reason", aiLimiter, async (req, res) => {
@@ -54,6 +65,8 @@ router.post("/reason", aiLimiter, async (req, res) => {
   if (validationError) {
     return res.status(400).json({ error: validationError });
   }
+
+  const apiOptions = resolveApiOptions(req);
 
   const { snapshot, insightText = "", history = [] } = req.body;
 
@@ -63,7 +76,7 @@ router.post("/reason", aiLimiter, async (req, res) => {
   });
 
   try {
-    const result = await runReasoningAgent({ snapshot, insightText, history });
+    const result = await runReasoningAgent({ snapshot, insightText, history, ...apiOptions });
 
     return res.json({
       reply: result.reply,

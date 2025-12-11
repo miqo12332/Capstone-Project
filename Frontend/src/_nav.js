@@ -28,7 +28,7 @@ const _nav = [
   },
   {
     component: CNavItem,
-    name: 'Habit Coach',
+    name: 'HabitCoach',
     to: '/habit-coach',
     icon: <CIcon icon={cilChatBubble} customClassName="nav-icon" />,
   },

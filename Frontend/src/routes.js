@@ -8,7 +8,6 @@ const Profile = React.lazy(() => import("./views/auth/Profile"))
 // ===== Dashboard & Habits =====
 const Dashboard = React.lazy(() => import("./views/dashboard/Dashboard"))
 const Habits = React.lazy(() => import("./views/dashboard/Habits"))
-const HabitCoach = React.lazy(() => import("./views/dashboard/HabitCoach"))
 const Planner = React.lazy(() => import("./views/dashboard/Planner"))
 const Notifications = React.lazy(() => import("./views/dashboard/Notifications"))
 
@@ -31,7 +30,7 @@ const routes = [
   { path: "/habits", name: "Habits", element: Habits },
   { path: "/addhabit", name: "Habits", element: Habits },
   { path: "/habit-library", name: "Habits", element: Habits },
-  { path: "/habit-coach", name: "Habit Coach", element: HabitCoach },
+  { path: "/habit-coach", name: "Habits", element: Habits },
   { path: "/planner", name: "Planner", element: Planner },
   { path: "/schedules", name: "Planner", element: Planner },
   { path: "/smart-scheduler", name: "Planner", element: Planner },

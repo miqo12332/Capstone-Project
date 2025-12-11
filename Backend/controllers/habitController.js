@@ -1,4 +1,5 @@
 import Habit from "../models/Habit.js";
+import { generateHabitPlan, rewriteHabitIdea } from "../services/habitIdeaService.js";
 
 export const getHabitsByUser = async (req, res, next) => {
   try {
@@ -43,6 +44,38 @@ export const createHabit = async (req, res, next) => {
 
     const habit = await Habit.create(payload);
     res.status(201).json(habit);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const generateHabitSuggestion = async (req, res, next) => {
+  try {
+    const title = req.body.title?.trim();
+
+    if (!title) {
+      return res.status(400).json({ error: "title is required" });
+    }
+
+    const plan = await generateHabitPlan(title);
+
+    return res.json(plan);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const rewriteHabit = async (req, res, next) => {
+  try {
+    const message = req.body.input?.trim() || req.body.text?.trim() || req.body.idea?.trim();
+
+    if (!message) {
+      return res.status(400).json({ error: "input is required" });
+    }
+
+    const rewritten = await rewriteHabitIdea(message);
+
+    return res.json(rewritten);
   } catch (error) {
     next(error);
   }

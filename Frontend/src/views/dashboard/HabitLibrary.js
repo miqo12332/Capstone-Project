@@ -299,7 +299,7 @@ const HabitLibrary = () => {
                     <CButton
                       key={category}
                       color={activeQuickCategory === category ? "primary" : "secondary"}
-                      variant={activeQuickCategory === category ? "" : "outline"}
+                      variant={activeQuickCategory === category ? undefined : "outline"}
                       size="sm"
                       onClick={() => handleQuickCategory(category)}
                     >
