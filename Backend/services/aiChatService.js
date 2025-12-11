@@ -82,7 +82,11 @@ const loadUserContext = async (userId) => {
       { model: Achievement, as: "achievements" },
       { model: UserSetting, as: "settings" },
       { model: CalendarEvent, as: "calendarEvents" },
-      { model: Friend, as: "friends" },
+      {
+        model: User,
+        as: "friends",
+        through: { model: Friend, attributes: ["status", "created_at", "share_habits"] },
+      },
       { model: GroupChallenge, as: "groupChallenges" },
     ],
   });
@@ -116,10 +120,13 @@ const loadUserContext = async (userId) => {
       start: event.start,
       end: event.end,
     })),
-    friends: (plain.friends || []).map((f) => ({
-      id: f.id,
-      name: f.name,
-      email: f.email,
+    friends: (plain.friends || []).map((friend) => ({
+      id: friend.id,
+      name: friend.name,
+      email: friend.email,
+      status: friend.Friend?.status || null,
+      connected_since: friend.Friend?.created_at || null,
+      share_habits: friend.Friend?.share_habits ?? null,
     })),
     groupChallenges: (plain.groupChallenges || []).map((challenge) => ({
       id: challenge.id,
