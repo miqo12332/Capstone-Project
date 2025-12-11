@@ -189,8 +189,8 @@ export const runReasoningAgent = async ({
         console.log("Trying Claude model:", modelName);
 
         const chat = new ChatAnthropic({
-          anthropicApiKey: apiKey,
-          anthropicApiUrl: CLAUDE_BASE_URL,
+          apiKey,
+          baseURL: CLAUDE_BASE_URL,
           model: modelName,
           temperature: 0.7,
           maxTokens: 1024,

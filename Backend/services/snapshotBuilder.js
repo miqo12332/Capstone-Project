@@ -19,7 +19,7 @@ export async function buildSnapshot(userId) {
 
   const now = new Date();
   const upcoming = await Schedule.findAll({
-    where: { starttime: { [Op.gte]: now } },
+    where: { starttime: { [Op.gte]: now }, user_id: userId },
     include: [{ model: Habit, as: "habit", attributes: ["title"] }],
     order: [["starttime", "ASC"]],
     limit: 5,
@@ -27,7 +27,7 @@ export async function buildSnapshot(userId) {
 
   const habitSummaries = habits.map(h => {
     const entries = completions.filter(c => c.habit_id === h.id);
-    const done = entries.filter(e => e.status === "completed").length;
+    const done = entries.filter(e => ["completed", "done"].includes(e.status)).length;
     const missed = entries.filter(e => e.status === "missed").length;
     return {
       title: h.title,
@@ -37,7 +37,7 @@ export async function buildSnapshot(userId) {
     };
   });
 
-  const totalCompleted = completions.filter(e => e.status === "completed").length;
+  const totalCompleted = completions.filter(e => ["completed", "done"].includes(e.status)).length;
 
   return {
     user: {
