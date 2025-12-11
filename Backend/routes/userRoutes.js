@@ -22,7 +22,7 @@ const sendVerificationEmail = async (email, code) => {
   const subject = "Verify your StepHabit account";
   const text = `Use this code to verify your StepHabit account: ${code}. It expires in 15 minutes.`;
 
-  await sendEmail({ to: email, subject, text });
+  return sendEmail({ to: email, subject, text });
 };
 
 const sanitizeString = (value) => {
@@ -143,8 +143,9 @@ router.post("/register", async (req, res) => {
       defaults: { ...defaultSettings, user_id: newUser.id },
     });
 
+    let deliveryResult;
     try {
-      await sendVerificationEmail(newUser.email, verificationCode);
+      deliveryResult = await sendVerificationEmail(newUser.email, verificationCode);
     } catch (emailErr) {
       console.error("Failed to send verification email", emailErr);
       await UserSetting.destroy({ where: { user_id: newUser.id } });
@@ -169,9 +170,13 @@ router.post("/register", async (req, res) => {
     }
 
     res.status(201).json({
-      message: "Verification code sent to your email.",
+      message:
+        deliveryResult?.logged
+          ? "Email delivery is not configured; the verification code was logged to the server console."
+          : "Verification code sent to your email.",
       email: newUser.email,
       userId: newUser.id,
+      deliveryStatus: deliveryResult?.logged ? "logged" : "sent",
       user: serializeUser({ ...newUser.get({ plain: true }), settings: await ensureUserSettings(newUser.id) }),
     });
   } catch (err) {
@@ -240,8 +245,9 @@ router.post("/resend-code", async (req, res) => {
     user.verification_expires_at = new Date(Date.now() + 15 * 60 * 1000);
     await user.save();
 
+    let deliveryResult;
     try {
-      await sendVerificationEmail(normalizedEmail, verificationCode);
+      deliveryResult = await sendVerificationEmail(normalizedEmail, verificationCode);
     } catch (emailErr) {
       console.error("Failed to send verification email", emailErr);
 
@@ -261,7 +267,12 @@ router.post("/resend-code", async (req, res) => {
       return res.status(500).json({ error: emailErr.message || "Could not send verification email. Please try again." });
     }
 
-    res.json({ message: "A new verification code has been sent." });
+    res.json({
+      message: deliveryResult?.logged
+        ? "Email delivery is not configured; the verification code was logged to the server console."
+        : "A new verification code has been sent.",
+      deliveryStatus: deliveryResult?.logged ? "logged" : "sent",
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to resend verification code" });

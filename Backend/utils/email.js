@@ -24,7 +24,7 @@ export const sendEmail = async ({ to, subject, text }) => {
 
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
-  const allowLoggingFallback = process.env.ALLOW_EMAIL_LOGGING === "true";
+  const allowLoggingFallback = process.env.ALLOW_EMAIL_LOGGING !== "false";
 
   if (!apiKey || !from) {
     if (allowLoggingFallback && process.env.NODE_ENV !== "production") {
@@ -86,6 +86,7 @@ export const sendEmail = async ({ to, subject, text }) => {
       status: response.status,
     });
   }
+  return { sent: true };
 };
 
 export { EmailSendError };

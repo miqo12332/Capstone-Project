@@ -252,9 +252,14 @@ const Register = () => {
         throw new Error(data?.error || "Registration failed")
       }
 
+      const successText =
+        data?.deliveryStatus === "logged"
+          ? "Email delivery isn't configured; the verification code was logged to the server console."
+          : "We sent you a 6-digit code. Enter it to activate your account."
+
       setMessage({
         type: "success",
-        text: "We sent you a 6-digit code. Enter it to activate your account.",
+        text: successText,
       })
       setVerificationRequested(true)
       setVerificationEmail((data?.email || form.email || "").trim())
@@ -291,7 +296,12 @@ const Register = () => {
       }
 
       setVerificationEmail(targetEmail || verificationEmail)
-      setMessage({ type: "success", text: "We sent a fresh code to your email." })
+      const successText =
+        data?.deliveryStatus === "logged"
+          ? "Email delivery isn't configured; the verification code was logged to the server console."
+          : "We sent a fresh code to your email."
+
+      setMessage({ type: "success", text: successText })
     } catch (err) {
       console.error("Resend code error:", err)
       setMessage({ type: "danger", text: err.message || "Failed to resend the code." })
