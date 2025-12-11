@@ -3,6 +3,7 @@ import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import { Op } from "sequelize";
 import { UserSetting } from "../models/index.js";
+import { generateVerificationToken, sendVerificationEmail } from "../utils/emailService.js";
 
 const defaultSettings = {
   timezone: "UTC",
@@ -49,6 +50,7 @@ const serializeUser = (user) => ({
   id: user.id,
   name: user.name,
   email: user.email,
+  emailVerified: Boolean(user.email_verified),
   age: user.age,
   gender: user.gender,
   bio: user.bio,
@@ -93,10 +95,16 @@ router.post("/register", async (req, res) => {
       motivation: onboarding.motivation ?? req.body.motivation ?? null,
     };
 
+    const verificationToken = generateVerificationToken();
+    const verificationExpires = new Date(Date.now() + 60 * 60 * 1000);
+
     const newUser = await User.create({
       name,
       email,
       password: hashed,
+      email_verified: false,
+      verification_token: verificationToken,
+      verification_expires: verificationExpires,
       primary_goal: sanitizeString(onboardingPayload.primaryGoal),
       focus_area: sanitizeString(onboardingPayload.focusArea),
       experience_level: sanitizeString(onboardingPayload.experienceLevel),
@@ -109,8 +117,14 @@ router.post("/register", async (req, res) => {
       defaults: { ...defaultSettings, user_id: newUser.id },
     });
 
+    try {
+      await sendVerificationEmail(email, verificationToken);
+    } catch (emailErr) {
+      console.error("Failed to send verification email", emailErr);
+    }
+
     res.status(201).json({
-      message: "User created",
+      message: "User created. Please verify your email to complete setup.",
       user: serializeUser({ ...newUser.get({ plain: true }), settings: await ensureUserSettings(newUser.id) }),
     });
   } catch (err) {
@@ -132,12 +146,102 @@ router.post("/login", async (req, res) => {
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(400).json({ error: "Invalid password" });
 
+    if (!user.email_verified) {
+      return res.status(403).json({
+        error: "Email not verified. Please check your inbox for the verification link.",
+        verificationRequired: true,
+      });
+    }
+
     await ensureUserSettings(user.id);
 
     res.json({ message: "Login successful", user: serializeUser(user) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Verify email
+router.get("/verify", async (req, res) => {
+  try {
+    const { code } = req.query;
+
+    if (!code || typeof code !== "string") {
+      return res.status(400).json({ error: "Verification code is required" });
+    }
+
+    const user = await User.findOne({
+      where: { verification_token: code },
+      include: [{ model: UserSetting, as: "settings" }],
+    });
+
+    if (!user || !user.verification_expires) {
+      return res.status(400).json({ error: "Invalid or expired verification code" });
+    }
+
+    if (new Date(user.verification_expires) < new Date()) {
+      return res.status(400).json({ error: "Invalid or expired verification code" });
+    }
+
+    if (!user.email_verified) {
+      user.email_verified = true;
+    }
+    user.verification_token = null;
+    user.verification_expires = null;
+    await user.save();
+
+    await ensureUserSettings(user.id);
+
+    return res.json({ message: "Email verified successfully", user: serializeUser(user) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to verify email" });
+  }
+});
+
+// Resend verification email
+router.post("/resend-verification", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email is required" });
+
+    const user = await User.findOne({ where: { email } });
+
+    if (!user) {
+      return res.json({ message: "If this email is registered, a verification link has been sent." });
+    }
+
+    if (user.email_verified) {
+      return res.json({ message: "Email is already verified." });
+    }
+
+    const shouldReuseExistingToken =
+      user.verification_token && user.verification_expires && new Date(user.verification_expires) > new Date();
+
+    const verificationToken = shouldReuseExistingToken
+      ? user.verification_token
+      : generateVerificationToken();
+
+    const verificationExpires = shouldReuseExistingToken
+      ? user.verification_expires
+      : new Date(Date.now() + 60 * 60 * 1000);
+
+    user.verification_token = verificationToken;
+    user.verification_expires = verificationExpires;
+    await user.save();
+
+    try {
+      await sendVerificationEmail(user.email, verificationToken);
+    } catch (emailErr) {
+      console.error("Failed to send verification email", emailErr);
+      return res.status(500).json({ error: "Unable to send verification email right now" });
+    }
+
+    return res.json({ message: "Verification email sent." });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to resend verification email" });
   }
 });
 
@@ -169,15 +273,22 @@ router.put("/profile/:id", async (req, res) => {
     });
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    if (email && email !== user.email) {
+    const normalizedEmail = typeof email === "string" ? email.trim() : "";
+
+    if (normalizedEmail && normalizedEmail !== user.email) {
       const existing = await User.findOne({
-        where: { email, id: { [Op.ne]: user.id } },
+        where: { email: normalizedEmail, id: { [Op.ne]: user.id } },
       });
       if (existing) return res.status(400).json({ error: "Email already in use" });
     }
 
     if (typeof name === "string" && name.trim()) user.name = name.trim();
-    if (typeof email === "string" && email.trim()) user.email = email.trim();
+    if (normalizedEmail && normalizedEmail !== user.email) {
+      user.email = normalizedEmail;
+      user.email_verified = false;
+      user.verification_token = generateVerificationToken();
+      user.verification_expires = new Date(Date.now() + 60 * 60 * 1000);
+    }
 
     if (typeof age !== "undefined") {
       if (age === null || age === "") {
@@ -213,6 +324,14 @@ router.put("/profile/:id", async (req, res) => {
     }
 
     await user.save();
+
+    if (user.verification_token) {
+      try {
+        await sendVerificationEmail(user.email, user.verification_token);
+      } catch (emailErr) {
+        console.error("Failed to send verification email", emailErr);
+      }
+    }
 
     const settingsRecord = await ensureUserSettings(user.id);
 
