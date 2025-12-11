@@ -131,6 +131,8 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
   const [showEditor, setShowEditor] = useState(false)
   const [editDraft, setEditDraft] = useState(createEditDraft({}))
   const [savingEdit, setSavingEdit] = useState(false)
+  const [historyEntries, setHistoryEntries] = useState([])
+  const [historyError, setHistoryError] = useState("")
 
   const user = JSON.parse(localStorage.getItem("user") || "{}")
   const userId = user?.id
@@ -167,17 +169,32 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
     }
   }, [userId])
 
+  const loadHistory = useCallback(async () => {
+    if (!userId) return
+    try {
+      const data = await getProgressHistory(userId)
+      setHistoryEntries(Array.isArray(data) ? data : [])
+      setHistoryError("")
+    } catch (error) {
+      console.error("Failed to load progress history", error)
+      setHistoryEntries([])
+      setHistoryError("Recent history is temporarily unavailable.")
+    }
+  }, [userId])
+
   useEffect(() => {
     loadHabits()
     loadChallenge()
-  }, [loadChallenge, loadHabits])
+    loadHistory()
+  }, [loadChallenge, loadHabits, loadHistory])
 
   useDataRefresh(
     [REFRESH_SCOPES.HABITS, REFRESH_SCOPES.PROGRESS],
     useCallback(() => {
       loadHabits()
       loadChallenge()
-    }, [loadChallenge, loadHabits]),
+      loadHistory()
+    }, [loadChallenge, loadHabits, loadHistory]),
   )
 
   const handleLog = async (habit, status) => {
@@ -200,6 +217,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
       }
       emitDataRefresh(REFRESH_SCOPES.PROGRESS, { habitId, status })
       emitDataRefresh(REFRESH_SCOPES.ANALYTICS, { habitId, status })
+      await loadHistory()
       setFeedback({
         type: status === "missed" ? "warning" : "success",
         message: `Logged ${status} for ${habit.title || habit.name || habit.habitName}.`,
@@ -274,6 +292,120 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
     [onAddClick],
   )
 
+  const formatDateKey = useCallback((date) => date.toISOString().split("T")[0], [])
+
+  const recentDays = useMemo(() => {
+    const today = new Date()
+    const days = []
+    for (let i = 27; i >= 0; i -= 1) {
+      const d = new Date(today)
+      d.setDate(today.getDate() - i)
+      days.push(d)
+    }
+    return days
+  }, [])
+
+  const weeks = useMemo(() => {
+    const chunks = []
+    for (let i = 0; i < recentDays.length; i += 7) {
+      chunks.push(recentDays.slice(i, i + 7))
+    }
+    return chunks
+  }, [recentDays])
+
+  const historyByHabit = useMemo(() => {
+    return historyEntries.reduce((acc, entry) => {
+      const habitKey = String(entry.habitId ?? entry.habit_id ?? "")
+      if (!habitKey) return acc
+      const dateKey = (entry.progressDate || entry.createdAt || "").slice(0, 10)
+      if (!dateKey) return acc
+      if (!acc[habitKey]) acc[habitKey] = {}
+      acc[habitKey][dateKey] = entry.status
+      return acc
+    }, {})
+  }, [historyEntries])
+
+  const historyByDate = useMemo(() => {
+    return historyEntries.reduce((map, entry) => {
+      const dateKey = (entry.progressDate || entry.createdAt || "").slice(0, 10)
+      if (!dateKey) return map
+      const list = map.get(dateKey) || []
+      list.push(entry)
+      map.set(dateKey, list)
+      return map
+    }, new Map())
+  }, [historyEntries])
+
+  const recentDateKeys = useMemo(() => new Set(recentDays.map(formatDateKey)), [formatDateKey, recentDays])
+
+  const recentLogs = useMemo(
+    () =>
+      historyEntries.filter((entry) =>
+        recentDateKeys.has((entry.progressDate || entry.createdAt || "").slice(0, 10)),
+      ),
+    [historyEntries, recentDateKeys],
+  )
+
+  const completionCount = useMemo(
+    () => recentLogs.filter((entry) => entry.status === "done").length,
+    [recentLogs],
+  )
+
+  const missedCount = useMemo(
+    () => recentLogs.filter((entry) => entry.status === "missed").length,
+    [recentLogs],
+  )
+
+  const completionRate = useMemo(() => {
+    const total = completionCount + missedCount
+    return total ? Math.round((completionCount / total) * 100) : 0
+  }, [completionCount, missedCount])
+
+  const completedHabitsCount = useMemo(() => {
+    const set = new Set()
+    recentLogs.forEach((entry) => {
+      if (entry.status === "done") {
+        const key = String(entry.habitId ?? entry.habit_id ?? entry.habitTitle ?? "")
+        if (key) set.add(key)
+      }
+    })
+    return set.size
+  }, [recentLogs])
+
+  const weeklyCompletion = useMemo(
+    () =>
+      weeks.map((week, index) => {
+        const logs = week.flatMap((day) => historyByDate.get(formatDateKey(day)) || [])
+        const total = logs.filter((log) => log.status === "done" || log.status === "missed").length
+        const done = logs.filter((log) => log.status === "done").length
+        const percent = total ? Math.round((done / total) * 100) : 0
+        return { label: `Week ${index + 1}`, percent, total }
+      }),
+    [formatDateKey, historyByDate, weeks],
+  )
+
+  const habitProgress = useMemo(() => {
+    const progressMap = new Map()
+    habits.forEach((habit) => {
+      const statuses = historyByHabit[String(habit.id)] || {}
+      let done = 0
+      let total = 0
+      recentDays.forEach((day) => {
+        const status = statuses[formatDateKey(day)]
+        if (status === "done") done += 1
+        if (status === "done" || status === "missed") total += 1
+      })
+      const rate = total ? Math.round((done / total) * 100) : 0
+      progressMap.set(habit.id, { rate, done, total })
+    })
+    return progressMap
+  }, [formatDateKey, habits, historyByHabit, recentDays])
+
+  const currentMonthLabel = useMemo(
+    () => new Date().toLocaleDateString(undefined, { month: "long" }),
+    [],
+  )
+
   return (
     <div className="mt-3 habits-section">
       <CRow className="g-4">
@@ -296,8 +428,39 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                 </CButton>
               </div>
             </CCardHeader>
-            <CCardBody className="d-flex flex-column gap-3">
+            <CCardBody className="d-flex flex-column gap-4">
               {feedback && <CAlert color={feedback.type}>{feedback.message}</CAlert>}
+              {historyError && <CAlert color="warning">{historyError}</CAlert>}
+
+              <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 tracker-summary">
+                <div>
+                  <div className="text-uppercase small text-muted">{currentMonthLabel}</div>
+                  <h5 className="mb-1">Recent 4-week snapshot</h5>
+                  <p className="text-body-secondary mb-0">
+                    Keep an eye on streaks, wins, and missed check-ins without leaving this view.
+                  </p>
+                </div>
+                <div className="d-flex flex-wrap gap-3">
+                  <div className="tracker-pill">
+                    <div className="text-uppercase small text-muted">Number of habits</div>
+                    <div className="fw-bold fs-4">{habits.length}</div>
+                  </div>
+                  <div className="tracker-pill">
+                    <div className="text-uppercase small text-muted">Completed habits</div>
+                    <div className="fw-bold fs-4">{completedHabitsCount}</div>
+                  </div>
+                  <div className="tracker-pill">
+                    <div className="text-uppercase small text-muted">Progress</div>
+                    <div className="d-flex align-items-center gap-2">
+                      <div className="flex-grow-1">
+                        <CProgress value={completionRate} color="success" />
+                      </div>
+                      <span className="fw-semibold">{completionRate}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {loading ? (
                 <div className="d-flex justify-content-center py-4">
                   <CSpinner color="primary" />
@@ -305,85 +468,154 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
               ) : habits.length === 0 ? (
                 emptyState
               ) : (
-                <CListGroup flush className="habits-list">
-                  {habits.map((habit) => (
-                    <CListGroupItem key={habit.id} className="py-3 habit-item">
-                      <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap">
-                        <div className="d-flex flex-column gap-1">
-                          <div className="d-flex align-items-center gap-2 mb-1">
-                            <span className="fw-semibold habit-title">{habit.title}</span>
-                            {habit.category && (
-                              <CBadge color="info" className="text-uppercase small subtle-badge">
-                                {habit.category}
-                              </CBadge>
-                            )}
-                            {habit.is_daily_goal && <CBadge color="success">Daily</CBadge>}
-                          </div>
-                          <div className="text-body-secondary small">
-                            {habit.description || "No description"}
-                          </div>
-                          {habit.target_reps ? (
-                            <div className="text-body-secondary small mt-1">
-                              🎯 Target: {habit.target_reps}
-                            </div>
-                          ) : null}
-                        </div>
-                        <div className="d-flex flex-wrap gap-2 habit-actions">
-                          <CButton
-                            size="sm"
-                            color="success"
-                            className={`rounded-pill log-action log-done${
-                              loggingState === `${habit.id}-done` ? " is-logging" : ""
-                            }`}
-                            disabled={loggingState === `${habit.id}-done`}
-                            onClick={() => handleLog(habit, "done")}
-                          >
-                            <span className="d-inline-flex align-items-center gap-2">
-                              {loggingState === `${habit.id}-done` && <CSpinner size="sm" color="light" />}
-                              <span>
-                                {loggingState === `${habit.id}-done` ? "Logging..." : "Log done"}
-                              </span>
-                            </span>
-                          </CButton>
-                          <CButton
-                            size="sm"
-                            color="danger"
-                            variant="outline"
-                            className={`rounded-pill log-action log-missed${loggingState === `${habit.id}-missed` ? " is-logging" : ""}`}
-                            disabled={loggingState === `${habit.id}-missed`}
-                            onClick={() => handleLog(habit, "missed")}
-                          >
-                            <span className="d-inline-flex align-items-center gap-2">
-                              {loggingState === `${habit.id}-missed` && <CSpinner size="sm" color="danger" />}
-                              <CIcon icon={cilClock} className="opacity-75" />
-                              <span>
-                                {loggingState === `${habit.id}-missed` ? "Logging..." : "Log missed"}
-                              </span>
-                            </span>
-                          </CButton>
-                          <CButton
-                            size="sm"
-                            color="secondary"
-                            variant="outline"
-                            className="rounded-pill"
-                            onClick={() => startEdit(habit)}
-                          >
-                            <CIcon icon={cilPencil} className="me-1" /> Edit
-                          </CButton>
-                          <CButton
-                            size="sm"
-                            color="danger"
-                            variant="ghost"
-                            className="rounded-pill"
-                            onClick={() => handleDelete(habit.id)}
-                          >
-                            <CIcon icon={cilTrash} />
-                          </CButton>
-                        </div>
+                <>
+                  <div className="week-ribbon d-none d-xl-flex">
+                    <div className="habit-col-placeholder" />
+                    {weeks.map((week, index) => (
+                      <div key={`week-${index}`} className="week-label flex-grow-1">
+                        Week {index + 1}
                       </div>
-                    </CListGroupItem>
-                  ))}
-                </CListGroup>
+                    ))}
+                    <div className="action-col-placeholder" />
+                  </div>
+
+                  <div className="tracker-grid-wrapper">
+                    <div className="habit-tracker-grid">
+                      <div className="tracker-cell tracker-head habit-col">Habit</div>
+                      {recentDays.map((day) => (
+                        <div key={`head-${formatDateKey(day)}`} className="tracker-cell tracker-head text-center">
+                          <div className="fw-semibold small">
+                            {day.toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2)}
+                          </div>
+                          <div className="text-muted tiny-date">{day.getDate()}</div>
+                        </div>
+                      ))}
+                      <div className="tracker-cell tracker-head action-col text-center">Log</div>
+
+                      {habits.map((habit) => {
+                        const progress = habitProgress.get(habit.id) || { rate: 0 }
+                        const habitKey = String(habit.id)
+                        return (
+                          <React.Fragment key={habit.id}>
+                            <div className="tracker-cell habit-col">
+                              <div className="d-flex flex-column gap-1">
+                                <div className="d-flex align-items-center gap-2 flex-wrap">
+                                  <span className="fw-semibold habit-title">{habit.title}</span>
+                                  {habit.category && (
+                                    <CBadge color="info" className="text-uppercase small subtle-badge">
+                                      {habit.category}
+                                    </CBadge>
+                                  )}
+                                  {habit.is_daily_goal && <CBadge color="success">Daily</CBadge>}
+                                </div>
+                                <div className="text-body-secondary small">
+                                  {habit.description || "No description"}
+                                </div>
+                                {habit.target_reps ? (
+                                  <div className="text-body-secondary small mt-1">🎯 Target: {habit.target_reps}</div>
+                                ) : null}
+                                <div className="d-flex align-items-center gap-2 mt-2">
+                                  <CProgress value={progress.rate} color="primary" className="flex-grow-1" />
+                                  <small className="text-muted">{progress.rate}%</small>
+                                </div>
+                              </div>
+                            </div>
+                            {recentDays.map((day) => {
+                              const status = historyByHabit[habitKey]?.[formatDateKey(day)]
+                              return (
+                                <div
+                                  key={`${habit.id}-${formatDateKey(day)}`}
+                                  className={`tracker-cell day-cell status-${status || "empty"}`}
+                                >
+                                  {status === "done" ? "✓" : status === "missed" ? "•" : ""}
+                                </div>
+                              )
+                            })}
+                            <div className="tracker-cell action-col">
+                              <div className="d-flex flex-column gap-2">
+                                <CButton
+                                  size="sm"
+                                  color="success"
+                                  className={`rounded-pill log-action w-100${
+                                    loggingState === `${habit.id}-done` ? " is-logging" : ""
+                                  }`}
+                                  disabled={loggingState === `${habit.id}-done`}
+                                  onClick={() => handleLog(habit, "done")}
+                                >
+                                  <span className="d-inline-flex align-items-center gap-2">
+                                    {loggingState === `${habit.id}-done` && <CSpinner size="sm" color="light" />}
+                                    <span>{loggingState === `${habit.id}-done` ? "Logging..." : "Mark done"}</span>
+                                  </span>
+                                </CButton>
+                                <CButton
+                                  size="sm"
+                                  color="danger"
+                                  variant="outline"
+                                  className={`rounded-pill log-action w-100${
+                                    loggingState === `${habit.id}-missed` ? " is-logging" : ""
+                                  }`}
+                                  disabled={loggingState === `${habit.id}-missed`}
+                                  onClick={() => handleLog(habit, "missed")}
+                                >
+                                  <span className="d-inline-flex align-items-center gap-2">
+                                    {loggingState === `${habit.id}-missed` && <CSpinner size="sm" color="danger" />}
+                                    <CIcon icon={cilClock} className="opacity-75" />
+                                    <span>{loggingState === `${habit.id}-missed` ? "Logging..." : "Missed"}</span>
+                                  </span>
+                                </CButton>
+                                <div className="d-flex gap-2">
+                                  <CButton
+                                    size="sm"
+                                    color="secondary"
+                                    variant="outline"
+                                    className="rounded-pill w-100"
+                                    onClick={() => startEdit(habit)}
+                                  >
+                                    <CIcon icon={cilPencil} className="me-1" /> Edit
+                                  </CButton>
+                                  <CButton
+                                    size="sm"
+                                    color="danger"
+                                    variant="ghost"
+                                    className="rounded-pill"
+                                    onClick={() => handleDelete(habit.id)}
+                                  >
+                                    <CIcon icon={cilTrash} />
+                                  </CButton>
+                                </div>
+                              </div>
+                            </div>
+                          </React.Fragment>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="rounded-3 bg-body-tertiary p-3">
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <span className="fw-semibold">Weekly completion</span>
+                      <span className="text-muted small">Rolling four weeks</span>
+                    </div>
+                    <CRow className="g-3">
+                      {weeklyCompletion.map((week) => (
+                        <CCol sm={6} lg={3} key={week.label}>
+                          <div className="mini-progress-card p-3 h-100">
+                            <div className="d-flex justify-content-between align-items-center">
+                              <span className="fw-semibold">{week.label}</span>
+                              <span className="text-muted small">{week.total || "No"} logs</span>
+                            </div>
+                            <CProgress
+                              className="mt-2"
+                              value={week.percent}
+                              color={week.percent >= 70 ? "success" : week.percent >= 40 ? "warning" : "danger"}
+                            />
+                            <div className="small text-muted mt-1">{week.percent}% completion</div>
+                          </div>
+                        </CCol>
+                      ))}
+                    </CRow>
+                  </div>
+                </>
               )}
             </CCardBody>
           </CCard>
