@@ -263,7 +263,9 @@ const Register = () => {
               type="button"
               color={isSelected ? "primary" : "light"}
               variant={isSelected ? undefined : "outline"}
-              className="w-100 h-100 text-start p-3"
+              className={`w-100 h-100 text-start p-3 onboarding-option${
+                isSelected ? " onboarding-option--selected" : ""
+              }`}
               onClick={() => handleOptionSelect(field, option.value)}
             >
               <div className="d-flex flex-column">
@@ -398,7 +400,7 @@ const Register = () => {
 
     return (
       <div className="d-flex flex-column gap-3">
-        <div className="p-3 bg-light rounded border">
+        <div className="p-3 rounded border verification-card">
           <div className="d-flex align-items-center gap-2 mb-1">
             <CIcon icon={cilEnvelopeClosed} className="text-primary" />
             <h5 className="mb-0">Check your inbox</h5>

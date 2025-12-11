@@ -199,6 +199,45 @@ body {
   align-items: stretch;
 }
 
+.onboarding-option {
+  border-radius: 14px;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: inset 0 0 0 1px var(--cui-border-color-translucent);
+}
+
+:root[data-coreui-theme='light'] .onboarding-option {
+  background-color: color-mix(in srgb, var(--cui-body-bg) 90%, var(--cui-primary) 6%);
+  border-color: color-mix(in srgb, var(--cui-border-color) 80%, var(--cui-primary) 8%);
+
+  &:hover {
+    background-color: color-mix(in srgb, var(--cui-primary) 10%, #ffffff 90%);
+    border-color: color-mix(in srgb, var(--cui-primary) 20%, var(--cui-border-color) 80%);
+    box-shadow: 0 6px 18px rgba(56, 79, 125, 0.12);
+  }
+}
+
+:root[data-coreui-theme='light'] .onboarding-option--selected {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cui-primary) 18%, #ffffff 82%), #ffffff);
+  border-color: color-mix(in srgb, var(--cui-primary) 35%, var(--cui-border-color) 65%);
+  box-shadow: 0 10px 24px rgba(56, 79, 125, 0.16);
+}
+
+.verification-card {
+  background-color: var(--cui-light-bg);
+}
+
+:root[data-coreui-theme='light'] .verification-card {
+  background: color-mix(in srgb, #ffffff 90%, var(--cui-primary) 6%);
+  border-color: color-mix(in srgb, var(--cui-border-color) 82%, var(--cui-primary) 8%);
+  box-shadow: 0 10px 28px rgba(56, 79, 125, 0.12);
+}
+
+:root[data-coreui-theme='dark'] .verification-card {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+
 .nav-grid > * {
   width: 100%;
 }
