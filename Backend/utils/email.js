@@ -32,7 +32,11 @@ export const sendEmail = async ({ to, subject, text }) => {
         "Email delivery is not configured; logging verification email payload for local testing only"
       );
       console.info({ to, subject, text });
-      return { logged: true };
+      return {
+        logged: true,
+        reason: "delivery_not_configured",
+        hint: "Set RESEND_API_KEY and a verified EMAIL_FROM to send real emails.",
+      };
     }
 
     throw new EmailSendError(

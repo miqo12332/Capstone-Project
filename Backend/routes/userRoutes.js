@@ -172,12 +172,13 @@ router.post("/register", async (req, res) => {
     res.status(201).json({
       message:
         deliveryResult?.logged
-          ? "Email delivery is not configured; the verification code was logged to the server console."
+          ? "Email delivery is not configured; the verification code was logged to the server console. Add RESEND_API_KEY and EMAIL_FROM to send real emails."
           : "Verification code sent to your email.",
       email: newUser.email,
       userId: newUser.id,
       deliveryStatus: deliveryResult?.logged ? "logged" : "sent",
       loggedCode: deliveryResult?.logged ? verificationCode : undefined,
+      deliveryHint: deliveryResult?.hint,
       user: serializeUser({ ...newUser.get({ plain: true }), settings: await ensureUserSettings(newUser.id) }),
     });
   } catch (err) {
@@ -270,10 +271,11 @@ router.post("/resend-code", async (req, res) => {
 
     res.json({
       message: deliveryResult?.logged
-        ? "Email delivery is not configured; the verification code was logged to the server console."
+        ? "Email delivery is not configured; the verification code was logged to the server console. Add RESEND_API_KEY and EMAIL_FROM to send real emails."
         : "A new verification code has been sent.",
       deliveryStatus: deliveryResult?.logged ? "logged" : "sent",
       loggedCode: deliveryResult?.logged ? verificationCode : undefined,
+      deliveryHint: deliveryResult?.hint,
     });
   } catch (err) {
     console.error(err);

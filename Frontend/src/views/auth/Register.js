@@ -256,7 +256,7 @@ const Register = () => {
         data?.deliveryStatus === "logged"
           ? `Email delivery isn't configured; the verification code was logged to the server console${
               data?.loggedCode ? ` (code: ${data.loggedCode})` : ""
-            }.`
+            }. ${data?.deliveryHint || "Add RESEND_API_KEY and EMAIL_FROM in Backend/.env to send real emails."}`
           : "We sent you a 6-digit code. Enter it to activate your account."
 
       setMessage({
@@ -302,7 +302,7 @@ const Register = () => {
         data?.deliveryStatus === "logged"
           ? `Email delivery isn't configured; the verification code was logged to the server console${
               data?.loggedCode ? ` (code: ${data.loggedCode})` : ""
-            }.`
+            }. ${data?.deliveryHint || "Add RESEND_API_KEY and EMAIL_FROM in Backend/.env to send real emails."}`
           : "We sent a fresh code to your email."
 
       setMessage({ type: "success", text: successText })
