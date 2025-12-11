@@ -37,6 +37,7 @@ import {
   cilChartLine,
   cilBadge,
   cilList,
+  cilBolt,
   cilPencil,
   cilPlus,
   cilTrash,
