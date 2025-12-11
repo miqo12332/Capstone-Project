@@ -48,33 +48,21 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "user_id, day and starttime are required" });
     }
 
-    let resolvedHabitId = habit_id ? Number(habit_id) : null;
+    const trimmedTitle = (custom_title || "").trim();
+    const scheduleType = type === "custom" ? "custom" : "habit";
 
-    if (!resolvedHabitId) {
-      if (type === "custom") {
-        const title = (custom_title || "").trim();
-        if (!title) {
-          return res
-            .status(400)
-            .json({ error: "custom_title is required when creating a custom schedule" });
-        }
+    if (scheduleType === "habit" && !habit_id) {
+      return res.status(400).json({ error: "habit_id is required for habit schedules" });
+    }
 
-        const [habit] = await Habit.findOrCreate({
-          where: { user_id, title },
-          defaults: {
-            description: notes || null,
-            category: "custom",
-          },
-        });
-
-        resolvedHabitId = habit.id;
-      } else {
-        return res.status(400).json({ error: "habit_id is required for habit schedules" });
-      }
+    if (scheduleType === "custom" && !trimmedTitle) {
+      return res
+        .status(400)
+        .json({ error: "custom_title is required when creating a custom schedule" });
     }
 
     const created = await Schedule.create({
-      habit_id: resolvedHabitId,
+      habit_id: scheduleType === "habit" ? Number(habit_id) : null,
       user_id,
       day,
       starttime,
@@ -83,6 +71,8 @@ router.post("/", async (req, res) => {
       repeat: repeat || "daily",
       customdays: repeat === "custom" ? customdays || null : null,
       notes: notes || null,
+      type: scheduleType,
+      custom_title: scheduleType === "custom" ? trimmedTitle : null,
     });
 
     const scheduleWithHabit = await Schedule.findByPk(created.id, {

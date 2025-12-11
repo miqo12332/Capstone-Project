@@ -1,4 +1,6 @@
 import Habit from "../models/Habit.js";
+import Progress from "../models/Progress.js";
+import Schedule from "../models/Schedule.js";
 import { generateHabitPlan, rewriteHabitIdea } from "../services/habitIdeaService.js";
 
 export const getHabitsByUser = async (req, res, next) => {
@@ -120,6 +122,8 @@ export const removeHabit = async (req, res, next) => {
       return res.status(404).json({ error: "Habit not found" });
     }
 
+    await Progress.destroy({ where: { habit_id: id } });
+    await Schedule.destroy({ where: { habit_id: id } });
     await habit.destroy();
     res.json({ message: "Habit deleted successfully" });
   } catch (error) {
