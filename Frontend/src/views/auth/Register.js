@@ -254,7 +254,9 @@ const Register = () => {
 
       const successText =
         data?.deliveryStatus === "logged"
-          ? "Email delivery isn't configured; the verification code was logged to the server console."
+          ? `Email delivery isn't configured; the verification code was logged to the server console${
+              data?.loggedCode ? ` (code: ${data.loggedCode})` : ""
+            }.`
           : "We sent you a 6-digit code. Enter it to activate your account."
 
       setMessage({
@@ -298,7 +300,9 @@ const Register = () => {
       setVerificationEmail(targetEmail || verificationEmail)
       const successText =
         data?.deliveryStatus === "logged"
-          ? "Email delivery isn't configured; the verification code was logged to the server console."
+          ? `Email delivery isn't configured; the verification code was logged to the server console${
+              data?.loggedCode ? ` (code: ${data.loggedCode})` : ""
+            }.`
           : "We sent a fresh code to your email."
 
       setMessage({ type: "success", text: successText })
