@@ -128,14 +128,30 @@ const AiChat = () => {
 
     setError(null);
     setLoading(true);
+
+    const optimisticHistory = [
+      ...history,
+      {
+        id: `local-${Date.now()}`,
+        role: "user",
+        content: message.trim(),
+        createdAt: new Date().toISOString(),
+      },
+    ];
+
+    setHistory(optimisticHistory);
+    setMessage("");
+
+    const previousHistory = history;
+
     try {
       const data = await sendAiChatMessage(user.id, message.trim());
       setHistory(data.history || []);
       setContext(data.context || null);
-      setMessage("");
     } catch (err) {
       console.error("Failed to send AI message", err);
       setError("Something went wrong sending your message. Try again.");
+      setHistory(previousHistory);
     } finally {
       setLoading(false);
     }
