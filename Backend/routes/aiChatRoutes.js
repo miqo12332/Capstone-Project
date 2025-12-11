@@ -21,6 +21,8 @@ router.get("/history", async (req, res) => {
 router.post("/message", async (req, res) => {
   const { userId, message } = req.body;
 
+  console.log("/ai-chat/message payload", req.body);
+
   if (!userId || !message) {
     return res.status(400).json({ error: "userId and message are required" });
   }

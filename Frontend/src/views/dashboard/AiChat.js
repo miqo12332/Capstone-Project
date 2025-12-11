@@ -124,33 +124,35 @@ const AiChat = () => {
 
   const handleSend = async (event) => {
     event?.preventDefault();
-    if (!user?.id || !message.trim()) return;
+
+    const trimmedMessage = message.trim();
+    if (!user?.id || !trimmedMessage) return;
 
     setError(null);
     setLoading(true);
 
-    const optimisticHistory = [
-      ...history,
+    const previousHistory = history;
+
+    setHistory((prev) => [
+      ...prev,
       {
         id: `local-${Date.now()}`,
         role: "user",
-        content: message.trim(),
+        content: trimmedMessage,
         createdAt: new Date().toISOString(),
       },
-    ];
+    ]);
 
-    setHistory(optimisticHistory);
     setMessage("");
 
-    const previousHistory = history;
-
     try {
-      const data = await sendAiChatMessage(user.id, message.trim());
+      const data = await sendAiChatMessage(user.id, trimmedMessage);
       setHistory(data.history || []);
       setContext(data.context || null);
     } catch (err) {
       console.error("Failed to send AI message", err);
       setError("Something went wrong sending your message. Try again.");
+      // Reload the last known history to avoid showing stuck optimistic messages
       setHistory(previousHistory);
     } finally {
       setLoading(false);
