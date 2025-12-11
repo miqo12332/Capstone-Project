@@ -134,3 +134,6 @@ CREATE TABLE notifications (
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+DELETE FROM assistant_memories WHERE user_id NOT IN (SELECT id FROM users);
+DELETE FROM chat_messages WHERE sender_id NOT IN (SELECT id FROM users);
