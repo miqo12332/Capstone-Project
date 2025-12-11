@@ -23,20 +23,21 @@ export const sendEmail = async ({ to, subject, text }) => {
   }
 
   const apiKey = process.env.RESEND_API_KEY;
-
-  // In non-production environments, allow registration to continue even if email
-  // delivery isn't fully configured. This prevents 500s during local testing
-  // while still enforcing real delivery in production.
-  if (!apiKey && process.env.NODE_ENV !== "production") {
-    console.warn(
-      "RESEND_API_KEY is not configured; logging verification email payload for local testing only"
-    );
-    console.info({ to, subject, text });
-    return;
-  }
+  const allowLoggingFallback = process.env.ALLOW_EMAIL_LOGGING === "true";
 
   if (!apiKey) {
-    throw new Error("RESEND_API_KEY is not configured");
+    if (allowLoggingFallback && process.env.NODE_ENV !== "production") {
+      console.warn(
+        "RESEND_API_KEY is not configured; logging verification email payload for local testing only"
+      );
+      console.info({ to, subject, text });
+      return { logged: true };
+    }
+
+    throw new EmailSendError(
+      "Email delivery is not configured. Please set RESEND_API_KEY and a verified EMAIL_FROM sender.",
+      { code: "DELIVERY_NOT_CONFIGURED" }
+    );
   }
 
   const from = process.env.EMAIL_FROM || "StepHabit <no-reply@stephabit.app>";

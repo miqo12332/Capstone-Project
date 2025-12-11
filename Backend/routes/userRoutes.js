@@ -150,11 +150,22 @@ router.post("/register", async (req, res) => {
       await UserSetting.destroy({ where: { user_id: newUser.id } });
       await newUser.destroy();
 
-      if (emailErr instanceof EmailSendError && emailErr.code === "INVALID_EMAIL") {
-        return res.status(400).json({ error: "Please enter a valid email address." });
+      if (emailErr instanceof EmailSendError) {
+        if (emailErr.code === "INVALID_EMAIL") {
+          return res.status(400).json({ error: "Please enter a valid email address." });
+        }
+
+        if (emailErr.code === "DELIVERY_NOT_CONFIGURED") {
+          return res.status(503).json({
+            error:
+              "Email delivery is not configured. Please add RESEND_API_KEY and EMAIL_FROM to the server environment.",
+          });
+        }
       }
 
-      return res.status(500).json({ error: emailErr.message || "Could not send verification email. Please try again." });
+      return res
+        .status(500)
+        .json({ error: emailErr.message || "Could not send verification email. Please try again." });
     }
 
     res.status(201).json({
@@ -234,8 +245,17 @@ router.post("/resend-code", async (req, res) => {
     } catch (emailErr) {
       console.error("Failed to send verification email", emailErr);
 
-      if (emailErr instanceof EmailSendError && emailErr.code === "INVALID_EMAIL") {
-        return res.status(400).json({ error: "Please enter a valid email address." });
+      if (emailErr instanceof EmailSendError) {
+        if (emailErr.code === "INVALID_EMAIL") {
+          return res.status(400).json({ error: "Please enter a valid email address." });
+        }
+
+        if (emailErr.code === "DELIVERY_NOT_CONFIGURED") {
+          return res.status(503).json({
+            error:
+              "Email delivery is not configured. Please add RESEND_API_KEY and EMAIL_FROM to the server environment.",
+          });
+        }
       }
 
       return res.status(500).json({ error: emailErr.message || "Could not send verification email. Please try again." });
