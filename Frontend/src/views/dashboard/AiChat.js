@@ -16,7 +16,7 @@ import {
   CSpinner,
 } from "@coreui/react";
 import CIcon from "@coreui/icons-react";
-import { cilDatabase, cilSend, cilSpeech, cilUser } from "@coreui/icons";
+import { cilSend, cilSpeech, cilStorage, cilUser } from "@coreui/icons";
 
 import { AuthContext } from "../../context/AuthContext";
 import { fetchAiChatHistory, sendAiChatMessage } from "../../services/aiChat";
@@ -51,7 +51,7 @@ const KnowledgeCard = ({ context }) => {
   return (
     <CCard className="mb-4">
       <CCardHeader className="d-flex align-items-center gap-2">
-        <CIcon icon={cilDatabase} className="text-info" />
+        <CIcon icon={cilStorage} className="text-info" />
         <div>
           <div className="fw-semibold">AI Knowledge</div>
           <small className="text-medium-emphasis">
