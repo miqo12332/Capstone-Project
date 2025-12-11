@@ -4,6 +4,15 @@ dotenv.config();
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 
+class EmailSendError extends Error {
+  constructor(message, { code, status } = {}) {
+    super(message);
+    this.name = "EmailSendError";
+    this.code = code;
+    this.status = status;
+  }
+}
+
 export const sendEmail = async ({ to, subject, text }) => {
   if (!to || !subject || !text) {
     throw new Error("Missing email payload fields");
@@ -47,7 +56,36 @@ export const sendEmail = async ({ to, subject, text }) => {
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Email send failed: ${errorText || response.statusText}`);
+    let errorText = await response.text();
+    let parsed;
+
+    try {
+      parsed = JSON.parse(errorText);
+      errorText = parsed?.error?.message || parsed?.message || errorText;
+    } catch (err) {
+      // Fall back to raw text if JSON parsing fails.
+    }
+
+    const isInvalidEmail =
+      response.status === 400 ||
+      response.status === 422 ||
+      /invalid email|email address is not valid/i.test(errorText || "") ||
+      /was not sent to/iu.test(errorText || "");
+
+    const message = errorText || response.statusText;
+
+    if (isInvalidEmail) {
+      throw new EmailSendError("The email address appears to be invalid.", {
+        code: "INVALID_EMAIL",
+        status: response.status,
+      });
+    }
+
+    throw new EmailSendError(`Email send failed: ${message}`, {
+      code: "DELIVERY_FAILED",
+      status: response.status,
+    });
   }
 };
+
+export { EmailSendError };

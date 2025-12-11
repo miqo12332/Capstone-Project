@@ -3,7 +3,7 @@ import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import { Op } from "sequelize";
 import { UserSetting } from "../models/index.js";
-import { sendEmail } from "../utils/email.js";
+import { sendEmail, EmailSendError } from "../utils/email.js";
 
 const defaultSettings = {
   timezone: "UTC",
@@ -32,6 +32,15 @@ const sanitizeString = (value) => {
 };
 
 const normalizeEmail = (value = "") => value.trim().toLowerCase();
+
+const isValidEmail = (value = "") => {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  // Basic RFC 5322-compliant pattern; intentionally permissive but screens out obvious typos.
+  const emailPattern =
+    /^(?:[a-zA-Z0-9_'^&+{}-]+(?:\.[a-zA-Z0-9_'^&+{}-]+)*|".+")@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/;
+  return emailPattern.test(trimmed);
+};
 
 const formatSettings = (settingsInstance) => {
   if (!settingsInstance) {
@@ -95,6 +104,9 @@ router.post("/register", async (req, res) => {
     const { name, email, password, onboarding = {} } = req.body;
     const normalizedEmail = normalizeEmail(email || "");
     if (!name || !normalizedEmail || !password) return res.status(400).json({ error: "All fields required" });
+    if (!isValidEmail(normalizedEmail)) {
+      return res.status(400).json({ error: "Please enter a valid email address." });
+    }
 
     const existing = await User.findOne({ where: { email: normalizedEmail } });
     if (existing) return res.status(400).json({ error: "Email already exists" });
@@ -137,7 +149,12 @@ router.post("/register", async (req, res) => {
       console.error("Failed to send verification email", emailErr);
       await UserSetting.destroy({ where: { user_id: newUser.id } });
       await newUser.destroy();
-      return res.status(500).json({ error: "Could not send verification email. Please try again." });
+
+      if (emailErr instanceof EmailSendError && emailErr.code === "INVALID_EMAIL") {
+        return res.status(400).json({ error: "Please enter a valid email address." });
+      }
+
+      return res.status(500).json({ error: emailErr.message || "Could not send verification email. Please try again." });
     }
 
     res.status(201).json({
@@ -197,6 +214,9 @@ router.post("/resend-code", async (req, res) => {
     const { email } = req.body;
     const normalizedEmail = normalizeEmail(email || "");
     if (!normalizedEmail) return res.status(400).json({ error: "Email is required" });
+    if (!isValidEmail(normalizedEmail)) {
+      return res.status(400).json({ error: "Please enter a valid email address." });
+    }
 
     const user = await User.findOne({ where: { email: normalizedEmail } });
     if (!user) return res.status(404).json({ error: "User not found" });
@@ -213,7 +233,12 @@ router.post("/resend-code", async (req, res) => {
       await sendVerificationEmail(normalizedEmail, verificationCode);
     } catch (emailErr) {
       console.error("Failed to send verification email", emailErr);
-      return res.status(500).json({ error: "Could not send verification email. Please try again." });
+
+      if (emailErr instanceof EmailSendError && emailErr.code === "INVALID_EMAIL") {
+        return res.status(400).json({ error: "Please enter a valid email address." });
+      }
+
+      return res.status(500).json({ error: emailErr.message || "Could not send verification email. Please try again." });
     }
 
     res.json({ message: "A new verification code has been sent." });
