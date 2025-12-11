@@ -159,7 +159,7 @@ router.post("/register", async (req, res) => {
         if (emailErr.code === "DELIVERY_NOT_CONFIGURED") {
           return res.status(503).json({
             error:
-              "Email delivery is not configured. Please add RESEND_API_KEY and EMAIL_FROM to the server environment.",
+              "Email delivery is not configured. Please add RESEND_API_KEY and EMAIL_FROM to the server environment. To use console logging instead, set ALLOW_EMAIL_LOGGING=true and restart the server.",
           });
         }
       }
@@ -261,7 +261,7 @@ router.post("/resend-code", async (req, res) => {
         if (emailErr.code === "DELIVERY_NOT_CONFIGURED") {
           return res.status(503).json({
             error:
-              "Email delivery is not configured. Please add RESEND_API_KEY and EMAIL_FROM to the server environment.",
+              "Email delivery is not configured. Please add RESEND_API_KEY and EMAIL_FROM to the server environment. To use console logging instead, set ALLOW_EMAIL_LOGGING=true and restart the server.",
           });
         }
       }

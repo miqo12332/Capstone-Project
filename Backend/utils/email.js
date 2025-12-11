@@ -24,9 +24,12 @@ export const sendEmail = async ({ to, subject, text }) => {
 
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
-  const allowLoggingFallback = process.env.ALLOW_EMAIL_LOGGING !== "false";
+  const allowLoggingFallback = process.env.ALLOW_EMAIL_LOGGING === "true";
 
   if (!apiKey || !from) {
+    const deliveryHint =
+      "Email delivery isn't configured. Set RESEND_API_KEY and a verified EMAIL_FROM to send real emails.";
+
     if (allowLoggingFallback && process.env.NODE_ENV !== "production") {
       console.warn(
         "Email delivery is not configured; logging verification email payload for local testing only"
@@ -35,14 +38,13 @@ export const sendEmail = async ({ to, subject, text }) => {
       return {
         logged: true,
         reason: "delivery_not_configured",
-        hint: "Set RESEND_API_KEY and a verified EMAIL_FROM to send real emails.",
+        hint: deliveryHint,
       };
     }
 
-    throw new EmailSendError(
-      "Email delivery is not configured. Please set RESEND_API_KEY and a verified EMAIL_FROM sender.",
-      { code: "DELIVERY_NOT_CONFIGURED" }
-    );
+    throw new EmailSendError(deliveryHint, {
+      code: "DELIVERY_NOT_CONFIGURED",
+    });
   }
 
   const response = await fetch(RESEND_API_URL, {
