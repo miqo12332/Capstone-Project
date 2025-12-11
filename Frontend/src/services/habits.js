@@ -30,6 +30,16 @@ export const generateHabitSuggestion = async (title) => {
   return await res.json();
 };
 
+export const rewriteHabitIdea = async (input) => {
+  const res = await fetch(`${BASE_URL}/ai-rewrite`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input }),
+  });
+  if (!res.ok) throw new Error("Failed to rewrite habit idea");
+  return await res.json();
+};
+
 export const updateHabit = async (id, habit) => {
   const res = await fetch(`${BASE_URL}/${id}`, {
     method: "PUT",
