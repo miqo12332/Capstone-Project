@@ -25,7 +25,6 @@ import {
   cilClock,
   cilList,
   cilPeople,
-  cilInfo,
   cilCheckCircle,
   cilWarning,
 } from "@coreui/icons";
@@ -53,7 +52,6 @@ const CalendarSync = () => {
   const [form, setForm] = useState({
     provider: "google",
     label: providerDefaults.google,
-    sourceUrl: "",
     icsText: "",
     fileName: "",
   });
@@ -125,7 +123,6 @@ const CalendarSync = () => {
       const payload = {
         provider: form.provider,
         label: form.label || providerDefaults[form.provider] || "Imported Calendar",
-        sourceUrl: form.sourceUrl?.trim() || undefined,
         icsText: form.icsText?.trim() || undefined,
         days: 45,
       };
@@ -137,7 +134,6 @@ const CalendarSync = () => {
       );
       setForm((prev) => ({
         ...prev,
-        sourceUrl: "",
         icsText: "",
         fileName: "",
       }));
@@ -255,23 +251,6 @@ const CalendarSync = () => {
                 </CCol>
 
                 <CCol xs={12}>
-                  <CFormLabel htmlFor="sourceUrl">
-                    Share link (optional)
-                  </CFormLabel>
-                  <CFormInput
-                    id="sourceUrl"
-                    name="sourceUrl"
-                    value={form.sourceUrl}
-                    onChange={handleInputChange}
-                    placeholder="https://calendar.google.com/calendar/ical/..."
-                  />
-                  <small className="text-body-secondary">
-                    Paste a read-only sharing link from Google or Apple Calendar
-                    to keep events in sync automatically.
-                  </small>
-                </CCol>
-
-                <CCol xs={12}>
                   <CFormLabel htmlFor="icsUpload">
                     Upload .ics file (optional)
                   </CFormLabel>
@@ -320,13 +299,6 @@ const CalendarSync = () => {
                 </CCol>
               </CRow>
             </CForm>
-
-            <CCallout color="info" className="mt-4">
-              <CIcon icon={cilInfo} className="me-2" />
-              Need a link? In Google Calendar open Settings → Settings for your
-              calendar → Secret address in iCal format. In Apple Calendar open
-              the calendar list, enable sharing, and copy the generated link.
-            </CCallout>
           </CCardBody>
         </CCard>
       </CCol>
