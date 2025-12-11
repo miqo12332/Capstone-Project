@@ -123,7 +123,7 @@ const AiChat = () => {
   }, [history]);
 
   const handleSend = async (event) => {
-    event.preventDefault();
+    event?.preventDefault();
     if (!user?.id || !message.trim()) return;
 
     setError(null);
@@ -206,7 +206,7 @@ const AiChat = () => {
                     </CBadge>
                   ))}
                 </div>
-                <CButton type="submit" color="info" disabled={loading}>
+                <CButton type="submit" color="info" disabled={loading} onClick={handleSend}>
                   {loading ? (
                     <>
                       <CSpinner size="sm" className="me-2" /> Sending
