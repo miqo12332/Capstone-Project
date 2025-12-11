@@ -970,10 +970,10 @@ body {
 }
 
 .profile-tab.active {
-  background: linear-gradient(135deg, rgba(63, 94, 251, 0.2), rgba(112, 247, 173, 0.18));
-  color: var(--cui-primary) !important;
-  border-color: color-mix(in srgb, var(--cui-primary), var(--cui-border-color));
-  box-shadow: 0 10px 30px rgba(63, 94, 251, 0.15);
+  background: linear-gradient(135deg, rgba(63, 94, 251, 0.14), rgba(112, 247, 173, 0.12));
+  color: #0f172a !important;
+  border-color: color-mix(in srgb, var(--cui-primary) 72%, var(--cui-border-color));
+  box-shadow: 0 10px 30px rgba(63, 94, 251, 0.16);
 }
 
 .profile-tab:hover {
@@ -1029,10 +1029,10 @@ body {
 }
 
 :root[data-coreui-theme='dark'] .profile-nav .profile-tab:hover {
-  background: color-mix(in srgb, var(--cui-primary) 26%, var(--cui-body-bg) 74%);
-  color: var(--cui-primary);
-  border-color: color-mix(in srgb, var(--cui-primary) 70%, rgba(63, 94, 251, 0.35));
-  box-shadow: 0 14px 34px rgba(63, 94, 251, 0.28);
+  background: color-mix(in srgb, var(--cui-body-bg) 88%, rgba(63, 94, 251, 0.18));
+  color: color-mix(in srgb, var(--cui-primary) 45%, var(--cui-body-color));
+  border-color: color-mix(in srgb, var(--cui-border-color) 65%, rgba(63, 94, 251, 0.38));
+  box-shadow: 0 12px 28px rgba(63, 94, 251, 0.2);
 }
 
 .soft-alert {
