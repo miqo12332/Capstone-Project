@@ -2,7 +2,8 @@ import express from "express";
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import { Op } from "sequelize";
-import { UserSetting } from "../models/index.js";
+import { UserSetting, EmailVerification } from "../models/index.js";
+import { sendVerificationEmail } from "../services/emailService.js";
 
 const defaultSettings = {
   timezone: "UTC",
@@ -74,13 +75,68 @@ const ensureUserSettings = async (userId) => {
 
 const router = express.Router();
 
+const generateSixDigitCode = () =>
+  Math.floor(100000 + Math.random() * 900000)
+    .toString()
+    .padStart(6, "0");
+
+router.post("/register/request-code", async (req, res) => {
+  try {
+    const email = typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    if (!email) return res.status(400).json({ error: "Email is required" });
+
+    const existing = await User.findOne({ where: { email } });
+    if (existing) return res.status(400).json({ error: "Email already exists" });
+
+    const code = generateSixDigitCode();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    const existingVerification = await EmailVerification.findOne({ where: { email } });
+    if (existingVerification) {
+      existingVerification.code = code;
+      existingVerification.expires_at = expiresAt;
+      await existingVerification.save();
+    } else {
+      await EmailVerification.create({ email, code, expires_at: expiresAt });
+    }
+
+    try {
+      await sendVerificationEmail(email, code);
+    } catch (emailError) {
+      console.error("Failed to send verification email", emailError);
+      return res.status(500).json({
+        error: "Failed to send verification email. Please confirm the email address exists and is reachable.",
+      });
+    }
+
+    res.json({ message: "Verification code sent" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Could not generate verification code" });
+  }
+});
+
 // Register
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password, onboarding = {} } = req.body;
+    const { name, email, password, verificationCode, onboarding = {} } = req.body;
     if (!name || !email || !password) return res.status(400).json({ error: "All fields required" });
 
-    const existing = await User.findOne({ where: { email } });
+    if (!verificationCode) {
+      return res.status(400).json({ error: "Verification code is required" });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const verification = await EmailVerification.findOne({
+      where: { email: normalizedEmail, code: verificationCode },
+    });
+
+    if (!verification || new Date(verification.expires_at).getTime() < Date.now()) {
+      return res.status(400).json({ error: "Invalid or expired verification code" });
+    }
+
+    const existing = await User.findOne({ where: { email: normalizedEmail } });
     if (existing) return res.status(400).json({ error: "Email already exists" });
 
     const hashed = await bcrypt.hash(password, 10);
@@ -95,7 +151,7 @@ router.post("/register", async (req, res) => {
 
     const newUser = await User.create({
       name,
-      email,
+      email: normalizedEmail,
       password: hashed,
       primary_goal: sanitizeString(onboardingPayload.primaryGoal),
       focus_area: sanitizeString(onboardingPayload.focusArea),
@@ -113,6 +169,8 @@ router.post("/register", async (req, res) => {
       message: "User created",
       user: serializeUser({ ...newUser.get({ plain: true }), settings: await ensureUserSettings(newUser.id) }),
     });
+
+    await verification.destroy();
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Registration failed" });
