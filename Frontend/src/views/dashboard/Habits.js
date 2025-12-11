@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import {
   CAlert,
@@ -30,6 +30,7 @@ import {
   CProgress,
   CProgressBar,
   CFormSwitch,
+  CTooltip,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
 import {
@@ -48,7 +49,11 @@ import HabitLibrary from "./HabitLibrary"
 import ProgressTracker from "./ProgressTracker"
 import HabitCoach from "./HabitCoach"
 import { getHabits, deleteHabit, updateHabit } from "../../services/habits"
-import { logHabitProgress, getProgressHistory } from "../../services/progress"
+import {
+  logHabitProgress,
+  getProgressHistory,
+  updateHabitProgressCount,
+} from "../../services/progress"
 import { promptMissedReflection } from "../../utils/reflection"
 import { getProgressAnalytics, formatPercent } from "../../services/analytics"
 import { emitDataRefresh, REFRESH_SCOPES, useDataRefresh } from "../../utils/refreshBus"
@@ -72,6 +77,11 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
   const [savingEdit, setSavingEdit] = useState(false)
   const [historyEntries, setHistoryEntries] = useState([])
   const [historyError, setHistoryError] = useState("")
+  const [calendarSaving, setCalendarSaving] = useState(null)
+
+  const today = useMemo(() => new Date(), [])
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth())
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear())
 
   const user = JSON.parse(localStorage.getItem("user") || "{}")
   const userId = user?.id
@@ -153,6 +163,70 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
     }
   }
 
+  const cycleStatus = useCallback((status) => {
+    if (status === "done") return "missed"
+    if (status === "missed") return null
+    return "done"
+  }, [])
+
+  const updateCountsForDate = useCallback(
+    async (habitId, dateKey, nextStatus) => {
+      if (!userId) return
+
+      const targetCounts = {
+        done: nextStatus === "done" ? 1 : 0,
+        missed: nextStatus === "missed" ? 1 : 0,
+      }
+
+      await Promise.all([
+        updateHabitProgressCount(habitId, {
+          userId,
+          status: "done",
+          targetCount: targetCounts.done,
+          date: dateKey,
+        }),
+        updateHabitProgressCount(habitId, {
+          userId,
+          status: "missed",
+          targetCount: targetCounts.missed,
+          date: dateKey,
+        }),
+      ])
+    },
+    [userId],
+  )
+
+  const handleCalendarToggle = useCallback(
+    async (habit, dateKey) => {
+      const habitId = habit?.id || habit?.habitId
+      if (!habitId || !userId) return
+
+      const currentStatus = historyByHabit[String(habitId)]?.[dateKey] || null
+      const nextStatus = cycleStatus(currentStatus)
+
+      try {
+        setCalendarSaving(`${habitId}-${dateKey}`)
+        await updateCountsForDate(habitId, dateKey, nextStatus)
+        emitDataRefresh(REFRESH_SCOPES.PROGRESS, { habitId, status: nextStatus || "cleared", date: dateKey })
+        emitDataRefresh(REFRESH_SCOPES.ANALYTICS, { habitId, status: nextStatus || "cleared", date: dateKey })
+        await loadHistory()
+        setFeedback({
+          type: nextStatus === "missed" ? "warning" : "success",
+          message:
+            nextStatus === null
+              ? `Cleared log for ${habit.title || habit.name || habit.habitName} on ${dateKey}.`
+              : `Marked ${nextStatus} for ${habit.title || habit.name || habit.habitName} on ${dateKey}.`,
+        })
+      } catch (error) {
+        console.error("Failed to update day status", error)
+        setFeedback({ type: "danger", message: "We couldn't update that day just now." })
+      } finally {
+        setCalendarSaving(null)
+      }
+    },
+    [cycleStatus, historyByHabit, loadHistory, updateCountsForDate, userId],
+  )
+
   const handleDelete = async (habitId) => {
     try {
       await deleteHabit(habitId)
@@ -215,26 +289,43 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
     [onAddClick],
   )
 
-  const formatDateKey = useCallback((date) => date.toISOString().split("T")[0], [])
+  const formatDateKey = useCallback((date) => {
+    return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+      .toISOString()
+      .split("T")[0]
+  }, [])
 
-  const recentDays = useMemo(() => {
-    const today = new Date()
+  const monthOptions = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, index) => ({
+        value: index,
+        label: new Date(2000, index, 1).toLocaleDateString(undefined, { month: "long" }),
+      })),
+    [],
+  )
+
+  const yearOptions = useMemo(() => {
+    const baseYear = today.getFullYear()
+    return Array.from({ length: 5 }, (_, index) => baseYear - 2 + index)
+  }, [today])
+
+  const visibleDays = useMemo(() => {
     const days = []
-    for (let i = 27; i >= 0; i -= 1) {
-      const d = new Date(today)
-      d.setDate(today.getDate() - i)
-      days.push(d)
+    const cursor = new Date(selectedYear, selectedMonth, 1)
+    while (cursor.getMonth() === selectedMonth) {
+      days.push(new Date(cursor))
+      cursor.setDate(cursor.getDate() + 1)
     }
     return days
-  }, [])
+  }, [selectedMonth, selectedYear])
 
   const weeks = useMemo(() => {
     const chunks = []
-    for (let i = 0; i < recentDays.length; i += 7) {
-      chunks.push(recentDays.slice(i, i + 7))
+    for (let i = 0; i < visibleDays.length; i += 7) {
+      chunks.push(visibleDays.slice(i, i + 7))
     }
     return chunks
-  }, [recentDays])
+  }, [visibleDays])
 
   const historyByHabit = useMemo(() => {
     return historyEntries.reduce((acc, entry) => {
@@ -259,24 +350,27 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
     }, new Map())
   }, [historyEntries])
 
-  const recentDateKeys = useMemo(() => new Set(recentDays.map(formatDateKey)), [formatDateKey, recentDays])
+  const visibleDateKeys = useMemo(
+    () => new Set(visibleDays.map(formatDateKey)),
+    [formatDateKey, visibleDays],
+  )
 
-  const recentLogs = useMemo(
+  const visibleLogs = useMemo(
     () =>
       historyEntries.filter((entry) =>
-        recentDateKeys.has((entry.progressDate || entry.createdAt || "").slice(0, 10)),
+        visibleDateKeys.has((entry.progressDate || entry.createdAt || "").slice(0, 10)),
       ),
-    [historyEntries, recentDateKeys],
+    [historyEntries, visibleDateKeys],
   )
 
   const completionCount = useMemo(
-    () => recentLogs.filter((entry) => entry.status === "done").length,
-    [recentLogs],
+    () => visibleLogs.filter((entry) => entry.status === "done").length,
+    [visibleLogs],
   )
 
   const missedCount = useMemo(
-    () => recentLogs.filter((entry) => entry.status === "missed").length,
-    [recentLogs],
+    () => visibleLogs.filter((entry) => entry.status === "missed").length,
+    [visibleLogs],
   )
 
   const completionRate = useMemo(() => {
@@ -286,14 +380,14 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
 
   const completedHabitsCount = useMemo(() => {
     const set = new Set()
-    recentLogs.forEach((entry) => {
+    visibleLogs.forEach((entry) => {
       if (entry.status === "done") {
         const key = String(entry.habitId ?? entry.habit_id ?? entry.habitTitle ?? "")
         if (key) set.add(key)
       }
     })
     return set.size
-  }, [recentLogs])
+  }, [visibleLogs])
 
   const weeklyCompletion = useMemo(
     () =>
@@ -313,7 +407,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
       const statuses = historyByHabit[String(habit.id)] || {}
       let done = 0
       let total = 0
-      recentDays.forEach((day) => {
+      visibleDays.forEach((day) => {
         const status = statuses[formatDateKey(day)]
         if (status === "done") done += 1
         if (status === "done" || status === "missed") total += 1
@@ -322,12 +416,40 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
       progressMap.set(habit.id, { rate, done, total })
     })
     return progressMap
-  }, [formatDateKey, habits, historyByHabit, recentDays])
+  }, [formatDateKey, habits, historyByHabit, visibleDays])
 
   const currentMonthLabel = useMemo(
-    () => new Date().toLocaleDateString(undefined, { month: "long" }),
-    [],
+    () => new Date(selectedYear, selectedMonth, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" }),
+    [selectedMonth, selectedYear],
   )
+
+  const DayStatusCheckbox = ({ status, onToggle, disabled, inputId, title }) => {
+    const checkboxRef = useRef(null)
+
+    useEffect(() => {
+      if (checkboxRef.current) {
+        checkboxRef.current.indeterminate = status === "missed"
+      }
+    }, [status])
+
+    return (
+      <div
+        className={`month-checkbox status-${status || "empty"}${disabled ? " is-saving" : ""}`}
+        role="group"
+        aria-label="Toggle status"
+        title={title}
+      >
+        <CFormCheck
+          type="checkbox"
+          id={inputId}
+          checked={status === "done"}
+          onChange={onToggle}
+          disabled={disabled}
+          inputRef={checkboxRef}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="mt-3 habits-section">
@@ -350,12 +472,38 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
               {historyError && <CAlert color="warning">{historyError}</CAlert>}
 
               <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 tracker-summary">
-                <div>
-                  <div className="text-uppercase small text-muted">{currentMonthLabel}</div>
-                  <h5 className="mb-1">Recent 4-week snapshot</h5>
+                <div className="d-flex flex-column gap-2">
+                  <div className="text-uppercase small text-muted">Month view</div>
+                  <h5 className="mb-1">{currentMonthLabel}</h5>
                   <p className="text-body-secondary mb-0">
-                    Keep an eye on streaks, wins, and missed check-ins without leaving this view.
+                    Hover over a habit to see more info. Click any day to cycle done → missed → clear for that habit.
                   </p>
+                  <div className="d-flex flex-wrap gap-2 align-items-center">
+                    <CFormSelect
+                      aria-label="Select month"
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                      className="month-select"
+                    >
+                      {monthOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </CFormSelect>
+                    <CFormSelect
+                      aria-label="Select year"
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(Number(e.target.value))}
+                      className="year-select"
+                    >
+                      {yearOptions.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </CFormSelect>
+                  </div>
                 </div>
                 <div className="d-flex flex-wrap gap-3">
                   <div className="tracker-pill">
@@ -397,9 +545,9 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                   </div>
 
                   <div className="tracker-grid-wrapper">
-                    <div className="habit-tracker-grid">
-                      <div className="tracker-cell tracker-head habit-col">Habit</div>
-                      {recentDays.map((day) => (
+                    <div className="habit-tracker-grid" style={{ "--habit-day-count": visibleDays.length }}>
+                      <div className="tracker-cell tracker-head habit-col">Our habits</div>
+                      {visibleDays.map((day) => (
                         <div key={`head-${formatDateKey(day)}`} className="tracker-cell tracker-head text-center">
                           <div className="fw-semibold small">
                             {day.toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2)}
@@ -417,7 +565,14 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                             <div className="tracker-cell habit-col">
                               <div className="d-flex flex-column gap-1">
                                 <div className="d-flex align-items-center gap-2 flex-wrap">
-                                  <span className="fw-semibold habit-title">{habit.title}</span>
+                                  <CTooltip
+                                    content={`${habit.description || "No description yet."}${
+                                      habit.target_reps ? ` • Target ${habit.target_reps}` : ""
+                                    }${habit.category ? ` • ${habit.category}` : ""}`}
+                                    placement="bottom"
+                                  >
+                                    <span className="fw-semibold habit-title cursor-help">{habit.title}</span>
+                                  </CTooltip>
                                   {habit.category && (
                                     <CBadge color="info" className="text-uppercase small subtle-badge">
                                       {habit.category}
@@ -437,14 +592,25 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                                 </div>
                               </div>
                             </div>
-                            {recentDays.map((day) => {
-                              const status = historyByHabit[habitKey]?.[formatDateKey(day)]
+                            {visibleDays.map((day) => {
+                              const dateKey = formatDateKey(day)
+                              const status = historyByHabit[habitKey]?.[dateKey]
+                              const isSaving = calendarSaving === `${habit.id}-${dateKey}`
                               return (
                                 <div
-                                  key={`${habit.id}-${formatDateKey(day)}`}
+                                  key={`${habit.id}-${dateKey}`}
                                   className={`tracker-cell day-cell status-${status || "empty"}`}
                                 >
-                                  {status === "done" ? "✓" : status === "missed" ? "•" : ""}
+                                  <DayStatusCheckbox
+                                    status={status}
+                                    disabled={isSaving}
+                                    inputId={`${habit.id}-${dateKey}`}
+                                    title={`${habit.title} on ${day.toLocaleDateString(undefined, {
+                                      month: "short",
+                                      day: "numeric",
+                                    })}`}
+                                    onToggle={() => handleCalendarToggle(habit, dateKey)}
+                                  />
                                 </div>
                               )
                             })}
@@ -511,7 +677,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                   <div className="rounded-3 bg-body-tertiary p-3">
                     <div className="d-flex justify-content-between align-items-center mb-2">
                       <span className="fw-semibold">Weekly completion</span>
-                      <span className="text-muted small">Rolling four weeks</span>
+                      <span className="text-muted small">Selected month</span>
                     </div>
                     <CRow className="g-3">
                       {weeklyCompletion.map((week) => (
