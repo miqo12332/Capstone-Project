@@ -3,7 +3,7 @@ import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import { Op } from "sequelize";
 import { RegistrationVerification, UserSetting } from "../models/index.js";
-import { sendEmail } from "../utils/emailService.js";
+import { EmailConfigError, sendEmail } from "../utils/emailService.js";
 
 const defaultSettings = {
   timezone: "UTC",
@@ -176,10 +176,13 @@ router.post("/register/request-code", async (req, res) => {
     res.status(200).json({ message: "Verification code sent" });
   } catch (err) {
     console.error("Verification email error:", err);
-    const message = err.message?.includes("Email service")
-      ? "Email service is not configured. Please try again later."
-      : "Unable to send verification code. Please confirm the email address.";
-    res.status(500).json({ error: message });
+    if (err instanceof EmailConfigError) {
+      return res.status(503).json({
+        error: "Email service is not configured. Please set SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS.",
+      });
+    }
+
+    res.status(500).json({ error: "Unable to send verification code. Please confirm the email address." });
   }
 });
 
