@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import PropTypes from "prop-types";
 
+import { sendReasoningRequest } from "../../services/ai";
+
 // Simple UI wrapper that calls the /ai/reason endpoint and renders the responses.
 // Pass in the latest snapshot and optional insight text to ground the AI companion.
 const AIAgentPanel = ({ snapshot, insightText = "", initialHistory = [] }) => {
@@ -14,29 +16,25 @@ const AIAgentPanel = ({ snapshot, insightText = "", initialHistory = [] }) => {
     if (!input.trim() || loading) return;
 
     const trimmed = input.trim();
-    const nextHistory = [...history, { role: "user", content: trimmed }];
+    const pendingHistory = [...history, { role: "user", content: trimmed }];
 
     setLoading(true);
     setError("");
+    setHistory(pendingHistory);
+    setInput("");
 
     try {
-      const response = await fetch("/ai/reason", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ snapshot, insightText, history: nextHistory }),
+      const result = await sendReasoningRequest({
+        snapshot,
+        insightText,
+        history: pendingHistory,
       });
 
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({}));
-        throw new Error(errorBody?.error || "Unable to reach the AI service.");
-      }
-
-      const result = await response.json();
-      setHistory([...nextHistory, { role: "assistant", content: result.reply }]);
+      setHistory([...pendingHistory, { role: "assistant", content: result.reply }]);
       if (result?.meta) setMeta(result.meta);
-      setInput("");
     } catch (err) {
       setError(err.message || "Unexpected error contacting the AI service.");
+      setHistory(history);
     } finally {
       setLoading(false);
     }
