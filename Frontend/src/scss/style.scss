@@ -963,12 +963,25 @@ body {
   margin: 4px;
   padding: 0.75rem 1rem;
   color: var(--cui-body-color);
+  background: color-mix(in srgb, var(--cui-body-bg) 92%, var(--cui-primary) 8%);
+  border: 1px solid color-mix(in srgb, var(--cui-border-color), rgba(63, 94, 251, 0.18));
+  transition: color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .profile-tab.active {
-  background: linear-gradient(135deg, rgba(63, 94, 251, 0.16), rgba(112, 247, 173, 0.16));
+  background: linear-gradient(135deg, rgba(63, 94, 251, 0.2), rgba(112, 247, 173, 0.18));
   color: var(--cui-primary) !important;
+  border-color: color-mix(in srgb, var(--cui-primary), var(--cui-border-color));
   box-shadow: 0 10px 30px rgba(63, 94, 251, 0.15);
+}
+
+.profile-tab:hover {
+  background: color-mix(in srgb, var(--cui-primary) 16%, var(--cui-body-bg) 84%);
+  color: var(--cui-primary);
+  border-color: color-mix(in srgb, var(--cui-primary) 60%, var(--cui-border-color) 40%);
+  box-shadow: 0 12px 28px rgba(63, 94, 251, 0.18);
+  transform: translateY(-1px);
 }
 
 .profile-progress {
@@ -1003,14 +1016,23 @@ body {
 }
 
 :root[data-coreui-theme='dark'] .profile-nav .profile-tab {
-  background: color-mix(in srgb, var(--cui-body-bg) 84%, rgba(255, 255, 255, 0.04));
+  background: color-mix(in srgb, var(--cui-body-bg) 80%, rgba(63, 94, 251, 0.16));
   color: var(--cui-body-color);
+  border-color: color-mix(in srgb, var(--cui-border-color), rgba(63, 94, 251, 0.26));
 }
 
 :root[data-coreui-theme='dark'] .profile-nav .profile-tab.active {
-  background: color-mix(in srgb, var(--cui-primary) 22%, var(--cui-body-bg) 78%);
+  background: linear-gradient(135deg, rgba(63, 94, 251, 0.32), color-mix(in srgb, var(--cui-body-bg) 78%, #0c1a32));
   color: var(--cui-primary) !important;
+  border-color: color-mix(in srgb, var(--cui-primary) 65%, rgba(63, 94, 251, 0.35));
   box-shadow: 0 12px 32px rgba(63, 94, 251, 0.25);
+}
+
+:root[data-coreui-theme='dark'] .profile-nav .profile-tab:hover {
+  background: color-mix(in srgb, var(--cui-primary) 26%, var(--cui-body-bg) 74%);
+  color: var(--cui-primary);
+  border-color: color-mix(in srgb, var(--cui-primary) 70%, rgba(63, 94, 251, 0.35));
+  box-shadow: 0 14px 34px rgba(63, 94, 251, 0.28);
 }
 
 .soft-alert {
