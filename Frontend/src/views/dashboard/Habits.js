@@ -33,13 +33,22 @@ import {
   CTooltip,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
-import { cilClock, cilChartLine, cilBadge, cilList, cilBolt, cilPlus } from "@coreui/icons"
+import {
+  cilClock,
+  cilChartLine,
+  cilBadge,
+  cilList,
+  cilBolt,
+  cilPlus,
+  cilPencil,
+  cilTrash,
+} from "@coreui/icons"
 
 import AddHabit from "./AddHabit"
 import HabitLibrary from "./HabitLibrary"
 import ProgressTracker from "./ProgressTracker"
 import HabitCoach from "./HabitCoach"
-import { getHabits, updateHabit } from "../../services/habits"
+import { deleteHabit, getHabits, updateHabit } from "../../services/habits"
 import { getProgressHistory, updateHabitProgressCount } from "../../services/progress"
 import { getProgressAnalytics, formatPercent } from "../../services/analytics"
 import { emitDataRefresh, REFRESH_SCOPES, useDataRefresh } from "../../utils/refreshBus"
@@ -63,6 +72,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
   const [historyEntries, setHistoryEntries] = useState([])
   const [historyError, setHistoryError] = useState("")
   const [calendarSaving, setCalendarSaving] = useState(null)
+  const [deletingId, setDeletingId] = useState(null)
 
   const today = useMemo(() => new Date(), [])
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth())
@@ -246,6 +256,28 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
       setFeedback({ type: "danger", message: "Could not save your changes." })
     } finally {
       setSavingEdit(false)
+    }
+  }
+
+  const removeHabit = async (habitId) => {
+    if (!habitId) return
+    const confirmDelete = window.confirm("Remove this habit? This cannot be undone.")
+    if (!confirmDelete) return
+
+    try {
+      setDeletingId(habitId)
+      await deleteHabit(habitId)
+      setHabits((prev) => prev.filter((habit) => habit.id !== habitId))
+      setHistoryEntries((prev) =>
+        prev.filter((entry) => String(entry.habitId ?? entry.habit_id) !== String(habitId)),
+      )
+      setFeedback({ type: "success", message: "Habit removed." })
+      emitDataRefresh(REFRESH_SCOPES.HABITS, { reason: "habit-removed", habitId })
+    } catch (error) {
+      console.error("Failed to delete habit", error)
+      setFeedback({ type: "danger", message: "Could not remove this habit." })
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -489,15 +521,6 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                 emptyState
               ) : (
                 <>
-                  <div className="week-ribbon d-none d-xl-flex">
-                    <div className="habit-col-placeholder" />
-                    {weeks.map((week, index) => (
-                      <div key={`week-${index}`} className="week-label flex-grow-1">
-                        Week {index + 1}
-                      </div>
-                    ))}
-                  </div>
-
                   <div className="tracker-grid-wrapper">
                     <div className="habit-tracker-grid" style={{ "--habit-day-count": visibleDays.length }}>
                       <div className="tracker-cell tracker-head habit-col">
@@ -526,33 +549,50 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                         return (
                           <React.Fragment key={habit.id}>
                             <div className="tracker-cell habit-col">
-                              <div className="habit-meta">
-                                <div className="d-flex align-items-center gap-2 flex-wrap">
-                                  <CTooltip
-                                    content={`${habit.description || "No description yet."}${
-                                      habit.target_reps ? ` • Target ${habit.target_reps}` : ""
-                                    }${habit.category ? ` • ${habit.category}` : ""}`}
-                                    placement="bottom"
-                                  >
-                                    <span
-                                      className="fw-semibold habit-title cursor-help"
-                                      role="button"
-                                      tabIndex={0}
-                                      onClick={() => startEdit(habit)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Enter" || e.key === " ") startEdit(habit)
-                                      }}
+                                <div className="habit-meta">
+                                  <div className="d-flex align-items-center gap-2 flex-wrap">
+                                    <CTooltip
+                                      content={`${habit.description || "No description yet."}${
+                                        habit.target_reps ? ` • Target ${habit.target_reps}` : ""
+                                      }${habit.category ? ` • ${habit.category}` : ""}`}
+                                      placement="bottom"
                                     >
-                                      {habit.title}
-                                    </span>
-                                  </CTooltip>
-                                  {habit.category && (
-                                    <CBadge color="light" className="text-uppercase small habit-tag">
-                                      {habit.category}
-                                    </CBadge>
-                                  )}
-                                  {habit.is_daily_goal && <CBadge color="success">Daily</CBadge>}
-                                </div>
+                                      <span className="fw-semibold habit-title cursor-help">{habit.title}</span>
+                                    </CTooltip>
+                                    {habit.category && (
+                                      <CBadge color="light" className="text-uppercase small habit-tag">
+                                        {habit.category}
+                                      </CBadge>
+                                    )}
+                                    {habit.is_daily_goal && <CBadge color="success">Daily</CBadge>}
+                                    <div className="habit-actions">
+                                      <CTooltip content="Edit" placement="top">
+                                        <CButton
+                                          size="sm"
+                                          color="light"
+                                          variant="ghost"
+                                          onClick={() => startEdit(habit)}
+                                        >
+                                          <CIcon icon={cilPencil} />
+                                        </CButton>
+                                      </CTooltip>
+                                      <CTooltip content="Delete" placement="top">
+                                        <CButton
+                                          size="sm"
+                                          color="danger"
+                                          variant="ghost"
+                                          disabled={deletingId === habit.id}
+                                          onClick={() => removeHabit(habit.id)}
+                                        >
+                                          {deletingId === habit.id ? (
+                                            <CSpinner size="sm" component="span" />
+                                          ) : (
+                                            <CIcon icon={cilTrash} />
+                                          )}
+                                        </CButton>
+                                      </CTooltip>
+                                    </div>
+                                  </div>
                                 {habit.description && <p className="habit-desc">{habit.description}</p>}
                                 {habit.target_reps ? (
                                   <p className="habit-desc text-muted mb-0">🎯 Target: {habit.target_reps}</p>

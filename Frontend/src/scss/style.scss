@@ -915,28 +915,17 @@ body {
   cursor: help;
 }
 
-.week-ribbon {
-  gap: 0.25rem;
-  padding-inline: 0.5rem;
-  color: var(--cui-secondary-color);
-
-  .week-label {
-    text-align: center;
-    font-weight: 600;
-    padding: 0.35rem 0.25rem;
-    background: color-mix(in srgb, var(--cui-body-bg) 92%, rgba(63, 94, 251, 0.06));
-    border-radius: 8px;
-  }
-
-  .habit-col-placeholder {
-    width: 260px;
-  }
-}
-
 .habit-col .habit-meta {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+}
+
+.habit-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
 }
 
 .habit-col .habit-title {
