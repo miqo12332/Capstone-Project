@@ -68,6 +68,32 @@ const buildFallbackPlan = (title) => {
   }
 }
 
+const normalizeRewrite = (candidate, fallback) => {
+  if (!candidate || typeof candidate !== "object") return fallback
+
+  return {
+    title: candidate.title?.toString().trim() || fallback.title,
+    description: candidate.description?.toString().trim() || fallback.description,
+    category: candidate.category?.toString().trim() || fallback.category,
+    isDailyGoal:
+      typeof candidate.isDailyGoal === "boolean"
+        ? candidate.isDailyGoal
+        : typeof candidate.is_daily_goal === "boolean"
+        ? candidate.is_daily_goal
+        : fallback.isDailyGoal,
+  }
+}
+
+const buildRewriteFallback = (message) => {
+  const base = buildHabitSuggestion(message)
+  return {
+    title: base.title,
+    description: base.description,
+    category: base.category,
+    isDailyGoal: true,
+  }
+}
+
 export const generateHabitPlan = async (title) => {
   const fallback = buildFallbackPlan(title)
 
@@ -112,6 +138,49 @@ export const generateHabitPlan = async (title) => {
     return normalizePlan(parsed, fallback)
   } catch (error) {
     console.warn("AI habit generation failed; using fallback", error?.message || error)
+    return fallback
+  }
+}
+
+export const rewriteHabitIdea = async (message) => {
+  const fallback = buildRewriteFallback(message)
+
+  if (!ENV_CLAUDE_API_KEY) return fallback
+
+  try {
+    const chat = new ChatAnthropic({
+      apiKey: ENV_CLAUDE_API_KEY,
+      baseURL: CLAUDE_BASE_URL,
+      model: CLAUDE_CHAT_MODEL,
+      temperature: 0.3,
+      maxTokens: 250,
+    })
+
+    const prompt = [
+      new SystemMessage(
+        [
+          "Rewrite the user's rough habit idea into a crisp StepHabit entry.",
+          "Respond ONLY with JSON shaped as { title: string, description: string, category: string, isDailyGoal: boolean }.",
+          "Title must be 2-5 words, Description under 180 characters with a clear action, Category is one short noun,",
+          "and isDailyGoal is true if the habit is suitable for daily repetition (default to true).",
+        ].join(" ")
+      ),
+      new HumanMessage(`Habit idea: "${message}". Rewrite and clarify it.`),
+    ]
+
+    const response = await chat.invoke(prompt)
+    const content =
+      typeof response?.content === "string"
+        ? response.content
+        : response?.content?.map?.((p) => p.text).filter(Boolean).join("\n")
+
+    const jsonText = typeof content === "string" ? content.match(/\{[\s\S]*\}/)?.[0] : null
+    if (!jsonText) return fallback
+
+    const parsed = JSON.parse(jsonText)
+    return normalizeRewrite(parsed, fallback)
+  } catch (error) {
+    console.warn("AI habit rewrite failed; using fallback", error?.message || error)
     return fallback
   }
 }

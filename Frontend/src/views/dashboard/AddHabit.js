@@ -39,12 +39,14 @@ import {
   cilClock,
   cilBolt,
   cilStar,
+  cilPencil,
 } from "@coreui/icons"
 import {
   getHabits,
   createHabit,
   deleteHabit,
   generateHabitSuggestion,
+  rewriteHabitIdea,
 } from "../../services/habits"
 import { emitDataRefresh, REFRESH_SCOPES } from "../../utils/refreshBus"
 
@@ -65,6 +67,9 @@ const AddHabit = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState("")
+  const [rewriteDraft, setRewriteDraft] = useState("")
+  const [rewriteLoading, setRewriteLoading] = useState(false)
+  const [rewriteError, setRewriteError] = useState("")
   const [showReflection, setShowReflection] = useState(false)
   const [reflectionDraft, setReflectionDraft] = useState("")
   const quickTemplates = [
@@ -188,6 +193,46 @@ const AddHabit = () => {
       setAiError("We couldn't fetch AI details right now. Try again in a moment.")
     } finally {
       setAiLoading(false)
+    }
+  }
+
+  const handleRewrite = async () => {
+    if (rewriteLoading) return
+    const idea = rewriteDraft.trim()
+
+    if (!idea) {
+      setRewriteError("Share a rough habit idea so AI can rewrite it.")
+      return
+    }
+
+    try {
+      setRewriteLoading(true)
+      setRewriteError("")
+      setAiError("")
+      setErr("")
+      setSuccess("")
+
+      const rewritten = await rewriteHabitIdea(idea)
+
+      setNewHabit((prev) => ({
+        ...prev,
+        title: rewritten.title || prev.title,
+        description: rewritten.description || prev.description,
+        category: rewritten.category || prev.category,
+        is_daily_goal:
+          typeof rewritten.isDailyGoal === "boolean"
+            ? rewritten.isDailyGoal
+            : typeof rewritten.is_daily_goal === "boolean"
+            ? rewritten.is_daily_goal
+            : prev.is_daily_goal,
+      }))
+
+      setSuccess("AI polished your habit—review the fields before saving.")
+    } catch (error) {
+      console.error("AI rewrite failed", error)
+      setRewriteError("We couldn't rewrite that habit right now. Please try again.")
+    } finally {
+      setRewriteLoading(false)
     }
   }
 
@@ -342,6 +387,52 @@ const AddHabit = () => {
                   />
                 </CInputGroup>
                 {aiError && <CFormText className="text-danger">{aiError}</CFormText>}
+              </div>
+
+              <div className="p-3 rounded border bg-body-tertiary">
+                <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                  <div className="d-flex align-items-center gap-2">
+                    <CIcon icon={cilPencil} className="text-primary" />
+                    <div>
+                      <div className="fw-semibold">AI Habit Rewriter</div>
+                      <CFormText className="text-muted">
+                        Paste any rough idea and AI will rewrite it into a clean title, description, category, and daily goal.
+                      </CFormText>
+                    </div>
+                  </div>
+                  <CButton
+                    color="primary"
+                    variant="outline"
+                    size="sm"
+                    className="text-nowrap"
+                    onClick={handleRewrite}
+                    disabled={rewriteLoading}
+                  >
+                    {rewriteLoading ? (
+                      <span className="d-inline-flex align-items-center gap-2">
+                        <CSpinner size="sm" /> Rewriting
+                      </span>
+                    ) : (
+                      <span className="d-inline-flex align-items-center gap-2">
+                        <CIcon icon={cilBolt} /> Rewrite with AI
+                      </span>
+                    )}
+                  </CButton>
+                </div>
+                <CFormTextarea
+                  rows={2}
+                  value={rewriteDraft}
+                  placeholder="e.g. I want to run sometimes in the mornings"
+                  onChange={(e) => setRewriteDraft(e.target.value)}
+                  disabled={rewriteLoading}
+                />
+                {rewriteError ? (
+                  <CFormText className="text-danger">{rewriteError}</CFormText>
+                ) : (
+                  <CFormText className="text-muted">
+                    We'll fill the fields above with a polished habit you can tweak before saving.
+                  </CFormText>
+                )}
               </div>
 
               <div className="row g-3">
