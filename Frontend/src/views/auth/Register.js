@@ -70,6 +70,9 @@ const Register = () => {
   const [step, setStep] = useState(0)
   const [message, setMessage] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const [sendingCode, setSendingCode] = useState(false)
+  const [verificationCode, setVerificationCode] = useState("")
+  const [codeSent, setCodeSent] = useState(false)
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -95,6 +98,10 @@ const Register = () => {
       {
         title: "Personalise your support",
         description: "Tell us how we can cheer you on and keep motivation high.",
+      },
+      {
+        title: "Verify your email",
+        description: "Enter the 6-digit code we just sent to confirm it’s really you.",
       },
     ],
     []
@@ -141,24 +148,11 @@ const Register = () => {
     return true
   }
 
-  const handleNext = () => {
-    if (!validateStep()) return
-    setStep((prev) => Math.min(prev + 1, steps.length - 1))
-  }
-
-  const handleBack = () => {
-    setMessage(null)
-    setStep((prev) => Math.max(prev - 1, 0))
-  }
-
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    if (!validateStep()) return
-
+  const requestVerificationCode = async () => {
     try {
-      setSubmitting(true)
+      setSendingCode(true)
       setMessage(null)
-      const response = await fetch(`${API_BASE}/users/register`, {
+      const response = await fetch(`${API_BASE}/users/register/request-code`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -179,7 +173,64 @@ const Register = () => {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data?.error || "Registration failed")
+        throw new Error(data?.error || "We couldn’t send the verification code.")
+      }
+
+      setCodeSent(true)
+      setMessage({ type: "success", text: "Verification code sent to your email." })
+      setStep((prev) => Math.min(prev + 1, steps.length - 1))
+    } catch (err) {
+      console.error("Verification request error:", err)
+      setMessage({ type: "danger", text: err.message || "Unable to send verification code." })
+    } finally {
+      setSendingCode(false)
+    }
+  }
+
+  const handleNext = async () => {
+    if (!validateStep()) return
+
+    if (step === steps.length - 2) {
+      await requestVerificationCode()
+      return
+    }
+
+    setStep((prev) => Math.min(prev + 1, steps.length - 1))
+  }
+
+  const handleBack = () => {
+    setMessage(null)
+    setStep((prev) => Math.max(prev - 1, 0))
+  }
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    if (step !== steps.length - 1) {
+      handleNext()
+      return
+    }
+
+    if (!verificationCode.trim()) {
+      setMessage({ type: "warning", text: "Please enter the verification code from your email." })
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      setMessage(null)
+      const response = await fetch(`${API_BASE}/users/register/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: form.email.trim(),
+          code: verificationCode.trim(),
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Verification failed")
       }
 
       setMessage({
@@ -189,7 +240,7 @@ const Register = () => {
       setTimeout(() => navigate("/login"), 1800)
     } catch (err) {
       console.error("Register error:", err)
-      setMessage({ type: "danger", text: err.message || "Could not connect to the server." })
+      setMessage({ type: "danger", text: err.message || "Could not verify the code." })
     } finally {
       setSubmitting(false)
     }
@@ -294,45 +345,90 @@ const Register = () => {
       )
     }
 
+    if (step === 2) {
+      return (
+        <div className="d-flex flex-column gap-4">
+          <div>
+            <div className="d-flex align-items-center gap-2 mb-2">
+              <CIcon icon={cilClock} className="text-primary" />
+              <h5 className="mb-0">How much time can you commit?</h5>
+            </div>
+            {renderOptionButtons(commitmentOptions, "dailyCommitment")}
+          </div>
+          <div>
+            <div className="d-flex align-items-center gap-2 mb-2">
+              <CIcon icon={cilStar} className="text-primary" />
+              <h5 className="mb-0">Where are you in your habit journey?</h5>
+            </div>
+            {renderOptionButtons(experienceOptions, "experienceLevel")}
+          </div>
+          <div>
+            <div className="d-flex align-items-center gap-2 mb-2">
+              <CIcon icon={cilPeople} className="text-primary" />
+              <h5 className="mb-0">How can we support you best?</h5>
+            </div>
+            {renderOptionButtons(supportOptions, "supportPreference")}
+          </div>
+          <div>
+            <div className="d-flex align-items-center gap-2 mb-2">
+              <CIcon icon={cilHeart} className="text-primary" />
+              <h5 className="mb-0">Share a spark of motivation</h5>
+            </div>
+            <CFormTextarea
+              name="motivation"
+              rows={3}
+              placeholder="What’s one reason you’re excited to start?"
+              value={form.motivation}
+              onChange={handleFieldChange}
+            />
+            <div className="small text-body-secondary mt-1">
+              We’ll echo this back on tough days to remind you why you began.
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     return (
-      <div className="d-flex flex-column gap-4">
-        <div>
-          <div className="d-flex align-items-center gap-2 mb-2">
-            <CIcon icon={cilClock} className="text-primary" />
-            <h5 className="mb-0">How much time can you commit?</h5>
+      <div className="d-flex flex-column gap-3">
+        <div className="p-3 bg-light rounded border">
+          <div className="d-flex align-items-center gap-2 mb-1">
+            <CIcon icon={cilEnvelopeClosed} className="text-primary" />
+            <h5 className="mb-0">Check your inbox</h5>
           </div>
-          {renderOptionButtons(commitmentOptions, "dailyCommitment")}
+          <p className="mb-2">We’ve sent a 6-digit code to {form.email || "your email"}. Enter it below to finish.</p>
+          <CButton
+            color="link"
+            className="px-0"
+            type="button"
+            onClick={requestVerificationCode}
+            disabled={sendingCode || submitting}
+          >
+            {sendingCode ? "Sending another code..." : "Didn’t get it? Resend code"}
+          </CButton>
         </div>
-        <div>
-          <div className="d-flex align-items-center gap-2 mb-2">
-            <CIcon icon={cilStar} className="text-primary" />
-            <h5 className="mb-0">Where are you in your habit journey?</h5>
-          </div>
-          {renderOptionButtons(experienceOptions, "experienceLevel")}
-        </div>
-        <div>
-          <div className="d-flex align-items-center gap-2 mb-2">
-            <CIcon icon={cilPeople} className="text-primary" />
-            <h5 className="mb-0">How can we support you best?</h5>
-          </div>
-          {renderOptionButtons(supportOptions, "supportPreference")}
-        </div>
-        <div>
-          <div className="d-flex align-items-center gap-2 mb-2">
-            <CIcon icon={cilHeart} className="text-primary" />
-            <h5 className="mb-0">Share a spark of motivation</h5>
-          </div>
-          <CFormTextarea
-            name="motivation"
-            rows={3}
-            placeholder="What’s one reason you’re excited to start?"
-            value={form.motivation}
-            onChange={handleFieldChange}
+
+        <CInputGroup className="mb-2">
+          <CInputGroupText>
+            <CIcon icon={cilLockLocked} />
+          </CInputGroupText>
+          <CFormInput
+            name="verificationCode"
+            type="text"
+            placeholder="Enter 6-digit code"
+            autoComplete="one-time-code"
+            value={verificationCode}
+            onChange={(event) => setVerificationCode(event.target.value)}
+            maxLength={6}
+            required
           />
-          <div className="small text-body-secondary mt-1">
-            We’ll echo this back on tough days to remind you why you began.
-          </div>
-        </div>
+        </CInputGroup>
+        <div className="small text-body-secondary">Check your spam folder if you don’t see the code.</div>
+        {codeSent && (
+          <CAlert color="info" className="mt-2">
+            Code sent! It expires in 15 minutes.
+          </CAlert>
+        )}
       </div>
     )
   }
@@ -379,11 +475,11 @@ const Register = () => {
                     {isLastStep ? (
                       <CButton color="success" type="submit" disabled={submitting}>
                         <CIcon icon={cilHeart} className="me-2" />
-                        {submitting ? "Creating..." : "Start my journey"}
+                        {submitting ? "Verifying..." : "Start my journey"}
                       </CButton>
                     ) : (
-                      <CButton color="primary" type="button" onClick={handleNext}>
-                        Continue
+                      <CButton color="primary" type="button" onClick={handleNext} disabled={sendingCode}>
+                        {sendingCode && step === steps.length - 2 ? "Sending code..." : "Continue"}
                       </CButton>
                     )}
                   </div>

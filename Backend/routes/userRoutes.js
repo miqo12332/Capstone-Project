@@ -2,7 +2,8 @@ import express from "express";
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import { Op } from "sequelize";
-import { UserSetting } from "../models/index.js";
+import { RegistrationVerification, UserSetting } from "../models/index.js";
+import { sendEmail } from "../utils/emailService.js";
 
 const defaultSettings = {
   timezone: "UTC",
@@ -74,6 +75,31 @@ const ensureUserSettings = async (userId) => {
 
 const router = express.Router();
 
+const VERIFICATION_EXPIRATION_MINUTES = 15;
+
+const generateVerificationCode = () => Math.floor(100000 + Math.random() * 900000).toString();
+
+const buildVerificationPayload = ({ name, email, password, onboarding }) => ({
+  name,
+  email,
+  password,
+  onboarding,
+});
+
+const persistVerification = async ({ email, code, payload }) => {
+  const codeHash = await bcrypt.hash(code, 10);
+  const expiresAt = new Date(Date.now() + VERIFICATION_EXPIRATION_MINUTES * 60 * 1000);
+
+  const [record] = await RegistrationVerification.upsert({
+    email,
+    code_hash: codeHash,
+    payload,
+    expires_at: expiresAt,
+  });
+
+  return record;
+};
+
 // Register
 router.post("/register", async (req, res) => {
   try {
@@ -116,6 +142,96 @@ router.post("/register", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Registration failed" });
+  }
+});
+
+router.post("/register/request-code", async (req, res) => {
+  try {
+    const { name, email, password, onboarding = {} } = req.body;
+    if (!name || !email || !password) return res.status(400).json({ error: "All fields required" });
+
+    const existing = await User.findOne({ where: { email } });
+    if (existing) return res.status(400).json({ error: "Email already exists" });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const onboardingPayload = {
+      primaryGoal: onboarding.primaryGoal ?? req.body.primaryGoal ?? null,
+      focusArea: onboarding.focusArea ?? req.body.focusArea ?? null,
+      experienceLevel: onboarding.experienceLevel ?? req.body.experienceLevel ?? null,
+      dailyCommitment: onboarding.dailyCommitment ?? req.body.dailyCommitment ?? null,
+      supportPreference: onboarding.supportPreference ?? req.body.supportPreference ?? null,
+      motivation: onboarding.motivation ?? req.body.motivation ?? null,
+    };
+
+    const code = generateVerificationCode();
+    const payload = buildVerificationPayload({ name, email, password: hashedPassword, onboarding: onboardingPayload });
+    await persistVerification({ email, code, payload });
+
+    await sendEmail({
+      to: email,
+      subject: "Your StepHabit verification code",
+      text: `Use this code to finish creating your account: ${code}\n\nThe code expires in ${VERIFICATION_EXPIRATION_MINUTES} minutes. If you didn't request this, you can ignore the email.`,
+    });
+
+    res.status(200).json({ message: "Verification code sent" });
+  } catch (err) {
+    console.error("Verification email error:", err);
+    const message = err.message?.includes("Email service")
+      ? "Email service is not configured. Please try again later."
+      : "Unable to send verification code. Please confirm the email address.";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/register/verify", async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) return res.status(400).json({ error: "Email and code are required" });
+
+    const verification = await RegistrationVerification.findOne({ where: { email } });
+    if (!verification) return res.status(400).json({ error: "No verification request found for this email" });
+
+    if (new Date(verification.expires_at) < new Date()) {
+      await verification.destroy();
+      return res.status(400).json({ error: "Verification code has expired" });
+    }
+
+    const isValidCode = await bcrypt.compare(code, verification.code_hash);
+    if (!isValidCode) return res.status(400).json({ error: "Invalid verification code" });
+
+    const { name, password, onboarding } = verification.payload;
+
+    const existing = await User.findOne({ where: { email } });
+    if (existing) {
+      await verification.destroy();
+      return res.status(400).json({ error: "Email already exists" });
+    }
+
+    const newUser = await User.create({
+      name,
+      email,
+      password,
+      primary_goal: sanitizeString(onboarding.primaryGoal),
+      focus_area: sanitizeString(onboarding.focusArea),
+      experience_level: sanitizeString(onboarding.experienceLevel),
+      daily_commitment: sanitizeString(onboarding.dailyCommitment),
+      support_preference: sanitizeString(onboarding.supportPreference),
+      motivation_statement: sanitizeString(onboarding.motivation),
+    });
+    await UserSetting.findOrCreate({
+      where: { user_id: newUser.id },
+      defaults: { ...defaultSettings, user_id: newUser.id },
+    });
+
+    await verification.destroy();
+
+    res.status(201).json({
+      message: "User created",
+      user: serializeUser({ ...newUser.get({ plain: true }), settings: await ensureUserSettings(newUser.id) }),
+    });
+  } catch (err) {
+    console.error("Verification error:", err);
+    res.status(500).json({ error: "Verification failed" });
   }
 });
 
