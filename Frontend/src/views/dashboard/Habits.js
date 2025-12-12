@@ -132,6 +132,23 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
     }, [loadHabits, loadHistory]),
   )
 
+  const isFutureDate = useCallback(
+    (dateInput) => {
+      if (!dateInput) return false
+
+      const asDate =
+        typeof dateInput === "string"
+          ? (() => {
+              const [year, month, day] = dateInput.split("-").map(Number)
+              return new Date(year, month - 1, day)
+            })()
+          : new Date(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate())
+
+      return asDate > startOfToday
+    },
+    [startOfToday],
+  )
+
   const cycleStatus = useCallback((status) => {
     if (status === "done") return "missed"
     if (status === "missed") return null
@@ -463,24 +480,6 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
     () => new Date(selectedYear, selectedMonth, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" }),
     [selectedMonth, selectedYear],
   )
-
-  const isFutureDate = useCallback(
-    (dateInput) => {
-      if (!dateInput) return false
-
-      const asDate =
-        typeof dateInput === "string"
-          ? (() => {
-              const [year, month, day] = dateInput.split("-").map(Number)
-              return new Date(year, month - 1, day)
-            })()
-          : new Date(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate())
-
-      return asDate > startOfToday
-    },
-    [startOfToday],
-  )
-
   const DayStatusCheckbox = ({ status, onToggle, disabled, inputId, title, isFuture }) => {
     const mark = status === "done" ? "✓" : status === "missed" ? "✕" : ""
 
