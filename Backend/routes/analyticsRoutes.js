@@ -140,9 +140,24 @@ router.get("/progress", async (req, res) => {
         ? Math.round((bucket.totals.done / totalChecks) * 100)
         : 0;
 
-      const lastSeven = productivity.slice(-7);
-      const lastSevenDone = lastSeven.reduce((sum, d) => sum + d.completed, 0);
-      const lastSevenMissed = lastSeven.reduce((sum, d) => sum + d.missed, 0);
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+
+      const lastSeven = entries.filter(([date]) => {
+        const current = new Date(date);
+        current.setHours(0, 0, 0, 0);
+        return current >= sevenDaysAgo;
+      });
+
+      const lastSevenDone = lastSeven.reduce(
+        (sum, [, counts]) => sum + counts.done,
+        0
+      );
+      const lastSevenMissed = lastSeven.reduce(
+        (sum, [, counts]) => sum + counts.missed,
+        0
+      );
       const recentTotal = lastSevenDone + lastSevenMissed;
       const recentCompletionRate = recentTotal
         ? Math.round((lastSevenDone / recentTotal) * 100)
