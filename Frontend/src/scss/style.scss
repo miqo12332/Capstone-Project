@@ -813,6 +813,22 @@ body {
   }
 }
 
+.day-cell__controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.note-button {
+  padding: 0.2rem 0.35rem;
+  color: var(--cui-secondary-color);
+
+  &:hover,
+  &:focus-visible {
+    color: var(--cui-primary);
+  }
+}
+
 .month-checkbox {
   width: calc(100% - 8px);
   aspect-ratio: 1 / 1;

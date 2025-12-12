@@ -48,7 +48,7 @@ router.post("/:habitId/log", async (req, res) => {
 router.put("/:habitId/logs", async (req, res) => {
   try {
     const { habitId } = req.params;
-    const { userId, status, targetCount, date } = req.body;
+    const { userId, status, targetCount, date, note } = req.body;
 
     if (!userId || !["done", "missed"].includes(status)) {
       return res.status(400).json({ error: "userId and valid status required" });
@@ -84,6 +84,8 @@ router.put("/:habitId/logs", async (req, res) => {
       ],
     });
 
+    const trimmedNote = note?.trim() || null;
+
     if (existing.length < desiredCount) {
       const missingCount = desiredCount - existing.length;
       const now = new Date();
@@ -94,11 +96,20 @@ router.put("/:habitId/logs", async (req, res) => {
           status,
           progress_date: isoDate,
           created_at: now,
+          reflection_reason: trimmedNote,
         }))
       );
     } else if (existing.length > desiredCount) {
       const toRemove = existing.slice(0, existing.length - desiredCount);
       await Promise.all(toRemove.map((row) => row.destroy()));
+    }
+
+    if (desiredCount > 0 && existing.length > 0) {
+      const latest = existing[0];
+      if (latest.reflection_reason !== trimmedNote) {
+        latest.reflection_reason = trimmedNote;
+        await latest.save();
+      }
     }
 
     const [doneCount, missedCount] = await Promise.all([
