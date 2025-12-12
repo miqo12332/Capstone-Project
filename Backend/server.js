@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import { DataTypes } from "sequelize";
 import sequelize from "./sequelize.js";
 import "./models/index.js";
 
@@ -102,6 +103,15 @@ const startServer = async () => {
       `);
     };
 
+    const ensureColumnExists = async (tableName, columnName, definition) => {
+      if (!hasTable(tableName)) return;
+
+      const tableDefinition = await queryInterface.describeTable(tableName);
+      if (!tableDefinition[columnName]) {
+        await queryInterface.addColumn(tableName, columnName, definition);
+      }
+    };
+
     await cleanupOrphans("user_settings", "user_id", "users", "id");
     await cleanupOrphans("assistant_memories", "user_id", "users", "id");
     await cleanupOrphans(
@@ -116,6 +126,11 @@ const startServer = async () => {
       "users",
       "id"
     );
+
+    await ensureColumnExists("users", "avatar", {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    });
 
     if (hasTable("users") && hasTable("assistant_memories")) {
       await sequelize.query(`
