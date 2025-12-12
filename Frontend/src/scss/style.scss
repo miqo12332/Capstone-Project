@@ -807,6 +807,10 @@ body {
   place-items: center;
   background: transparent;
   padding-inline: 4px;
+
+  &.is-future {
+    opacity: 0.55;
+  }
 }
 
 .month-checkbox {
@@ -869,6 +873,18 @@ body {
   &.is-saving {
     opacity: 0.55;
     pointer-events: none;
+  }
+
+  &.is-future,
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+    background: color-mix(in srgb, var(--cui-body-bg) 94%, rgba(0, 0, 0, 0.04));
+    color: color-mix(in srgb, var(--cui-secondary-color) 70%, rgba(0, 0, 0, 0.25));
+    border-style: dashed;
+    box-shadow: none;
+    pointer-events: none;
+    transform: none;
   }
 }
 
@@ -941,18 +957,6 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-}
-
-.habit-col .habit-desc {
-  display: none;
-  font-size: 0.9rem;
-  color: var(--cui-secondary-color);
-  margin: 0;
-}
-
-.habit-col .habit-meta:hover .habit-desc,
-.habit-col .habit-meta:focus-within .habit-desc {
-  display: block;
 }
 
 .habit-tag {

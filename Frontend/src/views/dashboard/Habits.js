@@ -75,6 +75,10 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
   const [deletingId, setDeletingId] = useState(null)
 
   const today = useMemo(() => new Date(), [])
+  const startOfToday = useMemo(
+    () => new Date(today.getFullYear(), today.getMonth(), today.getDate()),
+    [today],
+  )
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth())
   const [selectedYear, setSelectedYear] = useState(today.getFullYear())
 
@@ -175,6 +179,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
     async (habit, dateKey) => {
       const habitId = habit?.id || habit?.habitId
       if (!habitId || !userId) return
+      if (isFutureDate(dateKey)) return
 
       const currentStatus = historyByHabit[String(habitId)]?.[dateKey] || null
       const nextStatus = cycleStatus(currentStatus)
@@ -416,13 +421,32 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
     [selectedMonth, selectedYear],
   )
 
-  const DayStatusCheckbox = ({ status, onToggle, disabled, inputId, title }) => {
+  const isFutureDate = useCallback(
+    (dateInput) => {
+      if (!dateInput) return false
+
+      const asDate =
+        typeof dateInput === "string"
+          ? (() => {
+              const [year, month, day] = dateInput.split("-").map(Number)
+              return new Date(year, month - 1, day)
+            })()
+          : new Date(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate())
+
+      return asDate > startOfToday
+    },
+    [startOfToday],
+  )
+
+  const DayStatusCheckbox = ({ status, onToggle, disabled, inputId, title, isFuture }) => {
     const mark = status === "done" ? "✓" : status === "missed" ? "✕" : ""
 
     return (
       <button
         type="button"
-        className={`month-checkbox status-${status || "empty"}${disabled ? " is-saving" : ""}`}
+        className={`month-checkbox status-${status || "empty"}${disabled ? " is-saving" : ""}${
+          isFuture ? " is-future" : ""
+        }`}
         aria-label={title}
         aria-pressed={Boolean(status)}
         disabled={disabled}
@@ -593,10 +617,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                                       </CTooltip>
                                     </div>
                                   </div>
-                                {habit.description && <p className="habit-desc">{habit.description}</p>}
-                                {habit.target_reps ? (
-                                  <p className="habit-desc text-muted mb-0">🎯 Target: {habit.target_reps}</p>
-                                ) : null}
+                                {/* Description intentionally rendered only via tooltip to reduce clutter */}
                                 <div className="habit-progress-row">
                                   <CProgress
                                     value={progress.rate}
@@ -611,14 +632,18 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                               const dateKey = formatDateKey(day)
                               const status = historyByHabit[habitKey]?.[dateKey]
                               const isSaving = calendarSaving === `${habit.id}-${dateKey}`
+                              const isFuture = isFutureDate(day)
                               return (
                                 <div
                                   key={`${habit.id}-${dateKey}`}
-                                  className={`tracker-cell day-cell status-${status || "empty"}`}
+                                  className={`tracker-cell day-cell status-${status || "empty"}${
+                                    isFuture ? " is-future" : ""
+                                  }`}
                                 >
                                   <DayStatusCheckbox
                                     status={status}
-                                    disabled={isSaving}
+                                    disabled={isSaving || isFuture}
+                                    isFuture={isFuture}
                                     inputId={`${habit.id}-${dateKey}`}
                                     title={`${habit.title} on ${day.toLocaleDateString(undefined, {
                                       month: "short",
