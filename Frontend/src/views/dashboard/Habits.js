@@ -31,6 +31,7 @@ import {
   CProgressBar,
   CFormSwitch,
   CTooltip,
+  CPopover,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
 import {
@@ -42,6 +43,7 @@ import {
   cilPlus,
   cilPencil,
   cilTrash,
+  cilInfo,
 } from "@coreui/icons"
 
 import AddHabit from "./AddHabit"
@@ -132,6 +134,16 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
     return "done"
   }, [])
 
+  const formatDateKey = useCallback((date) => {
+    return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+      .toISOString()
+      .split("T")[0]
+  }, [])
+
+  const todayKey = useMemo(() => formatDateKey(today), [formatDateKey, today])
+
+  const isFutureDateKey = useCallback((dateKey) => dateKey > todayKey, [todayKey])
+
   const historyByHabit = useMemo(() => {
     return historyEntries.reduce((acc, entry) => {
       const habitKey = String(entry.habitId ?? entry.habit_id ?? "")
@@ -176,7 +188,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
       const habitId = habit?.id || habit?.habitId
       if (!habitId || !userId) return
 
-      if (dateKey > todayKey) {
+      if (isFutureDateKey(dateKey)) {
         setFeedback({ type: "warning", message: "That day has not arrived yet." })
         return
       }
@@ -224,7 +236,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
         setCalendarSaving(null)
       }
     },
-    [cycleStatus, historyByHabit, todayKey, updateCountsForDate, userId],
+    [cycleStatus, historyByHabit, isFutureDateKey, updateCountsForDate, userId],
   )
 
   const startEdit = (habit) => {
@@ -298,14 +310,6 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
     ),
     [onAddClick],
   )
-
-  const formatDateKey = useCallback((date) => {
-    return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-      .toISOString()
-      .split("T")[0]
-  }, [])
-
-  const todayKey = useMemo(() => formatDateKey(today), [formatDateKey, today])
 
   const monthOptions = useMemo(
     () =>
@@ -566,6 +570,34 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                                     >
                                       <span className="fw-semibold habit-title cursor-help">{habit.title}</span>
                                     </CTooltip>
+                                    <CPopover
+                                      content={
+                                        <div className="small">
+                                          <div className="fw-semibold mb-1">{habit.title}</div>
+                                          <div className="mb-1">
+                                            {habit.description || "No description yet."}
+                                          </div>
+                                          {habit.target_reps ? (
+                                            <div className="text-muted">🎯 Target: {habit.target_reps}</div>
+                                          ) : null}
+                                          {habit.category ? (
+                                            <div className="text-muted">Category: {habit.category}</div>
+                                          ) : null}
+                                        </div>
+                                      }
+                                      trigger="hover"
+                                      placement="right"
+                                    >
+                                      <CButton
+                                        size="sm"
+                                        color="light"
+                                        variant="ghost"
+                                        className="p-1"
+                                        aria-label={`More info about ${habit.title}`}
+                                      >
+                                        <CIcon icon={cilInfo} />
+                                      </CButton>
+                                    </CPopover>
                                     {habit.category && (
                                       <CBadge color="light" className="text-uppercase small habit-tag">
                                         {habit.category}
@@ -600,10 +632,6 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                                       </CTooltip>
                                     </div>
                                   </div>
-                                {habit.description && <p className="habit-desc">{habit.description}</p>}
-                                {habit.target_reps ? (
-                                  <p className="habit-desc text-muted mb-0">🎯 Target: {habit.target_reps}</p>
-                                ) : null}
                                 <div className="habit-progress-row">
                                   <CProgress
                                     value={progress.rate}
