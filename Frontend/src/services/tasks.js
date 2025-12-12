@@ -22,3 +22,29 @@ export const createTask = async (task) => {
 
   return await res.json();
 };
+
+export const updateTaskStatus = async (taskId, status) => {
+  const res = await fetch(`${BASE_URL}/${taskId}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+
+  if (!res.ok) {
+    const errorPayload = await res.json().catch(() => ({}));
+    throw new Error(errorPayload.error || "Failed to update task status");
+  }
+
+  return await res.json();
+};
+
+export const deleteTask = async (taskId) => {
+  const res = await fetch(`${BASE_URL}/${taskId}`, { method: "DELETE" });
+
+  if (!res.ok) {
+    const errorPayload = await res.json().catch(() => ({}));
+    throw new Error(errorPayload.error || "Failed to delete task");
+  }
+
+  return true;
+};
