@@ -176,6 +176,11 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
       const habitId = habit?.id || habit?.habitId
       if (!habitId || !userId) return
 
+      if (dateKey > todayKey) {
+        setFeedback({ type: "warning", message: "That day has not arrived yet." })
+        return
+      }
+
       const currentStatus = historyByHabit[String(habitId)]?.[dateKey] || null
       const nextStatus = cycleStatus(currentStatus)
 
@@ -219,7 +224,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
         setCalendarSaving(null)
       }
     },
-    [cycleStatus, historyByHabit, updateCountsForDate, userId],
+    [cycleStatus, historyByHabit, todayKey, updateCountsForDate, userId],
   )
 
   const startEdit = (habit) => {
@@ -299,6 +304,8 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
       .toISOString()
       .split("T")[0]
   }, [])
+
+  const todayKey = useMemo(() => formatDateKey(today), [formatDateKey, today])
 
   const monthOptions = useMemo(
     () =>
