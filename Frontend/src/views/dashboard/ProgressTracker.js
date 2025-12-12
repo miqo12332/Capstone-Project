@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CAlert,
   CBadge,
-  CButton,
   CCard,
   CCardBody,
   CCardHeader,
@@ -28,11 +27,7 @@ import {
 } from "recharts";
 import { getHabits } from "../../services/habits";
 import { formatPercent, getProgressAnalytics } from "../../services/analytics";
-import {
-  getTodayProgressLogs,
-  logHabitProgress,
-} from "../../services/progress";
-import { promptMissedReflection } from "../../utils/reflection";
+import { getTodayProgressLogs } from "../../services/progress";
 import { useDataRefresh, REFRESH_SCOPES } from "../../utils/refreshBus";
 
 const formatDate = (date) => {
@@ -47,12 +42,10 @@ const formatDate = (date) => {
 
 const ProgressTracker = () => {
   const [habits, setHabits] = useState([]);
-  const [progress, setProgress] = useState({});
   const [err, setErr] = useState("");
   const [analytics, setAnalytics] = useState(null);
   const [analyticsErr, setAnalyticsErr] = useState("");
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [todayCounts, setTodayCounts] = useState({});
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -156,53 +149,13 @@ const ProgressTracker = () => {
 
   const summary = analytics?.summary;
   const dailyTrend = summary?.dailyTrend ?? [];
-  const recentDaily = useMemo(
-    () => dailyTrend.slice(-7),
-    [dailyTrend]
-  );
+  const momentumTrend = useMemo(() => dailyTrend, [dailyTrend]);
   const leaderboard = summary?.habitLeaderboard ?? [];
-
-  const markStatus = async (habitId, status, habitTitle) => {
-    if (!userId) return;
-    try {
-      setSaving(true);
-      const payload = { userId, status };
-      if (status === "missed") {
-        const reason = promptMissedReflection(habitTitle);
-        if (!reason) {
-          setSaving(false);
-          return;
-        }
-        payload.reason = reason;
-      }
-      const data = await logHabitProgress(habitId, payload);
-      setProgress((prev) => ({ ...prev, [habitId]: data.row?.status || status }));
-      await Promise.all([
-        loadAnalytics({ showSpinner: false }),
-        loadTodayCounts(),
-      ]);
-      setErr("");
-    } catch (actionErr) {
-      console.error("Failed to update progress", actionErr);
-      setErr("Failed to update progress");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const statusBadgeColor = (rate) => {
     if (rate >= 80) return "success";
     if (rate >= 50) return "warning";
     return "danger";
-  };
-
-  const formatStatusLabel = (status) => {
-    if (!status) return "Pending";
-    return status === "done"
-      ? "Done"
-      : status === "missed"
-      ? "Missed"
-      : status;
   };
 
   return (
@@ -300,17 +253,17 @@ const ProgressTracker = () => {
                     <CCol xs={12} lg={7}>
                       <CCard className="h-100">
                         <CCardHeader className="fw-semibold">
-                          Recent momentum (last 7 days)
+                          Lifetime momentum
                         </CCardHeader>
                         <CCardBody style={{ height: 280 }}>
-                          {recentDaily.length ? (
+                          {momentumTrend.length ? (
                             <ResponsiveContainer
                               width="100%"
                               height="100%"
                               minWidth={200}
                               minHeight={200}
                             >
-                              <AreaChart data={recentDaily}>
+                              <AreaChart data={momentumTrend}>
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="date" tickFormatter={formatDate} />
                                 <YAxis allowDecimals={false} />
@@ -334,7 +287,7 @@ const ProgressTracker = () => {
                             </ResponsiveContainer>
                           ) : (
                             <div className="text-body-secondary text-center my-5">
-                              Keep logging progress to see your weekly momentum.
+                              Keep logging progress to see your lifetime momentum.
                             </div>
                           )}
                         </CCardBody>
@@ -386,11 +339,6 @@ const ProgressTracker = () => {
                     )}
                     {habits.map((habit) => {
                       const stats = habitStatsMap[habit.id] || {};
-                      const recent = stats.recent || {
-                        completionRate: 0,
-                        done: 0,
-                        missed: 0,
-                      };
                       const counts = todayCounts[habit.id] || { done: 0, missed: 0 };
                       const todayTotal = counts.done + counts.missed;
                       const todayCompletionRate = todayTotal
@@ -414,9 +362,9 @@ const ProgressTracker = () => {
                               </div>
                               <div className="text-body-secondary small">
                                 Current streak: {stats.streak?.current ?? 0} days ·
-                                Last 7-day success:
+                                Overall success:
                                 {" "}
-                                {formatPercent(recent.completionRate ?? 0)}
+                                {formatPercent(stats.successRate ?? 0)}
                               </div>
                               <div className="text-body-secondary small">
                                 Lifetime: {stats.totals?.done ?? 0} done /
@@ -460,36 +408,6 @@ const ProgressTracker = () => {
                           <div className="d-flex justify-content-between text-body-secondary small mt-1">
                             <span>{stats.totals?.done ?? 0} completed</span>
                             <span>{stats.totals?.missed ?? 0} missed</span>
-                          </div>
-
-                          <div className="d-flex justify-content-between align-items-center mt-3">
-                            <div className="text-body-secondary small">
-                              Last action: {formatStatusLabel(progress[habit.id])}
-                            </div>
-                            <div className="d-flex gap-2">
-                              <CButton
-                                color="danger"
-                                size="sm"
-                                disabled={saving}
-                                onClick={() =>
-                                  markStatus(
-                                    habit.id,
-                                    "missed",
-                                    habit.title || habit.name
-                                  )
-                                }
-                              >
-                                Mark missed
-                              </CButton>
-                              <CButton
-                                color="success"
-                                size="sm"
-                                disabled={saving}
-                                onClick={() => markStatus(habit.id, "done", habit.title)}
-                              >
-                                Mark done
-                              </CButton>
-                            </div>
                           </div>
                         </CListGroupItem>
                       );
