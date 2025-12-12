@@ -18,6 +18,12 @@ const Task = sequelize.define(
     hours_label: { type: DataTypes.STRING(120), allowNull: true },
     schedule_after: { type: DataTypes.DATE, allowNull: true },
     due_date: { type: DataTypes.DATE, allowNull: true },
+    color: { type: DataTypes.STRING(20), allowNull: true },
+    status: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: "pending",
+    },
     created_at: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },
   },
   {

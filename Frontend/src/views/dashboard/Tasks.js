@@ -25,9 +25,9 @@ import {
   CSpinner,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
-import { cilArrowRight, cilList, cilPlus, cilSend, cilTask, cilWatch } from "@coreui/icons"
+import { cilList, cilPlus, cilSend, cilTask, cilWatch } from "@coreui/icons"
 
-import { createTask, getTasks } from "../../services/tasks"
+import { createTask, getTasks, updateTaskStatus } from "../../services/tasks"
 import { sendReasoningRequest } from "../../services/ai"
 
 const defaultDraft = {
@@ -39,6 +39,8 @@ const defaultDraft = {
   hours_label: "Working Hours",
   schedule_after: "",
   due_date: "",
+  color: "#4f46e5",
+  status: "pending",
 }
 
 const formatDuration = (minutes) => {
@@ -61,6 +63,8 @@ const Tasks = () => {
   const [aiHistory, setAiHistory] = useState({})
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState(null)
+  const [draggedId, setDraggedId] = useState(null)
+  const [updatingStatusId, setUpdatingStatusId] = useState(null)
 
   const user = JSON.parse(localStorage.getItem("user") || "{}")
   const userId = user?.id
@@ -82,7 +86,12 @@ const Tasks = () => {
     try {
       setLoading(true)
       const data = await getTasks(userId)
-      setTasks(Array.isArray(data) ? data : [])
+      const normalized = (Array.isArray(data) ? data : []).map((task) => ({
+        ...task,
+        status: task.status || "pending",
+        color: task.color || "#4f46e5",
+      }))
+      setTasks(normalized)
       setFeedback(null)
     } catch (error) {
       console.error("Failed to load tasks", error)
@@ -148,6 +157,23 @@ const Tasks = () => {
     setAiError(null)
   }
 
+  const handleUpdateStatus = async (taskId, status) => {
+    setFeedback(null)
+    setUpdatingStatusId(taskId)
+
+    try {
+      const updated = await updateTaskStatus(taskId, status)
+      setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: updated.status } : task)))
+      setSelectedTask((prev) => (prev?.id === taskId ? { ...prev, status: updated.status } : prev))
+      setFeedback({ type: "success", message: `Task marked as ${status}.` })
+    } catch (error) {
+      console.error("Failed to update task status", error)
+      setFeedback({ type: "danger", message: error.message || "Unable to update task status." })
+    } finally {
+      setUpdatingStatusId(null)
+    }
+  }
+
   const taskSubpoints = selectedTask ? subpoints[selectedTask.id] || [] : []
   const taskHistory = selectedTask ? aiHistory[selectedTask.id] || [] : []
 
@@ -210,6 +236,47 @@ const Tasks = () => {
     }
   }
 
+  const moveTask = useCallback((fromId, toId) => {
+    setTasks((prev) => {
+      const fromIndex = prev.findIndex((item) => item.id === fromId)
+      const toIndex = prev.findIndex((item) => item.id === toId)
+
+      if (fromIndex === -1 || toIndex === -1) return prev
+
+      const updated = [...prev]
+      const [moved] = updated.splice(fromIndex, 1)
+      updated.splice(toIndex, 0, moved)
+      return updated
+    })
+  }, [])
+
+  const handleDragStart = (taskId) => {
+    setDraggedId(taskId)
+  }
+
+  const handleDragEnter = (targetId) => {
+    if (draggedId && draggedId !== targetId) {
+      moveTask(draggedId, targetId)
+    }
+  }
+
+  const handleDragEnd = () => {
+    setDraggedId(null)
+  }
+
+  const renderStatusBadge = (status) => {
+    const colorMap = {
+      done: "success",
+      missed: "danger",
+      pending: "secondary",
+    }
+    return (
+      <CBadge color={colorMap[status] || "secondary"} shape="rounded-pill">
+        {status || "pending"}
+      </CBadge>
+    )
+  }
+
   return (
     <div className="py-3">
       <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
@@ -262,64 +329,74 @@ const Tasks = () => {
               </CButton>
             </div>
           ) : (
-            <CRow className="g-3">
-              {tasks.map((task) => (
-                <CCol md={6} lg={4} key={task.id}>
-                  <CCard className="h-100 border shadow-sm">
-                    <CCardBody>
-                      <div className="d-flex align-items-start justify-content-between mb-2">
-                        <div>
-                          <div className="fw-semibold">{task.name}</div>
-                          <div className="text-body-secondary small">
-                            Created {new Date(task.created_at).toLocaleDateString()}
-                          </div>
-                        </div>
-                        {task.split_up && (
-                          <CBadge color="info" shape="rounded-pill">
-                            Split up
-                          </CBadge>
-                        )}
-                      </div>
-
-                      <div className="d-flex align-items-center gap-2 text-body-secondary small mb-2">
-                        <CIcon icon={cilWatch} className="text-primary" />
-                        <span>
-                          Duration {formatDuration(task.duration_minutes)}
-                          {task.min_duration_minutes
-                            ? ` • Min ${formatDuration(task.min_duration_minutes)}`
-                            : ""}
-                          {task.max_duration_minutes
-                            ? ` • Max ${formatDuration(task.max_duration_minutes)}`
-                            : ""}
-                        </span>
-                      </div>
-
-                      <div className="d-flex flex-wrap gap-2 small text-body-secondary">
-                        {task.hours_label && <CBadge color="light">{task.hours_label}</CBadge>}
-                        {task.schedule_after && (
-                          <CBadge color="light">
-                            Start after {new Date(task.schedule_after).toLocaleString()}
-                          </CBadge>
-                        )}
-                        {task.due_date && (
-                          <CBadge color="warning" textColor="dark">
-                            Due {new Date(task.due_date).toLocaleString()}
-                          </CBadge>
-                        )}
+            <>
+              <div className="mb-3 text-body-secondary small">
+                Drag tasks to reorder them. Click a task name to see its details.
+              </div>
+              <CListGroup className="shadow-sm">
+                {tasks.map((task) => (
+                  <CListGroupItem
+                    key={task.id}
+                    draggable
+                    onDragStart={() => handleDragStart(task.id)}
+                    onDragEnter={() => handleDragEnter(task.id)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={(e) => e.preventDefault()}
+                    className={`d-flex align-items-center justify-content-between gap-3 ${
+                      draggedId === task.id ? "border-primary border-2" : ""
+                    }`}
+                  >
+                    <div className="d-flex align-items-center gap-3 flex-grow-1">
+                      <span
+                        className="rounded-circle border"
+                        style={{
+                          backgroundColor: task.color || "#4f46e5",
+                          width: 16,
+                          height: 16,
+                          display: "inline-block",
+                          cursor: "grab",
+                        }}
+                        aria-label={`Task color ${task.color || "purple"}`}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-link text-decoration-none text-start p-0"
+                        onClick={() => openDetails(task)}
+                      >
+                        <div className="fw-semibold text-wrap">{task.name}</div>
+                      </button>
+                    </div>
+                    <div className="text-body-secondary small d-flex align-items-center gap-3 flex-wrap justify-content-end">
+                      <div className="d-flex align-items-center gap-1">
+                        {renderStatusBadge(task.status)}
                         <CButton
-                          color="light"
+                          color="success"
+                          variant="outline"
                           size="sm"
-                          className="ms-auto"
-                          onClick={() => openDetails(task)}
+                          disabled={updatingStatusId === task.id}
+                          onClick={() => handleUpdateStatus(task.id, "done")}
                         >
-                          <CIcon icon={cilArrowRight} className="me-2" /> Open
+                          {updatingStatusId === task.id ? <CSpinner size="sm" /> : "Done"}
+                        </CButton>
+                        <CButton
+                          color="danger"
+                          variant="outline"
+                          size="sm"
+                          disabled={updatingStatusId === task.id}
+                          onClick={() => handleUpdateStatus(task.id, "missed")}
+                        >
+                          {updatingStatusId === task.id ? <CSpinner size="sm" /> : "Missed"}
                         </CButton>
                       </div>
-                    </CCardBody>
-                  </CCard>
-                </CCol>
-              ))}
-            </CRow>
+                      <div className="d-flex align-items-center gap-2">
+                        <CIcon icon={cilWatch} className="text-primary" />
+                        <span>Created {new Date(task.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </CListGroupItem>
+                ))}
+              </CListGroup>
+            </>
           )}
         </CCardBody>
       </CCard>
@@ -421,6 +498,18 @@ const Tasks = () => {
                 onChange={(e) => handleDraftChange("due_date", e.target.value)}
               />
             </CCol>
+            <CCol md={6}>
+              <CFormLabel>Task color</CFormLabel>
+              <div className="d-flex align-items-center gap-2">
+                <CFormInput
+                  type="color"
+                  value={draft.color}
+                  onChange={(e) => handleDraftChange("color", e.target.value)}
+                  style={{ width: 64 }}
+                />
+                <small className="text-body-secondary">Shown on the list icon.</small>
+              </div>
+            </CCol>
           </CForm>
         </CModalBody>
         <CModalFooter className="d-flex justify-content-between">
@@ -448,6 +537,7 @@ const Tasks = () => {
             <div className="text-medium-emphasis small fw-normal">
               Share details, add subpoints, and chat with the AI.
             </div>
+            {selectedTask && <div className="mt-2">{renderStatusBadge(selectedTask.status)}</div>}
           </CModalTitle>
         </CModalHeader>
         <CModalBody>
