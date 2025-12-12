@@ -67,6 +67,11 @@ implementation specifics, data structures, deployment considerations, testing
 approaches, and future roadmap. Throughout, the document references concrete code
 paths to anchor discussion in the current repository state.
 
+To reach a thesis-scale depth, each chapter includes expanded rationale, design
+trade-offs, and operational runbooks. Readers can treat the report as a combined
+architecture decision record (ADR) collection, onboarding guide, and roadmap for
+future feature work.
+
 \subsection{Problem Statement and Goals}
 Individuals struggle to translate aspirational goals into daily action. StepHabit
 aims to solve this by combining three pillars:
@@ -96,6 +101,10 @@ extend the system with confidence.
         support habit plan generation and rewriting.
   \item \textbf{Infrastructure}: Environment-driven configuration via \texttt{dotenv},
         with static uploads served from \texttt{/uploads}.
+  \item \textbf{Tooling}: ESLint and Prettier for style consistency, nodemon for local
+        hot reloads, and Vite for fast module bundling in the frontend.
+  \item \textbf{Documentation}: This LaTeX artifact, inline JSDoc-style comments in
+        controllers, and CoreUI component stories to make UI interactions clear.
 \end{itemize}
 
 \subsection{High-Level Capabilities}
@@ -109,6 +118,27 @@ extend the system with confidence.
   \item Notifications and direct messaging for real-time engagement.
   \item AI habit coaching: plan suggestions and idea rewrites to improve habit
         quality.
+  \item Persistent assistant memories to retain per-user context when generating
+        future coaching responses.
+  \item Calendar ingestion for external events to prevent conflicting habit or task
+        plans.
+\end{itemize}
+
+\subsection{Non-Functional Requirements}
+Non-functional considerations shape implementation constraints and quality bars:
+\begin{itemize}
+  \item \textbf{Reliability}: Idempotent cleanup routines ensure a consistent database
+        state even after deployments or crashes.
+  \item \textbf{Security}: JWT authentication, encrypted password storage, and scoped
+        resource ownership checks protect user data.
+  \item \textbf{Performance}: Lazy-loaded frontend routes and pagination-friendly API
+        endpoints keep perceived latency low on modest hardware.
+  \item \textbf{Maintainability}: Centralized model associations and reusable
+        middleware reduce duplication as new features land.
+  \item \textbf{Extensibility}: AI connectors and calendar integrations are pluggable
+        to support future providers.
+  \item \textbf{Observability}: Structured logging and consistent error responses make
+        incident triage and monitoring simpler.
 \end{itemize}
 
 \section{Backend Architecture}
@@ -120,6 +150,12 @@ synchronizes models. It mounts API routers for users, habits, progress, schedule
 notifications, group challenges, achievements, friends, analytics, tasks, avatars,
 daily challenges, smart scheduling, library content, AI chat, assistant memories,
 calendar data, and messaging.
+
+The startup pipeline reflects a pragmatic choice: use \texttt{sequelize.sync} with
+\texttt{alter} rather than bespoke migrations. In small teams, this accelerates
+delivery but requires guardrails such as preflight integrity checks and backups.
+Future iterations could add \texttt{umzug} migration scripts to codify schema
+changes for production-grade rollouts.
 
 \subsection{Error Handling Strategy}
 A global error handler logs unexpected exceptions and returns a generic HTTP 500
@@ -138,6 +174,32 @@ During startup, the application:
 \end{enumerate}
 This pattern balances resilience with forward compatibility for incremental
 schema evolution.
+
+\subsection{Request Lifecycle}
+\begin{enumerate}
+  \item \textbf{Inbound}: Requests enter through Express, passing JSON body parsing
+        and CORS middleware.
+  \item \textbf{Authentication}: Protected routes validate JWTs and attach user
+        context. Public routes (e.g., registration) skip this step.
+  \item \textbf{Validation}: Controllers verify payload shape and accepted enums.
+  \item \textbf{Business Logic}: Service functions compute derived values, guard
+        against conflicts, and orchestrate ORM operations.
+  \item \textbf{Persistence}: Sequelize executes queries, emitting events for logging
+        and returning hydrated models.
+  \item \textbf{Response}: Payloads are normalized; errors funnel to the global
+        handler for consistent structure.
+\end{enumerate}
+
+\subsection{Observability}
+Operational visibility keeps the platform trustworthy:\\
+\begin{itemize}
+  \item \textbf{Logging}: Structured logs around startup steps, cleanup actions, and
+        controller branches aid debugging.
+  \item \textbf{Metrics}: While not yet implemented, hooks exist to layer in request
+        timing, DB latency, and AI token usage metrics.
+  \item \textbf{Tracing}: A future improvement would wrap Sequelize calls with
+        distributed trace IDs to follow user actions end-to-end.
+\end{itemize}
 
 \section{Data Modeling}
 Sequelize models define relational structures for user-centric productivity data.
@@ -167,6 +229,10 @@ truth for relationships.
   \item \textbf{ChatMessage} and \textbf{GroupChallengeMessage}: messaging constructs
         for direct and challenge-specific chats.
   \item \textbf{RegistrationVerification}: support for email verification flows.
+  \item \textbf{LibraryContent}: curated learning materials that accompany habit
+        plans.
+  \item \textbf{DailyChallenge}: a rotating mini-habit to increase engagement and
+        provide quick wins.
 \end{itemize}
 
 \subsection{Association Patterns}
@@ -179,6 +245,28 @@ Associations emphasize:
         and recipient roles.
   \item Hierarchical calendar structures linking integrations to events and users.
 \end{itemize}
+
+\subsection{Entity Attributes}
+\begin{longtable}{|p{3cm}|p{11cm}|}
+\hline
+\textbf{Model} & \textbf{Key attributes} \\ \hline
+User & id, name, email, password, avatar, timezone, preferences, verification status \\ \hline
+Habit & id, user\_id, title, description, category, daily\_goal, schedule metadata, color \\ \hline
+Task & id, user\_id, name, status, duration, schedule\_after, due\_date, color, priority \\ \hline
+BusySchedule & id, user\_id, start, end, description, source integration \\ \hline
+Progress & id, user\_id, habit\_id, date, completion count, notes \\ \hline
+Achievement & id, name, description, threshold, icon \\ \hline
+Notification & id, user\_id, type, payload, read flag \\ \hline
+AssistantMemory & id, user\_id, role, content, metadata, token counts \\ \hline
+CalendarEvent & id, user\_id, integration\_id, title, start, end, status \\ \hline
+\end{longtable}
+
+\subsection{Data Lifecycle}
+Data flows through a predictable lifecycle: creation (via user action or AI
+suggestion), validation (schema and business rules), persistence (Sequelize),
+consumption (UI queries and notifications), and archival (cleanup scripts). For
+long-term compliance, a deletion pipeline should anonymize PII while retaining
+aggregate analytics.
 
 \section{API Layer}
 \subsection{Habit Controller}
@@ -204,6 +292,44 @@ Task endpoints focus on flexible creation and status management:
         before persisting state changes.
 \end{itemize}
 
+\subsection{User and Authentication Controllers}
+User routes manage registration, login, profile updates, and email verification.
+Registration flows create users, issue verification tokens, and optionally seed
+starter habits. Login validates credentials, signs JWTs, and returns profile
+metadata to hydrate the frontend quickly.
+
+\subsection{Messaging and Community Controllers}
+Messaging endpoints store chat messages, associate them with senders and
+recipients, and fetch conversation histories in chronological order. Group
+challenge routes allow creating challenges, joining or leaving groups, posting
+contextual messages, and tracking leaderboard standings.
+
+\subsection{AI Controller}
+The generic AI endpoint proxies requests to configured large language models. It
+accepts prompts and system instructions, returning generated text. This decouples
+front-end experimentation from backend provider changes and centralizes API key
+management.
+
+\subsection{API Surface Map}
+Table~\ref{tab:api-map} summarizes prominent endpoints and intents.
+
+\begin{longtable}{|p{3.5cm}|p{4cm}|p{6.5cm}|}
+\caption{Representative API endpoints}\label{tab:api-map}\\
+\hline
+\textbf{Path} & \textbf{Method(s)} & \textbf{Purpose} \\ \hline
+/users/register & POST & Create user, trigger verification email \\ \hline
+/users/login & POST & Authenticate and issue JWT \\ \hline
+/habits & GET/POST & List or create habits for a user \\ \hline
+/habits/:id & PATCH/DELETE & Update or remove a habit \\ \hline
+/habits/ai/plan & POST & Generate structured habit plan \\ \hline
+/tasks & GET/POST & List or create tasks \\ \hline
+/tasks/:id/status & PATCH & Transition a task status \\ \hline
+/notifications & GET & Retrieve unread alerts \\ \hline
+/messages & GET/POST & Fetch or send direct messages \\ \hline
+/group-challenges & GET/POST & Explore or create challenges \\ \hline
+/calendar & GET/POST & Sync external calendar data \\ \hline
+\end{longtable}
+
 \subsection{Route Surface}
 The Express server mounts routers for users, habits, progress, schedules,
 notifications, group challenges, achievements, friends, analytics, tasks,
@@ -223,6 +349,26 @@ rewrite freeform habit ideas. These services enable:
   \item \textbf{Feedback loops}: embedding AI prompts within the UI (\emph{HabitCoach}) to
         guide users before they commit to new routines.
 \end{itemize}
+
+\subsection{Prompt Design}
+Prompts emphasize brevity and behavioral nudges. The system primes the model with
+the user's stated goal, constraints (time, tools, energy), and preferred tone.
+Outputs are formatted as checklists or bullet points to ease comprehension.
+
+\subsection{Safety and Guardrails}
+\begin{itemize}
+  \item \textbf{Rate Limits}: configurable caps on requests per minute to prevent
+        abuse and control costs.
+  \item \textbf{Content Filtering}: client-side checks can reject inappropriate input
+        before forwarding to the model.
+  \item \textbf{Auditability}: logs of prompts and responses (with PII minimization)
+        support debugging and user support escalations.
+\end{itemize}
+
+\subsection{Future AI Extensions}
+Potential improvements include retrieval-augmented generation using user history
+as context, sentiment-aware encouragement, and automatic schedule insertion
+based on predicted effort for each habit step.
 
 \section{Frontend Architecture}
 \subsection{Framework and Layout}
@@ -251,6 +397,29 @@ productivity tools.
   \item \textbf{Support}: contact forms and help center resources.
 \end{itemize}
 
+\subsection{State Management}
+Local component state handles transient UI interactions, while API responses are
+cached through simple hooks. For larger-scale collaboration features, adopting a
+state library (Redux Toolkit or Zustand) would standardize loading states and
+optimistic updates.
+
+\subsection{Design System Integration}
+CoreUI provides data tables, cards, charts, and navigation primitives. Custom
+theme tokens (colors for habit categories, accent colors for achievements) keep
+branding consistent. Icons and typography are selected for readability on dense
+dashboards.
+
+\subsection{Accessibility Considerations}
+Contrast ratios, focus outlines, semantic HTML landmarks, and ARIA labels are
+prioritized to make the planner usable with keyboards and screen readers. Motion
+is minimized, and user preferences for reduced animations can be honored through
+CSS media queries.
+
+\subsection{Responsive Layouts}
+Grid-based layouts adapt cards and tables for tablets and phones. Collapsible
+sidebars preserve navigation without sacrificing screen space for calendar views.
+Touch-friendly hit targets (44px minimum) are recommended for mobile interactions.
+
 \section{Security and Validation}
 \subsection{Authentication and Authorization}
 JWT-based authentication (via \texttt{jsonwebtoken}) secures protected endpoints.
@@ -263,6 +432,22 @@ Controllers validate required fields (e.g., \texttt{user\_id}, \texttt{name}) an
 values. Responses consistently use 400 for malformed requests and 404 for missing
 resources, while the global error handler standardizes 500 responses for
 unexpected failures.
+
+\subsection{Authorization Model}
+Resources are always scoped by \texttt{user\_id}. Multi-tenant boundaries become
+critical if organizations are introduced; a future \texttt{organization\_id} would
+partition data and permissions. Role-based access control could differentiate
+members, admins, and coaches.
+
+\subsection{Secrets Management}
+API keys for AI providers and JWT secrets reside in environment variables. In
+production, secrets should be injected via a vault (e.g., AWS Secrets Manager or
+HashiCorp Vault) with rotation policies and audit trails.
+
+\subsection{Data Privacy}
+Personally identifiable information (PII) such as names and emails are limited to
+essential use cases. Features that log AI prompts should redact PII or hash
+identifiers to comply with privacy regulations.
 
 \subsection{Data Integrity}
 Startup routines proactively remove orphaned records before syncing schemas,
@@ -287,6 +472,17 @@ Progress entries timestamp habit completions. Achievements and group challenges
 translate those completions into motivational milestones, with many-to-many
 links enabling users to share progress and compete collaboratively.
 
+\subsection{Calendar Integration Patterns}
+External calendars sync through OAuth (future enhancement) or token-based feeds.
+Events are normalized into \texttt{CalendarEvent} rows, with fields for start, end,
+status, and source. Conflicts are detected by overlapping intervals against
+existing busy blocks.
+
+\subsection{Notification Cadence}
+Reminders respect user timezones. A typical cadence includes morning summaries,
+midday nudges for pending habits, and evening wrap-ups. Push mechanisms could
+include email, SMS, or in-app toasts depending on user preferences.
+
 \section{Community and Communication}
 \subsection{Friendships and Group Challenges}
 Friend relationships are modeled through a self-referential join table, allowing
@@ -297,6 +493,16 @@ collective goals, with messages scoped to challenges for contextual discussion.
 Notifications provide user-specific alerts (e.g., reminders, challenge updates),
 while direct messages enable one-to-one communication. The chat model tracks
 senders and recipients, preserving conversational history.
+
+\subsection{Moderation}
+Community features require guardrails: profanity filters, abuse reporting, and
+rate limiting on message posting. Admin tools could allow muting or removing
+users who violate community guidelines.
+
+\subsection{Leaderboards}
+Leaderboards aggregate progress and challenge completions. To avoid discouraging
+new users, percentile-based tiers or personal best tracking can be surfaced
+alongside absolute rankings.
 
 \section{Deployment Considerations}
 \subsection{Environment Management}
@@ -316,6 +522,22 @@ environment handling for API base URLs and feature toggles.
 The Express server serves uploaded files from \texttt{/uploads}, enabling avatar and
 attachment features without requiring a separate CDN in development.
 
+\subsection{Containerization}
+Dockerfiles can encapsulate both backend and frontend. Multi-stage builds shrink
+image sizes by separating dependency installation from runtime layers. Compose
+files would orchestrate the web app, database, and reverse proxy (e.g., Nginx).
+
+\subsection{Continuous Integration/Delivery}
+CI pipelines should lint, test, build, and publish artifacts. CD can deploy to a
+staging environment for manual QA before promoting to production. Feature flags
+allow safe rollouts of experimental AI prompts.
+
+\subsection{Scaling Considerations}
+Horizontal scaling of the backend relies on statelessness; session data should be
+JWT-based or stored in Redis. The database can scale vertically or via read
+replicas. CDN-backed static hosting for the frontend reduces load on origin
+servers.
+
 \section{Testing and Quality}
 \subsection{Manual and Automated Checks}
 While automated test suites are not included in the current repository snapshot,
@@ -332,6 +554,21 @@ Linters (ESLint) and formatters (Prettier) can be integrated in both frontend an
 backend pipelines. Type checking with TypeScript or JSDoc annotations would
 further reduce runtime defects.
 
+\subsection{Test Data Management}
+Factories or fixtures can provision repeatable datasets for integration tests,
+including users with habits, tasks, and friendships. A seeded demo mode would
+accelerate manual QA and stakeholder demos.
+
+\subsection{Performance Testing}
+Load tests targeting task creation, habit plan generation, and message posting
+ensure endpoints remain responsive under concurrent usage. Synthetic monitoring
+could periodically exercise critical paths.
+
+\subsection{UX Research}
+Qualitative feedback loops---surveys, usability tests, and feature flags for A/B
+tests---help validate whether AI prompts and scheduling recommendations actually
+improve habit adherence.
+
 \section{Future Work}
 \begin{itemize}
   \item \textbf{Advanced Analytics}: richer habit adherence trends, burn-down charts
@@ -344,7 +581,70 @@ further reduce runtime defects.
         resolution strategies.
   \item \textbf{Extensible AI}: personalized coaching tuned to user progress and
         contextual data.
+  \item \textbf{Data Warehouse}: event pipelines and BI dashboards to study cohort
+        retention and feature adoption.
+  \item \textbf{Compliance}: GDPR/CCPA tooling for export, deletion, and consent
+        tracking.
+  \item \textbf{Plugin Ecosystem}: allow third-party extensions (focus timers,
+        mindfulness modules) via scoped tokens and manifest declarations.
+  \item \textbf{Open API}: document the REST surface with OpenAPI/Swagger for
+        partner integrations.
+  \item \textbf{Gamification Depth}: seasonal events, badges with rarity tiers, and
+        streak insurance options to keep engagement steady.
 \end{itemize}
+
+\section{Project Management and Delivery}
+\subsection{Milestones}
+\begin{itemize}
+  \item \textbf{M1 --- Foundations}: establish models, authentication, and CRUD for
+        habits/tasks; ship a minimal planner view.
+  \item \textbf{M2 --- Engagement}: add achievements, notifications, and group
+        challenges with leaderboards.
+  \item \textbf{M3 --- AI Coaching}: release habit plan generation, idea rewriting,
+        and assistant memories for contextual guidance.
+  \item \textbf{M4 --- Integrations}: calendar sync, avatar uploads, and library
+        content for education.
+  \item \textbf{M5 --- Hardening}: observability, migration tooling, and performance
+        optimizations for scale.
+\end{itemize}
+
+\subsection{Risk Management}
+Key risks include AI cost overruns, data breaches, and low user retention. Mitigate
+with budget alerts, layered security reviews, and continuous UX research. A risk
+register should assign owners and track mitigations.
+
+\subsection{Contribution Guidelines}
+Contributors should open issues with reproduction steps, follow coding standards
+consistent with ESLint/Prettier defaults, and include unit tests where possible.
+Pull requests must describe API changes and database impacts to avoid regressions.
+
+\section{Operations Runbook}
+\subsection{Incident Response}
+\begin{enumerate}
+  \item Triage incoming alerts (error spikes, elevated latency) and identify blast
+        radius.
+  \item Roll back recent deployments if correlated with incidents.
+  \item Examine logs for failing routes; reproduce with synthetic requests.
+  \item Communicate status updates to stakeholders and users when appropriate.
+  \item Post-incident, produce a timeline and remediation tasks to prevent
+        recurrence.
+\end{enumerate}
+
+\subsection{Backup and Recovery}
+Nightly database backups should capture user-generated data and uploads. Recovery
+drills ensure restoration procedures are well understood. For AI prompts, a
+privacy-safe log store enables replay without leaking sensitive content.
+
+\subsection{Change Management}
+Feature flags and canary deployments reduce blast radius. Schema changes should be
+backward compatible, staged with additive columns before removing legacy fields.
+
+\section{Ethical Considerations}
+StepHabit influences behavior; ethical design is crucial. AI advice should avoid
+medical or mental health diagnoses, provide disclaimers, and encourage users to
+consult professionals when appropriate. Data minimization and clear consent flows
+respect user autonomy. Community guidelines should promote positivity and
+inclusivity.
 
 \section{Conclusion}
 StepHabit blends goal tracking, scheduling, social accountability, and AI
