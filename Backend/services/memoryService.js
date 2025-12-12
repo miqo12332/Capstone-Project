@@ -20,6 +20,14 @@ export async function getChatHistory(userId, limit = 20) {
   return records.map(mapRecord);
 }
 
+export async function deleteChatHistory(userId) {
+  if (!userId) throw new Error("userId is required");
+
+  await AssistantMemory.destroy({
+    where: { user_id: userId, role: { [Op.in]: ["user", "assistant"] } },
+  });
+}
+
 export async function saveProfileMemory(userId, about) {
   if (!userId || !about) throw new Error("userId and about are required");
   const record = await AssistantMemory.create({

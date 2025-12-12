@@ -10,9 +10,9 @@ import {
   CCol,
   CForm,
   CFormInput,
-  CFormTextarea,
   CInputGroup,
   CInputGroupText,
+  CFormTextarea,
   CListGroup,
   CListGroupItem,
   CModal,
@@ -47,12 +47,12 @@ import {
 } from "../../services/progress";
 import { formatPercent, getProgressAnalytics } from "../../services/analytics";
 import { fetchCalendarOverview } from "../../services/calendar";
-import { promptMissedReflection } from "../../utils/reflection";
 import {
   fetchAssistantProfile,
   fetchAssistantSummary,
   saveAssistantProfile,
 } from "../../services/assistant";
+import { sendReasoningRequest } from "../../services/ai";
 import { useDataRefresh, REFRESH_SCOPES } from "../../utils/refreshBus";
 
 const Dashboard = () => {
@@ -76,6 +76,11 @@ const Dashboard = () => {
   const [aiSummary, setAiSummary] = useState("");
   const [aiSummaryAgent, setAiSummaryAgent] = useState(null);
   const [aiSummaryError, setAiSummaryError] = useState("");
+  const [patternModalOpen, setPatternModalOpen] = useState(false);
+  const [patternInsights, setPatternInsights] = useState([]);
+  const [patternRecommendation, setPatternRecommendation] = useState("");
+  const [patternLoading, setPatternLoading] = useState(false);
+  const [patternError, setPatternError] = useState("");
   const navigate = useNavigate();
 
   const user = useMemo(
@@ -352,6 +357,22 @@ const Dashboard = () => {
     setEditCounts({ done: 0, missed: 0 });
   };
 
+  const startMissedLog = (habitId, habitTitle) => {
+    setMissedError("");
+    setMissedReason("");
+    setMissedLogModal({
+      open: true,
+      habitId,
+      habitTitle: habitTitle || "this habit",
+    });
+  };
+
+  const closeMissedLog = () => {
+    setMissedLogModal({ open: false, habitId: null, habitTitle: "" });
+    setMissedReason("");
+    setMissedSaving(false);
+  };
+
   const submitEdit = async (habitId) => {
     if (!user?.id) return;
     try {
@@ -376,21 +397,47 @@ const Dashboard = () => {
     }
   };
 
-  const handleQuickLog = async (habitId, status, habitTitle) => {
+  const handleQuickLog = async (habitId, status, reason) => {
     if (!user?.id) return;
-    try {
-      const payload = { userId: user.id, status };
-      if (status === "missed") {
-        const reason = promptMissedReflection(habitTitle);
-        if (!reason) return;
-        payload.reason = reason;
+
+    const payload = { userId: user.id, status };
+    if (status === "missed") {
+      const trimmed = reason?.trim();
+      if (!trimmed) {
+        throw new Error("Please share a short note about why you missed it.");
       }
-      await logHabitProgress(habitId, payload);
-      await loadTodayProgress();
-      cancelEdit();
+      payload.reason = trimmed;
+    }
+
+    await logHabitProgress(habitId, payload);
+    await loadTodayProgress();
+    cancelEdit();
+  };
+
+  const handleDoneClick = async (habitId) => {
+    try {
+      await handleQuickLog(habitId, "done");
     } catch (err) {
       console.error("❌ Server error logging progress", err);
       alert("Failed to log progress. Please try again.");
+    }
+  };
+
+  const submitMissedLog = async () => {
+    if (!missedLogModal.habitId) return;
+
+    try {
+      setMissedSaving(true);
+      setMissedError("");
+      await handleQuickLog(missedLogModal.habitId, "missed", missedReason);
+      closeMissedLog();
+    } catch (err) {
+      console.error("❌ Failed to log missed reason", err);
+      setMissedError(
+        err.message || "We couldn't save your reflection. Please try again."
+      );
+    } finally {
+      setMissedSaving(false);
     }
   };
 
@@ -445,6 +492,171 @@ const Dashboard = () => {
     { label: "Log Progress", icon: "📝", path: "/progress-tracker" },
   ];
 
+  const formatTrendLabel = (entry) => {
+    if (!entry) return "recent day";
+
+    const date = entry.date || entry.day || entry.label;
+    if (!date) return "recent day";
+
+    const parsed = new Date(date);
+    if (parsed.toString() !== "Invalid Date") {
+      return parsed.toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+    }
+
+    return String(date);
+  };
+
+  const deriveLocalPattern = useCallback(() => {
+    if (!analytics || !Array.isArray(analytics?.habits) || analytics.habits.length === 0) {
+      return {
+        insights: [],
+        recommendation: "",
+        error: "We need more habit history before patterns can be detected.",
+      };
+    }
+
+    const recentDays = (analytics?.summary?.dailyTrend ?? []).slice(-14);
+    const insights = [];
+
+    const missedHeavy = recentDays.filter((day) => (Number(day.missed) || 0) > (Number(day.completed) || 0));
+    if (missedHeavy.length > 0) {
+      const sample = missedHeavy.slice(0, 2).map((day) => formatTrendLabel(day)).join(", ");
+      insights.push(`Missed more check-ins than completed on ${sample}${missedHeavy.length > 2 ? " and more" : ""}.`);
+    }
+
+    const strongStreakHabit = analytics.habits.reduce((best, habit) => {
+      const bestStreak = habit?.streak?.best ?? 0;
+      return bestStreak > (best?.streak?.best ?? -1) ? habit : best;
+    }, null);
+
+    if (strongStreakHabit?.habitName) {
+      insights.push(
+        `Strong streak: ${strongStreakHabit.habitName} has a best streak of ${strongStreakHabit.streak?.best || 0} days (current ${
+          strongStreakHabit.streak?.current || 0
+        }).`
+      );
+    }
+
+    const bestDay = recentDays.reduce((best, day) => {
+      const completed = Number(day.completed) || 0;
+      const missed = Number(day.missed) || 0;
+      const total = completed + missed;
+      const rate = total ? Math.round((completed / total) * 100) : 0;
+
+      if (!best || rate > best.rate) {
+        return { ...day, rate };
+      }
+      return best;
+    }, null);
+
+    if (bestDay) {
+      insights.push(`Best completion day: ${formatTrendLabel(bestDay)} with ${bestDay.rate}% completion.`);
+    }
+
+    const weakHabit = analytics.habits
+      .filter((habit) => (habit?.totals?.done || 0) + (habit?.totals?.missed || 0) > 0)
+      .reduce((weakest, habit) => {
+        const success = habit.successRate ?? 0;
+        return success < (weakest?.successRate ?? 101) ? habit : weakest;
+      }, null);
+
+    if (weakHabit?.habitName) {
+      insights.push(
+        `Weak spot: ${weakHabit.habitName} sits at ${formatPercent(weakHabit.successRate ?? 0)} success (${weakHabit?.totals?.done || 0} done / ${
+          weakHabit?.totals?.missed || 0
+        } missed).`
+      );
+    }
+
+    let recommendation = "Keep logging to reveal more personalized recommendations.";
+
+    if (weakHabit?.habitName && bestDay) {
+      recommendation = `Aim ${weakHabit.habitName} on ${formatTrendLabel(bestDay)}, when you're already hitting ${bestDay.rate}% completion, and set a reminder to prevent misses.`;
+    } else if (missedHeavy.length > 0) {
+      recommendation = "Add a backup slot on your most-missed day and pre-commit to a quick 2-minute version to keep momentum.";
+    } else if (strongStreakHabit?.habitName) {
+      recommendation = `Protect your ${strongStreakHabit.habitName} streak by pairing it with a calendar block and keeping the setup ready the night before.`;
+    }
+
+    return { insights, recommendation, bestDay, weakHabit, strongStreakHabit, missedHeavy };
+  }, [analytics]);
+
+  const parseAiPatternResponse = (reply) => {
+    if (!reply) return { insights: [], recommendation: "" };
+
+    try {
+      const parsed = JSON.parse(reply);
+      const parsedInsights = Array.isArray(parsed?.insights) ? parsed.insights.filter(Boolean) : [];
+      const parsedRecommendation = typeof parsed?.recommendation === "string" ? parsed.recommendation : "";
+
+      if (parsedInsights.length || parsedRecommendation) {
+        return { insights: parsedInsights, recommendation: parsedRecommendation };
+      }
+    } catch (err) {
+      // fall through to text parsing
+    }
+
+    const lines = reply
+      .split(/\n+/)
+      .map((line) => line.trim().replace(/^[-•]\s*/, ""))
+      .filter(Boolean);
+
+    const recommendation = lines.pop() || "";
+    return { insights: lines, recommendation };
+  };
+
+  const analyzeHabitPatterns = useCallback(async () => {
+    setPatternModalOpen(true);
+    setPatternLoading(true);
+    setPatternError("");
+
+    const localPattern = deriveLocalPattern();
+    if (localPattern.error) {
+      setPatternInsights([]);
+      setPatternRecommendation("");
+      setPatternError(localPattern.error);
+      setPatternLoading(false);
+      return;
+    }
+
+    try {
+      const snapshot = {
+        habits: analytics?.habits ?? [],
+        dailyTrend: (analytics?.summary?.dailyTrend ?? []).slice(-21),
+        streaks: analytics?.summary?.streakLeader ?? null,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      };
+
+      const response = await sendReasoningRequest({
+        snapshot,
+        insightText:
+          "Analyze the habit history to flag missed days, strong streaks, best completion windows, and weak habits. Respond as JSON with {\"insights\":[short bullets],\"recommendation\":\"one actionable tip\"}.",
+        history: [
+          {
+            role: "user",
+            content: "Detect habit patterns from analytics and propose one action to improve consistency.",
+          },
+        ],
+      });
+
+      const aiPattern = parseAiPatternResponse(response?.reply);
+
+      setPatternInsights(aiPattern.insights.length ? aiPattern.insights : localPattern.insights);
+      setPatternRecommendation(aiPattern.recommendation || localPattern.recommendation);
+    } catch (err) {
+      console.error("⚠️ Unable to fetch AI pattern detection", err);
+      setPatternError(err?.message || "We couldn't get AI-generated patterns right now.");
+      setPatternInsights(localPattern.insights);
+      setPatternRecommendation(localPattern.recommendation);
+    } finally {
+      setPatternLoading(false);
+    }
+  }, [analytics?.habits, analytics?.summary?.dailyTrend, analytics?.summary?.streakLeader, deriveLocalPattern]);
+
   const streakSnapshot = analytics?.summary?.streakLeader?.streak;
 
   const nextUp = upcomingPlans[0];
@@ -490,6 +702,14 @@ const Dashboard = () => {
               }}
             >
               🧠 AI summary
+            </CButton>
+            <CButton
+              color="primary"
+              className="action-chip"
+              variant="outline"
+              onClick={analyzeHabitPatterns}
+            >
+              🔍 AI pattern detection
             </CButton>
             <CButton
               color="light"
@@ -752,18 +972,14 @@ const Dashboard = () => {
                               <CButton
                                 color="danger"
                                 onClick={() =>
-                                  handleQuickLog(
-                                    habit.id,
-                                    "missed",
-                                    habit.title || habit.name
-                                  )
+                                  startMissedLog(habit.id, habit.title || habit.name)
                                 }
                               >
                                 Missed
                               </CButton>
                               <CButton
                                 color="success"
-                                onClick={() => handleQuickLog(habit.id, "done")}
+                                onClick={() => handleDoneClick(habit.id)}
                               >
                                 Done
                               </CButton>
@@ -1074,6 +1290,58 @@ const Dashboard = () => {
           </CRow>
         </>
       )}
+
+      <CModal
+        alignment="center"
+        visible={patternModalOpen}
+        onClose={() => setPatternModalOpen(false)}
+      >
+        <CModalHeader closeButton>AI pattern detection</CModalHeader>
+        <CModalBody>
+          {patternLoading ? (
+            <div className="d-flex align-items-center gap-3 text-body-secondary">
+              <CSpinner size="sm" />
+              <span>Scanning your habit history for trends...</span>
+            </div>
+          ) : patternError ? (
+            <CAlert color="warning" className="mb-0">
+              {patternError}
+            </CAlert>
+          ) : (
+            <>
+              <p className="text-body-secondary small">
+                Insights from your recent progress logs—misses, streaks, timing, and weaker habits.
+              </p>
+              {patternInsights.length > 0 ? (
+                <CListGroup flush className="mb-3">
+                  {patternInsights.map((insight, index) => (
+                    <CListGroupItem key={index}>{insight}</CListGroupItem>
+                  ))}
+                </CListGroup>
+              ) : (
+                <div className="text-body-secondary mb-3">
+                  No clear patterns yet. Keep logging to train the detector.
+                </div>
+              )}
+              <div className="fw-semibold">Actionable recommendation</div>
+              <div className="text-body-secondary">
+                {patternRecommendation || "Keep building history to unlock tailored guidance."}
+              </div>
+            </>
+          )}
+        </CModalBody>
+        <CModalFooter className="d-flex justify-content-between">
+          <div className="text-body-secondary small">Refresh after new check-ins to update your insights.</div>
+          <div className="d-flex gap-2">
+            <CButton color="secondary" variant="outline" onClick={() => setPatternModalOpen(false)}>
+              Close
+            </CButton>
+            <CButton color="primary" onClick={analyzeHabitPatterns} disabled={patternLoading}>
+              Refresh insights
+            </CButton>
+          </div>
+        </CModalFooter>
+      </CModal>
 
       <CModal
         alignment="center"

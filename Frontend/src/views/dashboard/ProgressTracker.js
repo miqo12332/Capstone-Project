@@ -2,13 +2,10 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CAlert,
   CBadge,
-  CButton,
   CCard,
   CCardBody,
   CCardHeader,
   CCol,
-  CFormInput,
-  CInputGroup,
   CListGroup,
   CListGroupItem,
   CProgress,
@@ -30,50 +27,8 @@ import {
 } from "recharts";
 import { getHabits } from "../../services/habits";
 import { formatPercent, getProgressAnalytics } from "../../services/analytics";
-import {
-  getTodayProgressLogs,
-  logHabitProgress,
-  updateHabitProgressCount,
-} from "../../services/progress";
-import { promptMissedReflection } from "../../utils/reflection";
+import { getTodayProgressLogs } from "../../services/progress";
 import { useDataRefresh, REFRESH_SCOPES } from "../../utils/refreshBus";
-
-const CountAdjuster = ({
-  label,
-  value,
-  color,
-  disabled,
-  onIncrement,
-  onDecrement,
-}) => (
-  <div className="d-flex flex-column gap-2 flex-fill">
-    <div className="d-flex justify-content-between align-items-center">
-      <span className="text-body-secondary text-uppercase small">{label}</span>
-      <CBadge color={color} className="px-3 py-2 fw-semibold">
-        {value}
-      </CBadge>
-    </div>
-    <CInputGroup size="sm">
-      <CButton
-        color={color}
-        variant="outline"
-        disabled={disabled || value === 0}
-        onClick={onDecrement}
-      >
-        −
-      </CButton>
-      <CFormInput value={value} readOnly className="text-center" />
-      <CButton
-        color={color}
-        variant="outline"
-        disabled={disabled}
-        onClick={onIncrement}
-      >
-        +
-      </CButton>
-    </CInputGroup>
-  </div>
-);
 
 const formatDate = (date) => {
   if (!date) return "—";
@@ -87,30 +42,14 @@ const formatDate = (date) => {
 
 const ProgressTracker = () => {
   const [habits, setHabits] = useState([]);
-  const [progress, setProgress] = useState({});
   const [err, setErr] = useState("");
   const [analytics, setAnalytics] = useState(null);
   const [analyticsErr, setAnalyticsErr] = useState("");
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [todayCounts, setTodayCounts] = useState({});
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const userId = user?.id;
-
-  const todayIso = useMemo(
-    () => new Date().toISOString().split("T")[0],
-    []
-  );
-  const todayLabel = useMemo(
-    () =>
-      new Date().toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        weekday: "short",
-      }),
-    []
-  );
 
   const loadHabits = useCallback(async () => {
     if (!userId) {
@@ -210,86 +149,13 @@ const ProgressTracker = () => {
 
   const summary = analytics?.summary;
   const dailyTrend = summary?.dailyTrend ?? [];
-  const recentDaily = useMemo(
-    () => dailyTrend.slice(-7),
-    [dailyTrend]
-  );
+  const momentumTrend = useMemo(() => dailyTrend, [dailyTrend]);
   const leaderboard = summary?.habitLeaderboard ?? [];
-
-  const markStatus = async (habitId, status, habitTitle) => {
-    if (!userId) return;
-    try {
-      setSaving(true);
-      const payload = { userId, status };
-      if (status === "missed") {
-        const reason = promptMissedReflection(habitTitle);
-        if (!reason) {
-          setSaving(false);
-          return;
-        }
-        payload.reason = reason;
-      }
-      const data = await logHabitProgress(habitId, payload);
-      setProgress((prev) => ({ ...prev, [habitId]: data.row?.status || status }));
-      await Promise.all([
-        loadAnalytics({ showSpinner: false }),
-        loadTodayCounts(),
-      ]);
-      setErr("");
-    } catch (actionErr) {
-      console.error("Failed to update progress", actionErr);
-      setErr("Failed to update progress");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const updateCount = async (habitId, status, nextValue) => {
-    if (!userId) return;
-    try {
-      setSaving(true);
-      const payload = await updateHabitProgressCount(habitId, {
-        userId,
-        status,
-        targetCount: nextValue,
-        date: todayIso,
-      });
-      setTodayCounts((prev) => ({
-        ...prev,
-        [habitId]: payload.counts,
-      }));
-      setProgress((prev) => ({ ...prev, [habitId]: status }));
-      await loadAnalytics({ showSpinner: false });
-      setErr("");
-    } catch (updateErr) {
-      console.error("Failed to adjust progress", updateErr);
-      setErr("Failed to adjust today's count");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const changeCountByDelta = (habitId, status, delta) => {
-    const currentCounts = todayCounts[habitId] || { done: 0, missed: 0 };
-    const currentValue = currentCounts[status] || 0;
-    const nextValue = Math.max(0, currentValue + delta);
-    if (nextValue === currentValue) return;
-    updateCount(habitId, status, nextValue);
-  };
 
   const statusBadgeColor = (rate) => {
     if (rate >= 80) return "success";
     if (rate >= 50) return "warning";
     return "danger";
-  };
-
-  const formatStatusLabel = (status) => {
-    if (!status) return "Pending";
-    return status === "done"
-      ? "Done"
-      : status === "missed"
-      ? "Missed"
-      : status;
   };
 
   return (
@@ -387,17 +253,17 @@ const ProgressTracker = () => {
                     <CCol xs={12} lg={7}>
                       <CCard className="h-100">
                         <CCardHeader className="fw-semibold">
-                          Recent momentum (last 7 days)
+                          Lifetime momentum
                         </CCardHeader>
                         <CCardBody style={{ height: 280 }}>
-                          {recentDaily.length ? (
+                          {momentumTrend.length ? (
                             <ResponsiveContainer
                               width="100%"
                               height="100%"
                               minWidth={200}
                               minHeight={200}
                             >
-                              <AreaChart data={recentDaily}>
+                              <AreaChart data={momentumTrend}>
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="date" tickFormatter={formatDate} />
                                 <YAxis allowDecimals={false} />
@@ -421,7 +287,7 @@ const ProgressTracker = () => {
                             </ResponsiveContainer>
                           ) : (
                             <div className="text-body-secondary text-center my-5">
-                              Keep logging progress to see your weekly momentum.
+                              Keep logging progress to see your lifetime momentum.
                             </div>
                           )}
                         </CCardBody>
@@ -473,11 +339,6 @@ const ProgressTracker = () => {
                     )}
                     {habits.map((habit) => {
                       const stats = habitStatsMap[habit.id] || {};
-                      const recent = stats.recent || {
-                        completionRate: 0,
-                        done: 0,
-                        missed: 0,
-                      };
                       const counts = todayCounts[habit.id] || { done: 0, missed: 0 };
                       const todayTotal = counts.done + counts.missed;
                       const todayCompletionRate = todayTotal
@@ -501,9 +362,9 @@ const ProgressTracker = () => {
                               </div>
                               <div className="text-body-secondary small">
                                 Current streak: {stats.streak?.current ?? 0} days ·
-                                Last 7-day success:
+                                Overall success:
                                 {" "}
-                                {formatPercent(recent.completionRate ?? 0)}
+                                {formatPercent(stats.successRate ?? 0)}
                               </div>
                               <div className="text-body-secondary small">
                                 Lifetime: {stats.totals?.done ?? 0} done /
@@ -547,71 +408,6 @@ const ProgressTracker = () => {
                           <div className="d-flex justify-content-between text-body-secondary small mt-1">
                             <span>{stats.totals?.done ?? 0} completed</span>
                             <span>{stats.totals?.missed ?? 0} missed</span>
-                          </div>
-
-                          <div className="border-top pt-3 mt-3">
-                            <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                              <div className="fw-semibold">Today's check-ins</div>
-                              <div className="text-body-secondary small">
-                                {todayLabel}
-                              </div>
-                            </div>
-                            <div className="d-flex flex-column flex-md-row gap-3">
-                              <CountAdjuster
-                                label="Completed"
-                                value={counts.done}
-                                color="success"
-                                disabled={saving}
-                                onIncrement={() =>
-                                  changeCountByDelta(habit.id, "done", 1)
-                                }
-                                onDecrement={() =>
-                                  changeCountByDelta(habit.id, "done", -1)
-                                }
-                              />
-                              <CountAdjuster
-                                label="Missed"
-                                value={counts.missed}
-                                color="danger"
-                                disabled={saving}
-                                onIncrement={() =>
-                                  changeCountByDelta(habit.id, "missed", 1)
-                                }
-                                onDecrement={() =>
-                                  changeCountByDelta(habit.id, "missed", -1)
-                                }
-                              />
-                            </div>
-                          </div>
-
-                          <div className="d-flex justify-content-between align-items-center mt-3">
-                            <div className="text-body-secondary small">
-                              Last action: {formatStatusLabel(progress[habit.id])}
-                            </div>
-                            <div className="d-flex gap-2">
-                              <CButton
-                                color="danger"
-                                size="sm"
-                                disabled={saving}
-                                onClick={() =>
-                                  markStatus(
-                                    habit.id,
-                                    "missed",
-                                    habit.title || habit.name
-                                  )
-                                }
-                              >
-                                Mark missed
-                              </CButton>
-                              <CButton
-                                color="success"
-                                size="sm"
-                                disabled={saving}
-                                onClick={() => markStatus(habit.id, "done", habit.title)}
-                              >
-                                Mark done
-                              </CButton>
-                            </div>
                           </div>
                         </CListGroupItem>
                       );

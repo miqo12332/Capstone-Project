@@ -41,7 +41,6 @@ const MySchedule = () => {
     integrationLabel: "",
   })
   const [calendarEvents, setCalendarEvents] = useState([])
-  const [calendarSourceUrl, setCalendarSourceUrl] = useState("")
   const [calendarFileName, setCalendarFileName] = useState("")
   const [calendarFileText, setCalendarFileText] = useState("")
   const calendarFileInputRef = useRef(null)
@@ -203,15 +202,14 @@ const MySchedule = () => {
       setCalendarError("")
       setCalendarStatus((prev) => ({ ...prev, syncing: true }))
 
-      if (!calendarSourceUrl && !calendarFileText) {
+      if (!calendarFileText) {
         setCalendarStatus((prev) => ({ ...prev, syncing: false }))
-        return setCalendarError("Provide an iCal URL or upload a .ics file to sync")
+        return setCalendarError("Upload a .ics file to sync your calendar")
       }
 
       const payload = {
         provider: "google",
         label: "Google Calendar",
-        sourceUrl: calendarSourceUrl || undefined,
         icsText: calendarFileText || undefined,
         days: 45,
       }
@@ -552,7 +550,7 @@ const MySchedule = () => {
                 <div>
                   <div className="fw-semibold">Pull from Google Calendar</div>
                   <div className="small text-body-secondary">
-                    Paste your secret iCal link to mirror busy events here so the assistant avoids conflicts.
+                    Upload a .ics file to mirror busy events here so the assistant avoids conflicts.
                   </div>
                   {calendarStatus.lastSync && (
                     <div className="small text-success mt-1">
@@ -578,29 +576,25 @@ const MySchedule = () => {
                   )}
                 </CButton>
               </div>
-              <CInputGroup className="mt-2">
-                <CInputGroupText>Secret iCal link</CInputGroupText>
-                <CFormInput
-                  value={calendarSourceUrl}
-                  onChange={(e) => setCalendarSourceUrl(e.target.value)}
-                  placeholder="https://calendar.google.com/calendar/ical/..."
-                />
-              </CInputGroup>
               <div className="mt-3">
                 <CFormLabel className="text-uppercase text-muted fw-semibold small mb-1">
-                  Or upload a .ics file
+                  Upload a .ics file
                 </CFormLabel>
                 <div className="d-flex align-items-center gap-2 flex-wrap position-relative">
-                  <CButton component="label" color="secondary" variant="outline">
+                  <label
+                    htmlFor="calendarUpload"
+                    className="btn btn-outline-secondary mb-0 d-inline-flex align-items-center"
+                  >
                     Choose file
-                    <CFormInput
-                      type="file"
-                      accept=".ics,text/calendar"
-                      onChange={handleCalendarFile}
-                      ref={calendarFileInputRef}
-                      className="d-none"
-                    />
-                  </CButton>
+                  </label>
+                  <input
+                    id="calendarUpload"
+                    type="file"
+                    accept=".ics,text/calendar"
+                    onChange={handleCalendarFile}
+                    ref={calendarFileInputRef}
+                    className="d-none"
+                  />
                   {calendarFileName && (
                     <div className="small text-success">Selected: {calendarFileName}</div>
                   )}

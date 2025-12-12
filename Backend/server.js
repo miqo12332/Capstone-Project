@@ -16,7 +16,7 @@ import achievementRoutes from "./routes/achievementRoutes.js";
 import friendRoutes from "./routes/friendRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
-import avatarRoutes from "./routes/avatarRoutes.js"; // ✅ new route
+import avatarRoutes from "./routes/avatarRoutes.js";
 import dailyChallengeRoutes from "./routes/dailyChallengeRoutes.js";
 import smartSchedulerRoutes from "./routes/smartSchedulerRoutes.js";
 import libraryRoutes from "./routes/libraryRoutes.js";
@@ -40,11 +40,9 @@ const PORT = process.env.PORT || 5001;
 // === Middlewares ===
 app.use(cors());
 app.use(express.json());
-
-// === Serve uploaded images ===
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// === Base Health Route ===
+// === Health Check ===
 app.get("/", (req, res) => {
   res.send("✅ StepHabit Backend is Running...");
 });
@@ -60,7 +58,7 @@ app.use("/api/achievements", achievementRoutes);
 app.use("/api/friends", friendRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/tasks", taskRoutes);
-app.use("/api/avatar", avatarRoutes); // ✅ avatar upload route
+app.use("/api/avatar", avatarRoutes);
 app.use("/api/daily-challenge", dailyChallengeRoutes);
 app.use("/api/smart-scheduler", smartSchedulerRoutes);
 app.use("/api/library", libraryRoutes);
@@ -76,23 +74,27 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
-// === Connect Database and Start Server ===
+// === START SERVER ===
 const startServer = async () => {
   try {
     await sequelize.authenticate();
     console.log("✅ Database connection established successfully.");
 
-    // Clean up legacy data that can violate new foreign key constraints when
-    // `sequelize.sync({ alter: true })` attempts to add them. Without this, an
-    // orphaned record in `user_settings` (left over from older schemas) causes
-    // Postgres to reject the migration with `SequelizeForeignKeyConstraintError`.
     const queryInterface = sequelize.getQueryInterface();
     const tables = await queryInterface.showAllTables();
-    const tableNames = tables.map((table) =>
-      typeof table === "string" ? table : table.tableName || table.table_name
+    const tableNames = tables.map(t =>
+      typeof t === "string" ? t : t.tableName || t.table_name
     );
+
     const hasTable = (name) => tableNames.includes(name);
 
+    // 🔥 CRITICAL FIX: drop legacy user_settings table
+    if (hasTable("user_settings")) {
+      await queryInterface.dropTable("user_settings");
+      console.log("🧹 Dropped legacy user_settings table");
+    }
+
+    // ---- Generic orphan cleanup helper ----
     const cleanupOrphans = async (table, fkColumn, parentTable, parentColumn) => {
       if (!hasTable(table) || !hasTable(parentTable)) return;
 
@@ -103,53 +105,35 @@ const startServer = async () => {
       `);
     };
 
-    const ensureColumnExists = async (tableName, columnName, definition) => {
-      if (!hasTable(tableName)) return;
-
-      const tableDefinition = await queryInterface.describeTable(tableName);
-      if (!tableDefinition[columnName]) {
-        await queryInterface.addColumn(tableName, columnName, definition);
-      }
-    };
-
-    await cleanupOrphans("user_settings", "user_id", "users", "id");
+    // ---- Run orphan cleanups BEFORE sync ----
     await cleanupOrphans("assistant_memories", "user_id", "users", "id");
-    await cleanupOrphans(
-      "group_challenge_messages",
-      "challenge_id",
-      "group_challenges",
-      "id"
-    );
-    await cleanupOrphans(
-      "group_challenge_messages",
-      "sender_id",
-      "users",
-      "id"
-    );
+    await cleanupOrphans("calendar_events", "user_id", "users", "id");
+    await cleanupOrphans("calendar_integrations", "user_id", "users", "id");
+    await cleanupOrphans("notifications", "user_id", "users", "id");
+    await cleanupOrphans("progress", "user_id", "users", "id");
+    await cleanupOrphans("tasks", "user_id", "users", "id");
+    await cleanupOrphans("habits", "user_id", "users", "id");
+    await cleanupOrphans("friends", "user_id", "users", "id");
+    await cleanupOrphans("friends", "friend_id", "users", "id");
 
-    await ensureColumnExists("users", "avatar", {
-      type: DataTypes.STRING(255),
-      allowNull: true,
-    });
-
-    if (hasTable("users") && hasTable("assistant_memories")) {
-      await sequelize.query(`
-        DELETE FROM assistant_memories
-        WHERE user_id IS NOT NULL
-        AND user_id NOT IN (SELECT id FROM users);
-      `);
+    // ---- Ensure optional columns exist ----
+    if (hasTable("users")) {
+      const userDef = await queryInterface.describeTable("users");
+      if (!userDef.avatar) {
+        await queryInterface.addColumn("users", "avatar", {
+          type: DataTypes.STRING(255),
+          allowNull: true,
+        });
+      }
     }
 
-
-    // Ensure any new columns or tables introduced in the models are available
-    // without requiring a manual migration step. This keeps features such as
-    // user profile preferences in sync across environments where the schema
-    // might have been created before these fields existed.
+    // ---- FINAL SAFE SYNC ----
     await sequelize.sync({ alter: true });
 
-    app.listen(PORT, () =>
-      console.log(`🚀 Server running on http://localhost:${PORT}`)
-    );
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on http://localhost:${PORT}`);
+    });
+
   } catch (err) {
     console.error("❌ Database connection failed:", err);
     process.exit(1);
@@ -157,4 +141,3 @@ const startServer = async () => {
 };
 
 startServer();
-

@@ -985,7 +985,8 @@ const HistoryTab = ({ entries, loading, error, onRefresh }) => {
     const rows = filteredEntries
       .map((entry) => {
         const reason = entry.reason ? entry.reason.replace(/"/g, '""') : ""
-        return `${entry.habitTitle},${entry.status},${entry.progressDate},${formatTime(entry.createdAt)},"${reason}"`
+        const actualDate = entry.createdAt ?? entry.progressDate
+        return `${entry.habitTitle},${entry.status},${formatDate(actualDate)},${formatTime(actualDate)},"${reason}"`
       })
       .join("\n")
     const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' })
@@ -1105,7 +1106,7 @@ const HistoryTab = ({ entries, loading, error, onRefresh }) => {
                     )}
                   </div>
                   <div className="small text-muted">
-                    {formatDate(entry.progressDate)} · {formatTime(entry.createdAt)}
+                    {formatDate(entry.createdAt ?? entry.progressDate)} · {formatTime(entry.createdAt ?? entry.progressDate)}
                   </div>
                   {entry.status === 'missed' && entry.reason && (
                     <div className="small text-body-secondary bg-body-tertiary p-2 rounded-2">
@@ -1113,9 +1114,15 @@ const HistoryTab = ({ entries, loading, error, onRefresh }) => {
                     </div>
                   )}
                 </div>
-                <CBadge color={entry.status === 'done' ? 'success' : 'danger'} className="px-3 py-2">
-                  {entry.status === 'done' ? 'Done' : 'Missed'}
-                </CBadge>
+                <div className="d-flex flex-column align-items-end gap-1">
+                  <CBadge color={entry.status === 'done' ? 'success' : 'danger'} className="px-3 py-2">
+                    {entry.status === 'done' ? 'Done' : 'Missed'}
+                  </CBadge>
+                  <div className="small text-muted text-end">
+                    {entry.status === 'done' ? 'Habit done for' : 'Habit missed for'}{' '}
+                    {formatDate(entry.progressDate ?? entry.createdAt)}
+                  </div>
+                </div>
               </div>
             </CListGroupItem>
           ))}
@@ -1344,20 +1351,39 @@ const Habits = () => {
   const handleTabChange = useCallback(
     (tab) => {
       setActiveTab(tab)
-      navigate(pathForTab(tab))
+      if (location.pathname !== pathForTab(tab)) {
+        navigate(pathForTab(tab))
+      }
     },
-    [navigate, pathForTab],
+    [location.pathname, navigate, pathForTab],
   )
+
+  const scrollToAddSection = useCallback(() => {
+    const attemptScroll = (tries = 0) => {
+      const addSection = document.getElementById("add-habit-section")
+      if (addSection && addSection.offsetParent !== null) {
+        addSection.scrollIntoView({ behavior: "smooth", block: "start" })
+        return
+      }
+
+      if (tries < 12) {
+        setTimeout(() => attemptScroll(tries + 1), 150)
+      }
+    }
+
+    requestAnimationFrame(() => attemptScroll())
+  }, [])
 
   const goToAddTab = useCallback(() => {
     handleTabChange("add")
-    requestAnimationFrame(() => {
-      const addSection = document.getElementById("add-habit-section")
-      if (addSection) {
-        addSection.scrollIntoView({ behavior: "smooth", block: "start" })
-      }
-    })
-  }, [handleTabChange])
+    scrollToAddSection()
+  }, [handleTabChange, scrollToAddSection])
+
+  useEffect(() => {
+    if (activeTab === "add") {
+      scrollToAddSection()
+    }
+  }, [activeTab, scrollToAddSection])
 
   const summary = analytics?.summary
 

@@ -13,6 +13,7 @@ DROP TABLE IF EXISTS habits CASCADE;
 DROP TABLE IF EXISTS group_challenges CASCADE;
 DROP TABLE IF EXISTS achievements CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS calendar_integrations CASCADE;
 
 -- ======================
 -- USERS

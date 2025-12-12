@@ -14,3 +14,10 @@ export const sendAiChatMessage = async (userId, message) => {
   const response = await api.post("/ai-chat/message", { userId, message });
   return response.data;
 };
+
+export const deleteAiChatHistory = async (userId) => {
+  if (!userId) throw new Error("userId is required to delete chat history");
+
+  const response = await api.delete("/ai-chat/history", { params: { userId } });
+  return response.data;
+};
