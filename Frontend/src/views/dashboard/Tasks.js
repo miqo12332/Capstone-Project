@@ -11,8 +11,11 @@ import {
   CFormInput,
   CFormLabel,
   CFormSwitch,
+  CFormTextarea,
   CInputGroup,
   CInputGroupText,
+  CListGroup,
+  CListGroupItem,
   CModal,
   CModalBody,
   CModalFooter,
@@ -22,9 +25,10 @@ import {
   CSpinner,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
-import { cilList, cilPlus, cilTask, cilWatch } from "@coreui/icons"
+import { cilArrowRight, cilList, cilPlus, cilSend, cilTask, cilWatch } from "@coreui/icons"
 
 import { createTask, getTasks } from "../../services/tasks"
+import { sendReasoningRequest } from "../../services/ai"
 
 const defaultDraft = {
   name: "",
@@ -50,6 +54,13 @@ const Tasks = () => {
   const [saving, setSaving] = useState(false)
   const [draft, setDraft] = useState(() => ({ ...defaultDraft }))
   const [feedback, setFeedback] = useState(null)
+  const [selectedTask, setSelectedTask] = useState(null)
+  const [subpoints, setSubpoints] = useState({})
+  const [subpointInput, setSubpointInput] = useState("")
+  const [aiMessage, setAiMessage] = useState("")
+  const [aiHistory, setAiHistory] = useState({})
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState(null)
 
   const user = JSON.parse(localStorage.getItem("user") || "{}")
   const userId = user?.id
@@ -120,6 +131,82 @@ const Tasks = () => {
       setFeedback({ type: "danger", message: error.message || "Unable to create task." })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const openDetails = (task) => {
+    setSelectedTask(task)
+    setSubpointInput("")
+    setAiMessage("")
+    setAiError(null)
+  }
+
+  const closeDetails = () => {
+    setSelectedTask(null)
+    setSubpointInput("")
+    setAiMessage("")
+    setAiError(null)
+  }
+
+  const taskSubpoints = selectedTask ? subpoints[selectedTask.id] || [] : []
+  const taskHistory = selectedTask ? aiHistory[selectedTask.id] || [] : []
+
+  const handleAddSubpoint = () => {
+    const trimmed = subpointInput.trim()
+    if (!selectedTask || !trimmed) return
+
+    setSubpoints((prev) => ({
+      ...prev,
+      [selectedTask.id]: [...(prev[selectedTask.id] || []), trimmed],
+    }))
+    setSubpointInput("")
+  }
+
+  const handleSendAi = async () => {
+    if (!selectedTask) return
+    const trimmed = aiMessage.trim()
+    if (!trimmed) return
+
+    const baseHistory = aiHistory[selectedTask.id] || []
+    const optimisticHistory = [
+      ...baseHistory,
+      { role: "user", content: trimmed, id: `local-${Date.now()}` },
+    ]
+
+    setAiHistory((prev) => ({ ...prev, [selectedTask.id]: optimisticHistory }))
+    setAiMessage("")
+    setAiLoading(true)
+    setAiError(null)
+
+    try {
+      const snapshot = {
+        task: selectedTask,
+        subpoints: taskSubpoints,
+        totalTasks: tasks.length,
+      }
+
+      const response = await sendReasoningRequest({
+        snapshot,
+        insightText: "Help me work on this task",
+        history: optimisticHistory,
+      })
+
+      const assistantMessage = {
+        role: "assistant",
+        content: response.reply,
+        id: `assistant-${Date.now()}`,
+      }
+
+      setAiHistory((prev) => ({
+        ...prev,
+        [selectedTask.id]: [...optimisticHistory, assistantMessage],
+      }))
+    } catch (error) {
+      console.error("Failed to send AI request", error)
+      setAiError(error.message || "Unable to talk with the AI right now.")
+      setAiHistory((prev) => ({ ...prev, [selectedTask.id]: baseHistory }))
+    } finally {
+      setAiLoading(false)
     }
   }
 
@@ -219,6 +306,14 @@ const Tasks = () => {
                             Due {new Date(task.due_date).toLocaleString()}
                           </CBadge>
                         )}
+                        <CButton
+                          color="light"
+                          size="sm"
+                          className="ms-auto"
+                          onClick={() => openDetails(task)}
+                        >
+                          <CIcon icon={cilArrowRight} className="me-2" /> Open
+                        </CButton>
                       </div>
                     </CCardBody>
                   </CCard>
@@ -338,6 +433,179 @@ const Tasks = () => {
               {saving ? <CSpinner size="sm" className="me-2" /> : <CIcon icon={cilTask} className="me-2" />}Create
             </CButton>
           </div>
+        </CModalFooter>
+      </CModal>
+
+      <CModal
+        alignment="center"
+        visible={Boolean(selectedTask)}
+        onClose={closeDetails}
+        size="lg"
+      >
+        <CModalHeader closeButton>
+          <CModalTitle>
+            Talk about: {selectedTask?.name}
+            <div className="text-medium-emphasis small fw-normal">
+              Share details, add subpoints, and chat with the AI.
+            </div>
+          </CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {selectedTask && (
+            <CRow className="g-3">
+              <CCol md={6}>
+                <CCard className="border-0 bg-body-secondary mb-3">
+                  <CCardBody>
+                    <div className="d-flex align-items-center justify-content-between mb-2">
+                      <div>
+                        <div className="fw-semibold">Task details</div>
+                        <small className="text-body-secondary">Quick snapshot for the AI.</small>
+                      </div>
+                      {selectedTask.split_up && (
+                        <CBadge color="info" shape="rounded-pill">
+                          Split up
+                        </CBadge>
+                      )}
+                    </div>
+                    <div className="text-body-secondary small mb-2">
+                      Duration {formatDuration(selectedTask.duration_minutes)}
+                      {selectedTask.min_duration_minutes
+                        ? ` • Min ${formatDuration(selectedTask.min_duration_minutes)}`
+                        : ""}
+                      {selectedTask.max_duration_minutes
+                        ? ` • Max ${formatDuration(selectedTask.max_duration_minutes)}`
+                        : ""}
+                    </div>
+                    <div className="d-flex flex-wrap gap-2 small">
+                      {selectedTask.hours_label && (
+                        <CBadge color="light">{selectedTask.hours_label}</CBadge>
+                      )}
+                      {selectedTask.schedule_after && (
+                        <CBadge color="light">
+                          Start after {new Date(selectedTask.schedule_after).toLocaleString()}
+                        </CBadge>
+                      )}
+                      {selectedTask.due_date && (
+                        <CBadge color="warning" textColor="dark">
+                          Due {new Date(selectedTask.due_date).toLocaleString()}
+                        </CBadge>
+                      )}
+                    </div>
+                  </CCardBody>
+                </CCard>
+
+                <div className="mb-2 d-flex align-items-center justify-content-between">
+                  <div>
+                    <div className="fw-semibold">Subpoints</div>
+                    <small className="text-body-secondary">
+                      Break the task down before asking the AI.
+                    </small>
+                  </div>
+                  <CBadge color="light" textColor="dark">
+                    {taskSubpoints.length || 0} added
+                  </CBadge>
+                </div>
+
+                <CInputGroup className="mb-2">
+                  <CFormInput
+                    placeholder="Add a subpoint"
+                    value={subpointInput}
+                    onChange={(e) => setSubpointInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault()
+                        handleAddSubpoint()
+                      }
+                    }}
+                  />
+                  <CButton color="primary" variant="outline" onClick={handleAddSubpoint}>
+                    Add
+                  </CButton>
+                </CInputGroup>
+
+                <CListGroup className="mb-3">
+                  {taskSubpoints.length ? (
+                    taskSubpoints.map((point, idx) => (
+                      <CListGroupItem key={`${selectedTask.id}-point-${idx}`}>
+                        {point}
+                      </CListGroupItem>
+                    ))
+                  ) : (
+                    <CListGroupItem className="text-body-secondary">
+                      No subpoints yet. Create a couple so the AI can be specific.
+                    </CListGroupItem>
+                  )}
+                </CListGroup>
+              </CCol>
+
+              <CCol md={6}>
+                <div className="d-flex align-items-center justify-content-between mb-2">
+                  <div>
+                    <div className="fw-semibold">Ask the AI</div>
+                    <small className="text-body-secondary">
+                      The AI sees this task, your subpoints, and recent messages.
+                    </small>
+                  </div>
+                  {aiLoading && <CSpinner size="sm" color="info" />}
+                </div>
+
+                <div
+                  className="border rounded p-3 mb-3 bg-body-secondary"
+                  style={{ minHeight: 220, maxHeight: 320, overflowY: "auto" }}
+                >
+                  {taskHistory.length ? (
+                    taskHistory.map((entry) => (
+                      <div key={entry.id} className="mb-3">
+                        <small className="text-uppercase text-medium-emphasis fw-semibold d-block mb-1">
+                          {entry.role === "user" ? "You" : "AI"}
+                        </small>
+                        <div
+                          className={`p-2 rounded-4 ${
+                            entry.role === "assistant" ? "bg-white" : "bg-primary text-white"
+                          }`}
+                        >
+                          {entry.content}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-body-secondary text-center">
+                      Ask a question to start planning this task with the AI.
+                    </div>
+                  )}
+                </div>
+
+                {aiError && <CAlert color="danger">{aiError}</CAlert>}
+
+                <CInputGroup>
+                  <CFormTextarea
+                    rows={2}
+                    placeholder="Ask for help, break down steps, or request coaching"
+                    value={aiMessage}
+                    onChange={(e) => setAiMessage(e.target.value)}
+                    disabled={aiLoading}
+                  />
+                  <CButton color="primary" disabled={aiLoading} onClick={handleSendAi}>
+                    {aiLoading ? (
+                      <>
+                        <CSpinner size="sm" className="me-2" /> Sending
+                      </>
+                    ) : (
+                      <>
+                        <CIcon icon={cilSend} className="me-2" /> Send
+                      </>
+                    )}
+                  </CButton>
+                </CInputGroup>
+              </CCol>
+            </CRow>
+          )}
+        </CModalBody>
+        <CModalFooter>
+          <div className="text-body-secondary small">AI requests use your task snapshot and notes.</div>
+          <CButton color="secondary" variant="ghost" onClick={closeDetails}>
+            Close
+          </CButton>
         </CModalFooter>
       </CModal>
     </div>
