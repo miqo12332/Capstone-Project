@@ -1350,12 +1350,16 @@ const Habits = () => {
   )
 
   const scrollToAddSection = useCallback(() => {
-    requestAnimationFrame(() => {
+    const attemptScroll = (tries = 0) => {
       const addSection = document.getElementById("add-habit-section")
       if (addSection) {
         addSection.scrollIntoView({ behavior: "smooth", block: "start" })
+      } else if (tries < 5) {
+        setTimeout(() => attemptScroll(tries + 1), 100)
       }
-    })
+    }
+
+    requestAnimationFrame(() => attemptScroll())
   }, [])
 
   const goToAddTab = useCallback(() => {
