@@ -1114,9 +1114,15 @@ const HistoryTab = ({ entries, loading, error, onRefresh }) => {
                     </div>
                   )}
                 </div>
-                <CBadge color={entry.status === 'done' ? 'success' : 'danger'} className="px-3 py-2">
-                  {entry.status === 'done' ? 'Done' : 'Missed'}
-                </CBadge>
+                <div className="d-flex flex-column align-items-end gap-1">
+                  <CBadge color={entry.status === 'done' ? 'success' : 'danger'} className="px-3 py-2">
+                    {entry.status === 'done' ? 'Done' : 'Missed'}
+                  </CBadge>
+                  <div className="small text-muted text-end">
+                    {entry.status === 'done' ? 'Habit done' : 'Habit logged'} at{' '}
+                    {formatDate(entry.createdAt ?? entry.progressDate)} · {formatTime(entry.createdAt ?? entry.progressDate)}
+                  </div>
+                </div>
               </div>
             </CListGroupItem>
           ))}
