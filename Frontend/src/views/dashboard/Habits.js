@@ -1344,18 +1344,23 @@ const Habits = () => {
   const handleTabChange = useCallback(
     (tab) => {
       setActiveTab(tab)
-      navigate(pathForTab(tab))
+      if (location.pathname !== pathForTab(tab)) {
+        navigate(pathForTab(tab))
+      }
     },
-    [navigate, pathForTab],
+    [location.pathname, navigate, pathForTab],
   )
 
   const scrollToAddSection = useCallback(() => {
     const attemptScroll = (tries = 0) => {
       const addSection = document.getElementById("add-habit-section")
-      if (addSection) {
+      if (addSection && addSection.offsetParent !== null) {
         addSection.scrollIntoView({ behavior: "smooth", block: "start" })
-      } else if (tries < 5) {
-        setTimeout(() => attemptScroll(tries + 1), 100)
+        return
+      }
+
+      if (tries < 12) {
+        setTimeout(() => attemptScroll(tries + 1), 150)
       }
     }
 
