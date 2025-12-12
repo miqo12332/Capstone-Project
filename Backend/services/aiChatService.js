@@ -3,6 +3,7 @@ import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages
 import { QueryTypes } from "sequelize";
 
 import sequelize from "../sequelize.js";
+import { buildHabitSuggestion, detectConfirmation, detectHabitIdea } from "../utils/habitNlp.js";
 import {
   Achievement,
   CalendarEvent,
@@ -15,7 +16,7 @@ import {
   User,
   UserSetting,
 } from "../models/index.js";
-import { getChatHistory } from "./memoryService.js";
+import { findPendingHabitSuggestion, getChatHistory } from "./memoryService.js";
 
 const CLAUDE_BASE_URL = (process.env.CLAUDE_BASE_URL || "https://api.anthropic.com").replace(/\/$/, "");
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-3-5-sonnet-20240620";
@@ -146,6 +147,35 @@ const formatTableSummary = (tables) =>
     })
     .join("\n");
 
+const analyzeHabitIntent = (message, history = []) => {
+  const normalized = (message || "").trim();
+  const lower = normalized.toLowerCase();
+  const pendingSuggestion = findPendingHabitSuggestion(history);
+
+  if (!normalized) {
+    return { intent: "chat", habitSuggestion: null, reply: null };
+  }
+
+  if (detectConfirmation(lower) && pendingSuggestion) {
+    return {
+      intent: "confirm-add",
+      habitSuggestion: pendingSuggestion,
+      reply: `Want me to add "${pendingSuggestion.title}" as a habit or tweak it first?`,
+    };
+  }
+
+  if (detectHabitIdea(lower)) {
+    const habitSuggestion = buildHabitSuggestion(normalized);
+    return {
+      intent: "suggest",
+      habitSuggestion,
+      reply: `Here's a simple habit: ${habitSuggestion.title} — ${habitSuggestion.description}. Should I add this or adjust it?`,
+    };
+  }
+
+  return { intent: "chat", habitSuggestion: null, reply: null };
+};
+
 const toChatMessage = (entry) => {
   if (!entry?.content) return null;
   return entry.role === "assistant"
@@ -239,12 +269,16 @@ const callClaude = async (messages) => {
   return null;
 };
 
-export const generateAiChatReply = async ({ userId, message }) => {
+export const generateAiChatReply = async ({ userId, message, history: providedHistory = null }) => {
   const [dbOverview, userContext, history] = await Promise.all([
     describeTables(),
     loadUserContext(userId),
-    getChatHistory(userId, MESSAGE_HISTORY_LIMIT),
+    providedHistory
+      ? Promise.resolve(providedHistory)
+      : getChatHistory(userId, MESSAGE_HISTORY_LIMIT),
   ]);
+
+  const habitAnalysis = analyzeHabitIntent(message, history);
 
   const systemInstruction = [
     "You are a warm, conversational AI assistant for the StepHabit platform.",
@@ -255,13 +289,20 @@ export const generateAiChatReply = async ({ userId, message }) => {
     "User context:\n" + JSON.stringify(userContext || {}, null, 2),
   ].join("\n\n");
 
-  const claudeReply = await callClaude(
-    buildChatMessages({ systemInstruction, history, message })
-  );
+  const claudeReply =
+    habitAnalysis.intent === "chat"
+      ? await callClaude(buildChatMessages({ systemInstruction, history, message }))
+      : null;
 
   const reply =
+    habitAnalysis.reply ||
     claudeReply ||
     fallbackReply({ message, userContext, dbOverview, history });
 
-  return { reply, context: { dbOverview, userContext, history } };
+  return {
+    reply,
+    intent: habitAnalysis.intent,
+    habitSuggestion: habitAnalysis.habitSuggestion,
+    context: { dbOverview, userContext, history },
+  };
 };
