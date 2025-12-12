@@ -1349,15 +1349,25 @@ const Habits = () => {
     [navigate, pathForTab],
   )
 
-  const goToAddTab = useCallback(() => {
-    handleTabChange("add")
+  const scrollToAddSection = useCallback(() => {
     requestAnimationFrame(() => {
       const addSection = document.getElementById("add-habit-section")
       if (addSection) {
         addSection.scrollIntoView({ behavior: "smooth", block: "start" })
       }
     })
-  }, [handleTabChange])
+  }, [])
+
+  const goToAddTab = useCallback(() => {
+    handleTabChange("add")
+    scrollToAddSection()
+  }, [handleTabChange, scrollToAddSection])
+
+  useEffect(() => {
+    if (activeTab === "add") {
+      scrollToAddSection()
+    }
+  }, [activeTab, scrollToAddSection])
 
   const summary = analytics?.summary
 
