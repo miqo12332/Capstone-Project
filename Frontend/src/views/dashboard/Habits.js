@@ -985,7 +985,8 @@ const HistoryTab = ({ entries, loading, error, onRefresh }) => {
     const rows = filteredEntries
       .map((entry) => {
         const reason = entry.reason ? entry.reason.replace(/"/g, '""') : ""
-        return `${entry.habitTitle},${entry.status},${entry.progressDate},${formatTime(entry.createdAt)},"${reason}"`
+        const actualDate = entry.createdAt ?? entry.progressDate
+        return `${entry.habitTitle},${entry.status},${formatDate(actualDate)},${formatTime(actualDate)},"${reason}"`
       })
       .join("\n")
     const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' })
@@ -1105,7 +1106,7 @@ const HistoryTab = ({ entries, loading, error, onRefresh }) => {
                     )}
                   </div>
                   <div className="small text-muted">
-                    {formatDate(entry.progressDate)} · {formatTime(entry.createdAt)}
+                    {formatDate(entry.createdAt ?? entry.progressDate)} · {formatTime(entry.createdAt ?? entry.progressDate)}
                   </div>
                   {entry.status === 'missed' && entry.reason && (
                     <div className="small text-body-secondary bg-body-tertiary p-2 rounded-2">
