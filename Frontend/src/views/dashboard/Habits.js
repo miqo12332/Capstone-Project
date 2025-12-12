@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import {
   CAlert,
@@ -485,7 +485,26 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
     () => new Date(selectedYear, selectedMonth, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" }),
     [selectedMonth, selectedYear],
   )
-  const DayStatusCheckbox = ({ status, onToggle, disabled, inputId, title, isFuture }) => {
+  const DayStatusCheckbox = ({
+    status,
+    onToggle,
+    onOpenNote,
+    disabled,
+    inputId,
+    title,
+    isFuture,
+  }) => {
+    const clickTimer = useRef(null)
+
+    useEffect(() => {
+      return () => {
+        if (clickTimer.current) {
+          clearTimeout(clickTimer.current)
+          clickTimer.current = null
+        }
+      }
+    }, [])
+
     const mark = status === "done" ? "✓" : status === "missed" ? "✕" : ""
 
     return (
@@ -497,7 +516,24 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
         aria-label={title}
         aria-pressed={Boolean(status)}
         disabled={disabled}
-        onClick={onToggle}
+        onClick={() => {
+          if (clickTimer.current) {
+            clearTimeout(clickTimer.current)
+            clickTimer.current = null
+          }
+          clickTimer.current = setTimeout(() => {
+            clickTimer.current = null
+            onToggle()
+          }, 200)
+        }}
+        onDoubleClick={(event) => {
+          event.preventDefault()
+          if (clickTimer.current) {
+            clearTimeout(clickTimer.current)
+            clickTimer.current = null
+          }
+          onOpenNote?.()
+        }}
         title={title}
         id={inputId}
       >
@@ -703,29 +739,11 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                                         day: "numeric",
                                       })}${noteLabel}`}
                                       onToggle={() => handleCalendarToggle(habit, dateKey)}
+                                      onOpenNote={() => {
+                                        if (!status || isFuture) return
+                                        openNoteEditor(habit, dateKey, status)
+                                      }}
                                     />
-                                    {status && !isFuture && (
-                                      <CTooltip
-                                        content={dayEntry?.reason ? "Edit description" : "Add description"}
-                                        placement="top"
-                                      >
-                                        <CButton
-                                          size="sm"
-                                          color="light"
-                                          variant="ghost"
-                                          className="note-button"
-                                          aria-label={
-                                            dayEntry?.reason
-                                              ? "Edit description for this day"
-                                              : "Add description for this day"
-                                          }
-                                          disabled={isSaving}
-                                          onClick={() => openNoteEditor(habit, dateKey, status)}
-                                        >
-                                          <CIcon icon={cilPencil} />
-                                        </CButton>
-                                      </CTooltip>
-                                    )}
                                   </div>
                                 </div>
                               )
