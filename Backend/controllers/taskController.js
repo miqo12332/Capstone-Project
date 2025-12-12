@@ -38,9 +38,16 @@ export const createTask = async (req, res, next) => {
   try {
     const name = req.body.name?.trim();
     const userId = req.body.user_id;
+    const color = req.body.color?.trim() || null;
+    const status = req.body.status?.trim() || "pending";
 
     if (!name || !userId) {
       return res.status(400).json({ error: "name and user_id are required" });
+    }
+
+    const allowedStatuses = ["pending", "done", "missed"];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ error: "Invalid status value" });
     }
 
     const task = await Task.create({
@@ -53,9 +60,40 @@ export const createTask = async (req, res, next) => {
       hours_label: req.body.hours_label?.trim() || null,
       schedule_after: toDate(req.body.schedule_after),
       due_date: toDate(req.body.due_date),
+      color,
+      status,
     });
 
     return res.status(201).json(task);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateTaskStatus = async (req, res, next) => {
+  try {
+    const taskId = req.params.taskId;
+    const status = req.body.status?.trim();
+    const allowedStatuses = ["pending", "done", "missed"];
+
+    if (!taskId) {
+      return res.status(400).json({ error: "taskId is required" });
+    }
+
+    if (!status || !allowedStatuses.includes(status)) {
+      return res.status(400).json({ error: "Invalid status value" });
+    }
+
+    const task = await Task.findByPk(taskId);
+
+    if (!task) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    task.status = status;
+    await task.save();
+
+    return res.json(task);
   } catch (error) {
     next(error);
   }

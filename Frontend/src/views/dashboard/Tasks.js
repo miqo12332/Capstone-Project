@@ -27,7 +27,7 @@ import {
 import CIcon from "@coreui/icons-react"
 import { cilList, cilPlus, cilSend, cilTask, cilWatch } from "@coreui/icons"
 
-import { createTask, getTasks } from "../../services/tasks"
+import { createTask, getTasks, updateTaskStatus } from "../../services/tasks"
 import { sendReasoningRequest } from "../../services/ai"
 
 const defaultDraft = {
@@ -39,6 +39,8 @@ const defaultDraft = {
   hours_label: "Working Hours",
   schedule_after: "",
   due_date: "",
+  color: "#4f46e5",
+  status: "pending",
 }
 
 const formatDuration = (minutes) => {
@@ -62,6 +64,7 @@ const Tasks = () => {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState(null)
   const [draggedId, setDraggedId] = useState(null)
+  const [updatingStatusId, setUpdatingStatusId] = useState(null)
 
   const user = JSON.parse(localStorage.getItem("user") || "{}")
   const userId = user?.id
@@ -83,7 +86,12 @@ const Tasks = () => {
     try {
       setLoading(true)
       const data = await getTasks(userId)
-      setTasks(Array.isArray(data) ? data : [])
+      const normalized = (Array.isArray(data) ? data : []).map((task) => ({
+        ...task,
+        status: task.status || "pending",
+        color: task.color || "#4f46e5",
+      }))
+      setTasks(normalized)
       setFeedback(null)
     } catch (error) {
       console.error("Failed to load tasks", error)
@@ -147,6 +155,23 @@ const Tasks = () => {
     setSubpointInput("")
     setAiMessage("")
     setAiError(null)
+  }
+
+  const handleUpdateStatus = async (taskId, status) => {
+    setFeedback(null)
+    setUpdatingStatusId(taskId)
+
+    try {
+      const updated = await updateTaskStatus(taskId, status)
+      setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: updated.status } : task)))
+      setSelectedTask((prev) => (prev?.id === taskId ? { ...prev, status: updated.status } : prev))
+      setFeedback({ type: "success", message: `Task marked as ${status}.` })
+    } catch (error) {
+      console.error("Failed to update task status", error)
+      setFeedback({ type: "danger", message: error.message || "Unable to update task status." })
+    } finally {
+      setUpdatingStatusId(null)
+    }
   }
 
   const taskSubpoints = selectedTask ? subpoints[selectedTask.id] || [] : []
@@ -239,6 +264,19 @@ const Tasks = () => {
     setDraggedId(null)
   }
 
+  const renderStatusBadge = (status) => {
+    const colorMap = {
+      done: "success",
+      missed: "danger",
+      pending: "secondary",
+    }
+    return (
+      <CBadge color={colorMap[status] || "secondary"} shape="rounded-pill">
+        {status || "pending"}
+      </CBadge>
+    )
+  }
+
   return (
     <div className="py-3">
       <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
@@ -308,10 +346,18 @@ const Tasks = () => {
                       draggedId === task.id ? "border-primary border-2" : ""
                     }`}
                   >
-                    <div className="d-flex align-items-center gap-2 flex-grow-1">
-                      <span className="text-body-secondary" style={{ cursor: "grab" }}>
-                        <CIcon icon={cilList} />
-                      </span>
+                    <div className="d-flex align-items-center gap-3 flex-grow-1">
+                      <span
+                        className="rounded-circle border"
+                        style={{
+                          backgroundColor: task.color || "#4f46e5",
+                          width: 16,
+                          height: 16,
+                          display: "inline-block",
+                          cursor: "grab",
+                        }}
+                        aria-label={`Task color ${task.color || "purple"}`}
+                      />
                       <button
                         type="button"
                         className="btn btn-link text-decoration-none text-start p-0"
@@ -320,9 +366,32 @@ const Tasks = () => {
                         <div className="fw-semibold text-wrap">{task.name}</div>
                       </button>
                     </div>
-                    <div className="text-body-secondary small d-flex align-items-center gap-2">
-                      <CIcon icon={cilWatch} className="text-primary" />
-                      <span>Created {new Date(task.created_at).toLocaleDateString()}</span>
+                    <div className="text-body-secondary small d-flex align-items-center gap-3 flex-wrap justify-content-end">
+                      <div className="d-flex align-items-center gap-1">
+                        {renderStatusBadge(task.status)}
+                        <CButton
+                          color="success"
+                          variant="outline"
+                          size="sm"
+                          disabled={updatingStatusId === task.id}
+                          onClick={() => handleUpdateStatus(task.id, "done")}
+                        >
+                          {updatingStatusId === task.id ? <CSpinner size="sm" /> : "Done"}
+                        </CButton>
+                        <CButton
+                          color="danger"
+                          variant="outline"
+                          size="sm"
+                          disabled={updatingStatusId === task.id}
+                          onClick={() => handleUpdateStatus(task.id, "missed")}
+                        >
+                          {updatingStatusId === task.id ? <CSpinner size="sm" /> : "Missed"}
+                        </CButton>
+                      </div>
+                      <div className="d-flex align-items-center gap-2">
+                        <CIcon icon={cilWatch} className="text-primary" />
+                        <span>Created {new Date(task.created_at).toLocaleDateString()}</span>
+                      </div>
                     </div>
                   </CListGroupItem>
                 ))}
@@ -429,6 +498,18 @@ const Tasks = () => {
                 onChange={(e) => handleDraftChange("due_date", e.target.value)}
               />
             </CCol>
+            <CCol md={6}>
+              <CFormLabel>Task color</CFormLabel>
+              <div className="d-flex align-items-center gap-2">
+                <CFormInput
+                  type="color"
+                  value={draft.color}
+                  onChange={(e) => handleDraftChange("color", e.target.value)}
+                  style={{ width: 64 }}
+                />
+                <small className="text-body-secondary">Shown on the list icon.</small>
+              </div>
+            </CCol>
           </CForm>
         </CModalBody>
         <CModalFooter className="d-flex justify-content-between">
@@ -456,6 +537,7 @@ const Tasks = () => {
             <div className="text-medium-emphasis small fw-normal">
               Share details, add subpoints, and chat with the AI.
             </div>
+            {selectedTask && <div className="mt-2">{renderStatusBadge(selectedTask.status)}</div>}
           </CModalTitle>
         </CModalHeader>
         <CModalBody>
