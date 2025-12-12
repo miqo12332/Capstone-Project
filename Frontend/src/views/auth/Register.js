@@ -406,7 +406,7 @@ const Register = () => {
           <p className="mb-2">We’ve sent a 6-digit code to {form.email || "your email"}. Enter it below to finish.</p>
           <CButton
             color="link"
-            className="px-0"
+            className="px-0 auth-link"
             type="button"
             onClick={requestVerificationCode}
             disabled={sendingCode || submitting}
@@ -492,7 +492,12 @@ const Register = () => {
                   </div>
 
                   <div className="text-center mt-3">
-                    <CButton color="link" className="px-0" onClick={() => navigate("/login")} disabled={submitting}>
+                    <CButton
+                      color="link"
+                      className="px-0 auth-link"
+                      onClick={() => navigate("/login")}
+                      disabled={submitting}
+                    >
                       Already have an account? Log in
                     </CButton>
                   </div>

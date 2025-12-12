@@ -557,6 +557,25 @@ body {
   color: var(--cui-primary);
 }
 
+.auth-link {
+  color: var(--cui-primary) !important;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s ease, text-decoration-color 0.2s ease;
+}
+
+.auth-link:hover,
+.auth-link:focus-visible {
+  color: #3046d3;
+  text-decoration: underline;
+}
+
+.auth-link:disabled {
+  color: var(--cui-primary) !important;
+  opacity: 0.7;
+  text-decoration: none;
+}
+
 // ===== Habits module refresh =====
 .habits-page {
   background: radial-gradient(circle at 20% 20%, rgba(75, 113, 255, 0.06), transparent 32%),
