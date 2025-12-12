@@ -126,6 +126,14 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
     }, [loadHabits, loadHistory]),
   )
 
+  const formatDateKey = useCallback((date) => {
+    return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+      .toISOString()
+      .split("T")[0]
+  }, [])
+
+  const todayKey = useMemo(() => formatDateKey(today), [formatDateKey, today])
+
   const cycleStatus = useCallback((status) => {
     if (status === "done") return "missed"
     if (status === "missed") return null
@@ -298,14 +306,6 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
     ),
     [onAddClick],
   )
-
-  const formatDateKey = useCallback((date) => {
-    return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-      .toISOString()
-      .split("T")[0]
-  }, [])
-
-  const todayKey = useMemo(() => formatDateKey(today), [formatDateKey, today])
 
   const monthOptions = useMemo(
     () =>
