@@ -72,6 +72,8 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
   const [historyEntries, setHistoryEntries] = useState([])
   const [historyError, setHistoryError] = useState("")
   const [calendarSaving, setCalendarSaving] = useState(null)
+  const [noteDraft, setNoteDraft] = useState("")
+  const [noteTarget, setNoteTarget] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
 
   const today = useMemo(() => new Date(), [])
@@ -143,13 +145,13 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
       const dateKey = (entry.progressDate || entry.createdAt || "").slice(0, 10)
       if (!dateKey) return acc
       if (!acc[habitKey]) acc[habitKey] = {}
-      acc[habitKey][dateKey] = entry.status
+      acc[habitKey][dateKey] = { status: entry.status, reason: entry.reason }
       return acc
     }, {})
   }, [historyEntries])
 
   const updateCountsForDate = useCallback(
-    async (habitId, dateKey, nextStatus) => {
+    async (habitId, dateKey, nextStatus, note) => {
       if (!userId) return
 
       const targetCounts = {
@@ -163,30 +165,31 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
           status: "done",
           targetCount: targetCounts.done,
           date: dateKey,
+          note: nextStatus === "done" ? note || null : null,
         }),
         updateHabitProgressCount(habitId, {
           userId,
           status: "missed",
           targetCount: targetCounts.missed,
           date: dateKey,
+          note: nextStatus === "missed" ? note || null : null,
         }),
       ])
     },
     [userId],
   )
 
-  const handleCalendarToggle = useCallback(
-    async (habit, dateKey) => {
+  const applyStatusChange = useCallback(
+    async (habit, dateKey, nextStatus, note) => {
       const habitId = habit?.id || habit?.habitId
       if (!habitId || !userId) return
       if (isFutureDate(dateKey)) return
 
-      const currentStatus = historyByHabit[String(habitId)]?.[dateKey] || null
-      const nextStatus = cycleStatus(currentStatus)
+      const trimmedNote = note?.trim() || null
 
       try {
         setCalendarSaving(`${habitId}-${dateKey}`)
-        await updateCountsForDate(habitId, dateKey, nextStatus)
+        await updateCountsForDate(habitId, dateKey, nextStatus, trimmedNote)
         emitDataRefresh(REFRESH_SCOPES.PROGRESS, { habitId, status: nextStatus || "cleared", date: dateKey })
         emitDataRefresh(REFRESH_SCOPES.ANALYTICS, { habitId, status: nextStatus || "cleared", date: dateKey })
         setHistoryEntries((prev) => {
@@ -206,6 +209,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
             status: nextStatus,
             progressDate: dateKey,
             createdAt: new Date().toISOString(),
+            reason: trimmedNote,
           }
 
           return [...filtered, nextEntry]
@@ -224,8 +228,47 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
         setCalendarSaving(null)
       }
     },
-    [cycleStatus, historyByHabit, updateCountsForDate, userId],
+    [isFutureDate, updateCountsForDate, userId],
   )
+
+  const handleCalendarToggle = useCallback(
+    (habit, dateKey) => {
+      const habitId = habit?.id || habit?.habitId
+      if (!habitId || !userId) return
+      if (isFutureDate(dateKey)) return
+
+      const currentEntry = historyByHabit[String(habitId)]?.[dateKey]
+      const currentStatus = currentEntry?.status || null
+      const nextStatus = cycleStatus(currentStatus)
+
+      if (!nextStatus) {
+        applyStatusChange(habit, dateKey, nextStatus, null)
+        return
+      }
+
+      setNoteTarget({ habit, dateKey, status: nextStatus })
+      setNoteDraft(currentEntry?.reason || "")
+    },
+    [applyStatusChange, cycleStatus, historyByHabit, isFutureDate, userId],
+  )
+
+  const closeNoteModal = useCallback(() => {
+    setNoteTarget(null)
+    setNoteDraft("")
+  }, [])
+
+  const handleNoteSubmit = useCallback(async () => {
+    if (!noteTarget) return
+    await applyStatusChange(noteTarget.habit, noteTarget.dateKey, noteTarget.status, noteDraft)
+    closeNoteModal()
+  }, [applyStatusChange, closeNoteModal, noteDraft, noteTarget])
+
+  const noteModalSaving = useMemo(() => {
+    if (!noteTarget) return false
+    const habitId = noteTarget.habit?.id || noteTarget.habit?.habitId
+    if (!habitId) return false
+    return calendarSaving === `${habitId}-${noteTarget.dateKey}`
+  }, [calendarSaving, noteTarget])
 
   const startEdit = (habit) => {
     setEditDraft(createEditDraft(habit))
@@ -406,7 +449,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
       let done = 0
       let total = 0
       visibleDays.forEach((day) => {
-        const status = statuses[formatDateKey(day)]
+        const status = statuses[formatDateKey(day)]?.status
         if (status === "done") done += 1
         if (status === "done" || status === "missed") total += 1
       })
@@ -630,9 +673,14 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                             </div>
                             {visibleDays.map((day) => {
                               const dateKey = formatDateKey(day)
-                              const status = historyByHabit[habitKey]?.[dateKey]
+                              const dayEntry = historyByHabit[habitKey]?.[dateKey]
+                              const status = dayEntry?.status || null
                               const isSaving = calendarSaving === `${habit.id}-${dateKey}`
                               const isFuture = isFutureDate(day)
+                              const noteLabel = dayEntry?.reason
+                                ? ` • Note: ${dayEntry.reason}`
+                                : ""
+
                               return (
                                 <div
                                   key={`${habit.id}-${dateKey}`}
@@ -648,7 +696,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                                     title={`${habit.title} on ${day.toLocaleDateString(undefined, {
                                       month: "short",
                                       day: "numeric",
-                                    })}`}
+                                    })}${noteLabel}`}
                                     onToggle={() => handleCalendarToggle(habit, dateKey)}
                                   />
                                 </div>
@@ -744,6 +792,36 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
           </CButton>
           <CButton color="primary" disabled={savingEdit} onClick={saveEdit}>
             {savingEdit ? "Saving..." : "Save changes"}
+          </CButton>
+        </CModalFooter>
+      </CModal>
+
+      <CModal visible={Boolean(noteTarget)} onClose={closeNoteModal} alignment="center">
+        <CModalHeader closeButton>
+          <CModalTitle>Add a note for this check-in</CModalTitle>
+        </CModalHeader>
+        <CModalBody className="d-flex flex-column gap-3">
+          <div className="text-muted">
+            {noteTarget?.habit?.title || "Habit"} · {noteTarget?.dateKey}
+          </div>
+          <CFormTextarea
+            rows={3}
+            autoFocus
+            value={noteDraft}
+            onChange={(e) => setNoteDraft(e.target.value)}
+            placeholder="Optional note about this day (e.g., why it worked or what got in the way)."
+            disabled={noteModalSaving}
+          />
+          <div className="text-muted small">
+            Notes are saved with your {noteTarget?.status} status and removed if you clear the day.
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" variant="ghost" onClick={closeNoteModal} disabled={noteModalSaving}>
+            Cancel
+          </CButton>
+          <CButton color="primary" onClick={handleNoteSubmit} disabled={noteModalSaving}>
+            {noteModalSaving ? <CSpinner size="sm" /> : "Save note"}
           </CButton>
         </CModalFooter>
       </CModal>
@@ -1028,7 +1106,7 @@ const HistoryTab = ({ entries, loading, error, onRefresh }) => {
       <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-3">
         <div className="text-muted small">
           {filteredEntries.length === entries.length
-            ? "Latest 50 check-ins, including your missed-day notes."
+            ? "Latest 50 check-ins, including your notes."
             : `Showing ${filteredEntries.length} of ${entries.length} logs.`}
         </div>
         <div className="d-flex gap-2 flex-wrap">
@@ -1133,9 +1211,10 @@ const HistoryTab = ({ entries, loading, error, onRefresh }) => {
                   <div className="small text-muted">
                     {formatDate(entry.createdAt ?? entry.progressDate)} · {formatTime(entry.createdAt ?? entry.progressDate)}
                   </div>
-                  {entry.status === 'missed' && entry.reason && (
+                  {entry.reason && (
                     <div className="small text-body-secondary bg-body-tertiary p-2 rounded-2">
-                      <span className="fw-semibold">Your note:</span> {entry.reason}
+                      <span className="fw-semibold">{entry.status === 'missed' ? 'Your note:' : 'Note:'}</span>{" "}
+                      {entry.reason}
                     </div>
                   )}
                 </div>
