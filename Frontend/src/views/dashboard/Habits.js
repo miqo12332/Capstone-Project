@@ -176,6 +176,11 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
       const habitId = habit?.id || habit?.habitId
       if (!habitId || !userId) return
 
+      if (dateKey > todayKey) {
+        setFeedback({ type: "info", message: "You can only log a day once it arrives." })
+        return
+      }
+
       const currentStatus = historyByHabit[String(habitId)]?.[dateKey] || null
       const nextStatus = cycleStatus(currentStatus)
 
@@ -219,7 +224,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
         setCalendarSaving(null)
       }
     },
-    [cycleStatus, historyByHabit, updateCountsForDate, userId],
+    [cycleStatus, historyByHabit, todayKey, updateCountsForDate, userId],
   )
 
   const startEdit = (habit) => {
@@ -299,6 +304,8 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
       .toISOString()
       .split("T")[0]
   }, [])
+
+  const todayKey = useMemo(() => formatDateKey(today), [formatDateKey, today])
 
   const monthOptions = useMemo(
     () =>
@@ -611,6 +618,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                               const dateKey = formatDateKey(day)
                               const status = historyByHabit[habitKey]?.[dateKey]
                               const isSaving = calendarSaving === `${habit.id}-${dateKey}`
+                              const isFutureDay = dateKey > todayKey
                               return (
                                 <div
                                   key={`${habit.id}-${dateKey}`}
@@ -618,12 +626,16 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                                 >
                                   <DayStatusCheckbox
                                     status={status}
-                                    disabled={isSaving}
+                                    disabled={isSaving || isFutureDay}
                                     inputId={`${habit.id}-${dateKey}`}
-                                    title={`${habit.title} on ${day.toLocaleDateString(undefined, {
-                                      month: "short",
-                                      day: "numeric",
-                                    })}`}
+                                    title={
+                                      isFutureDay
+                                        ? "Logging opens when the date arrives."
+                                        : `${habit.title} on ${day.toLocaleDateString(undefined, {
+                                            month: "short",
+                                            day: "numeric",
+                                          })}`
+                                    }
                                     onToggle={() => handleCalendarToggle(habit, dateKey)}
                                   />
                                 </div>
