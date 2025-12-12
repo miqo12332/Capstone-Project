@@ -27,7 +27,7 @@ import {
 import CIcon from "@coreui/icons-react"
 import { cilList, cilPlus, cilSend, cilTask, cilWatch } from "@coreui/icons"
 
-import { createTask, getTasks, updateTaskStatus } from "../../services/tasks"
+import { createTask, deleteTask, getTasks, updateTaskStatus } from "../../services/tasks"
 import { sendReasoningRequest } from "../../services/ai"
 
 const defaultDraft = {
@@ -65,6 +65,8 @@ const Tasks = () => {
   const [aiError, setAiError] = useState(null)
   const [draggedId, setDraggedId] = useState(null)
   const [updatingStatusId, setUpdatingStatusId] = useState(null)
+  const [confirmDeleteTask, setConfirmDeleteTask] = useState(null)
+  const [deletingTaskId, setDeletingTaskId] = useState(null)
 
   const user = JSON.parse(localStorage.getItem("user") || "{}")
   const userId = user?.id
@@ -155,6 +157,27 @@ const Tasks = () => {
     setSubpointInput("")
     setAiMessage("")
     setAiError(null)
+  }
+
+  const handleDeleteTask = async () => {
+    if (!confirmDeleteTask) return
+    setDeletingTaskId(confirmDeleteTask.id)
+    setFeedback(null)
+
+    try {
+      await deleteTask(confirmDeleteTask.id)
+      setTasks((prev) => prev.filter((task) => task.id !== confirmDeleteTask.id))
+      if (selectedTask?.id === confirmDeleteTask.id) {
+        closeDetails()
+      }
+      setFeedback({ type: "success", message: "Task deleted." })
+    } catch (error) {
+      console.error("Failed to delete task", error)
+      setFeedback({ type: "danger", message: error.message || "Unable to delete task." })
+    } finally {
+      setDeletingTaskId(null)
+      setConfirmDeleteTask(null)
+    }
   }
 
   const handleUpdateStatus = async (taskId, status) => {
@@ -386,6 +409,14 @@ const Tasks = () => {
                           onClick={() => handleUpdateStatus(task.id, "missed")}
                         >
                           {updatingStatusId === task.id ? <CSpinner size="sm" /> : "Missed"}
+                        </CButton>
+                        <CButton
+                          color="danger"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setConfirmDeleteTask(task)}
+                        >
+                          Delete
                         </CButton>
                       </div>
                       <div className="d-flex align-items-center gap-2">
@@ -695,6 +726,36 @@ const Tasks = () => {
           <div className="text-body-secondary small">AI requests use your task snapshot and notes.</div>
           <CButton color="secondary" variant="ghost" onClick={closeDetails}>
             Close
+          </CButton>
+        </CModalFooter>
+      </CModal>
+
+      <CModal
+        alignment="center"
+        visible={Boolean(confirmDeleteTask)}
+        onClose={() => setConfirmDeleteTask(null)}
+      >
+        <CModalHeader closeButton>
+          <CModalTitle>Delete task</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {confirmDeleteTask ? (
+            <>
+              <p className="mb-1">Are you sure you want to delete this task?</p>
+              <p className="fw-semibold">{confirmDeleteTask.name}</p>
+              <p className="text-body-secondary mb-0">
+                This action cannot be undone and will remove the task from your list.
+              </p>
+            </>
+          ) : null}
+        </CModalBody>
+        <CModalFooter className="d-flex justify-content-between">
+          <CButton color="secondary" variant="ghost" onClick={() => setConfirmDeleteTask(null)}>
+            Cancel
+          </CButton>
+          <CButton color="danger" onClick={handleDeleteTask} disabled={Boolean(deletingTaskId)}>
+            {deletingTaskId ? <CSpinner size="sm" className="me-2" /> : null}
+            Delete
           </CButton>
         </CModalFooter>
       </CModal>

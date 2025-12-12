@@ -98,3 +98,25 @@ export const updateTaskStatus = async (req, res, next) => {
     next(error);
   }
 };
+
+export const deleteTask = async (req, res, next) => {
+  try {
+    const taskId = req.params.taskId;
+
+    if (!taskId) {
+      return res.status(400).json({ error: "taskId is required" });
+    }
+
+    const task = await Task.findByPk(taskId);
+
+    if (!task) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    await task.destroy();
+
+    return res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+};

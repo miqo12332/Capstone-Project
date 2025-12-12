@@ -37,3 +37,14 @@ export const updateTaskStatus = async (taskId, status) => {
 
   return await res.json();
 };
+
+export const deleteTask = async (taskId) => {
+  const res = await fetch(`${BASE_URL}/${taskId}`, { method: "DELETE" });
+
+  if (!res.ok) {
+    const errorPayload = await res.json().catch(() => ({}));
+    throw new Error(errorPayload.error || "Failed to delete task");
+  }
+
+  return true;
+};
