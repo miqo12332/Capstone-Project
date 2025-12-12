@@ -936,9 +936,15 @@ body {
 }
 
 .habit-col .habit-desc {
+  display: none;
   font-size: 0.9rem;
   color: var(--cui-secondary-color);
   margin: 0;
+}
+
+.habit-col .habit-meta:hover .habit-desc,
+.habit-col .habit-meta:focus-within .habit-desc {
+  display: block;
 }
 
 .habit-tag {
