@@ -165,11 +165,10 @@ const analyzeHabitIntent = (message, history = []) => {
   }
 
   if (detectHabitIdea(lower)) {
-    const habitSuggestion = buildHabitSuggestion(normalized);
     return {
       intent: "suggest",
-      habitSuggestion,
-      reply: `Here's a simple habit: ${habitSuggestion.title} — ${habitSuggestion.description}. Should I add this or adjust it?`,
+      habitSuggestion: null,
+      reply: null,
     };
   }
 
@@ -269,6 +268,46 @@ const callClaude = async (messages) => {
   return null;
 };
 
+const parseHabitJson = (raw) => {
+  if (!raw) return null;
+
+  try {
+    const cleaned = raw.trim().replace(/```(json)?/g, "");
+    const jsonStart = cleaned.indexOf("{");
+    const jsonEnd = cleaned.lastIndexOf("}");
+    const target = jsonStart >= 0 && jsonEnd >= 0 ? cleaned.slice(jsonStart, jsonEnd + 1) : cleaned;
+    const parsed = JSON.parse(target);
+
+    if (!parsed.title || !parsed.description) return null;
+
+    return {
+      title: parsed.title,
+      description: parsed.description,
+      category: parsed.category || "General",
+      isDailyGoal: parsed.isDailyGoal !== false,
+      targetReps: parsed.targetReps ?? null,
+      summary: parsed.summary || `${parsed.title} — ${parsed.description}`,
+    };
+  } catch (error) {
+    console.error("Failed to parse habit JSON", error?.message || error);
+    return null;
+  }
+};
+
+const requestClaudeHabitSuggestion = async ({ message, userContext }) => {
+  const systemInstruction = [
+    "You are Claude, an encouraging habit coach.",
+    "Given a user's request, propose a single, realistic starter habit using their context.",
+    "Respond ONLY with compact JSON using keys: title (short habit name), description (one sentence with when/how long), category (broad area), isDailyGoal (boolean), targetReps (integer or null), summary (friendly one-line pitch).",
+    "Keep defaults gentle (e.g., 10 minutes a day) and avoid markdown.",
+    `User context: ${JSON.stringify(userContext || {})}`,
+  ].join("\n");
+
+  const messages = [new SystemMessage(systemInstruction), new HumanMessage(message)];
+  const reply = await callClaude(messages);
+  return parseHabitJson(reply);
+};
+
 export const generateAiChatReply = async ({ userId, message, history: providedHistory = null }) => {
   const [dbOverview, userContext, history] = await Promise.all([
     describeTables(),
@@ -289,20 +328,28 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     "User context:\n" + JSON.stringify(userContext || {}, null, 2),
   ].join("\n\n");
 
-  const claudeReply =
-    habitAnalysis.intent === "chat"
-      ? await callClaude(buildChatMessages({ systemInstruction, history, message }))
-      : null;
+  let habitSuggestion = habitAnalysis.habitSuggestion;
+  let replyFromClaude = null;
+
+  if (habitAnalysis.intent === "suggest") {
+    habitSuggestion =
+      (await requestClaudeHabitSuggestion({ message, userContext })) || buildHabitSuggestion(message);
+  } else if (habitAnalysis.intent === "chat") {
+    replyFromClaude = await callClaude(buildChatMessages({ systemInstruction, history, message }));
+  }
 
   const reply =
     habitAnalysis.reply ||
-    claudeReply ||
+    (habitAnalysis.intent === "suggest" && habitSuggestion
+      ? `${habitSuggestion.summary || `${habitSuggestion.title} — ${habitSuggestion.description}`} Want me to add it or adjust it first?`
+      : null) ||
+    replyFromClaude ||
     fallbackReply({ message, userContext, dbOverview, history });
 
   return {
     reply,
     intent: habitAnalysis.intent,
-    habitSuggestion: habitAnalysis.habitSuggestion,
+    habitSuggestion,
     context: { dbOverview, userContext, history },
   };
 };
