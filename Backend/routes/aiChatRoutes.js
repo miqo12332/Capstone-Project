@@ -1,7 +1,11 @@
 import express from "express";
 
 import { generateAiChatReply } from "../services/aiChatService.js";
-import { getChatHistory, saveMessage } from "../services/memoryService.js";
+import {
+  deleteChatHistory,
+  getChatHistory,
+  saveMessage,
+} from "../services/memoryService.js";
 
 const router = express.Router();
 
@@ -15,6 +19,19 @@ router.get("/history", async (req, res) => {
   } catch (error) {
     console.error("/ai-chat/history failed", error);
     return res.status(500).json({ error: "Unable to load AI chat history" });
+  }
+});
+
+router.delete("/history", async (req, res) => {
+  const { userId } = req.query;
+  if (!userId) return res.status(400).json({ error: "userId is required" });
+
+  try {
+    await deleteChatHistory(Number(userId));
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("/ai-chat/history delete failed", error);
+    return res.status(500).json({ error: "Unable to delete AI chat history" });
   }
 });
 

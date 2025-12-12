@@ -12,6 +12,11 @@ import {
   CFormTextarea,
   CInputGroup,
   CInputGroupText,
+  CModal,
+  CModalBody,
+  CModalFooter,
+  CModalHeader,
+  CModalTitle,
   CRow,
   CSpinner,
 } from "@coreui/react";
@@ -19,7 +24,11 @@ import CIcon from "@coreui/icons-react";
 import { cilSend, cilSpeech, cilStorage, cilUser } from "@coreui/icons";
 
 import { AuthContext } from "../../context/AuthContext";
-import { fetchAiChatHistory, sendAiChatMessage } from "../../services/aiChat";
+import {
+  deleteAiChatHistory,
+  fetchAiChatHistory,
+  sendAiChatMessage,
+} from "../../services/aiChat";
 
 const roleConfig = {
   user: { color: "primary", label: "You", icon: cilUser },
@@ -95,6 +104,8 @@ const HabitCoach = () => {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState(null);
   const bottomRef = useRef(null);
 
@@ -159,6 +170,25 @@ const HabitCoach = () => {
     }
   };
 
+  const handleDeleteConversation = async () => {
+    if (!user?.id) return;
+
+    setDeleting(true);
+    setError(null);
+
+    try {
+      await deleteAiChatHistory(user.id);
+      setHistory([]);
+      setContext(null);
+    } catch (err) {
+      console.error("Failed to delete coach history", err);
+      setError("Unable to delete your coach history right now.");
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   const promptExamples = [
     "Catch me up on my habits and what's new.",
     "Give me one next step based on my goals.",
@@ -166,84 +196,125 @@ const HabitCoach = () => {
   ];
 
   return (
-    <CRow>
-      <CCol md={8}>
-        <CCard className="mb-4">
-          <CCardHeader className="d-flex align-items-center justify-content-between">
-            <div>
-              <div className="fw-semibold">HabitCoach</div>
-              <small className="text-medium-emphasis">
-                Ask anything — HabitCoach follows your conversation and can see your profile plus every table.
-              </small>
-            </div>
-            <CBadge color="info">Live</CBadge>
-          </CCardHeader>
-          <CCardBody>
-            {error && <CAlert color="danger">{error}</CAlert>}
-            {initialLoading ? (
-              <div className="text-center py-4">
-                <CSpinner color="info" />
+    <>
+      <CRow>
+        <CCol md={8}>
+          <CCard className="mb-4">
+            <CCardHeader className="d-flex align-items-center justify-content-between">
+              <div>
+                <div className="fw-semibold">HabitCoach</div>
+                <small className="text-medium-emphasis">
+                  Ask anything — HabitCoach follows your conversation and can see your profile plus every table.
+                </small>
               </div>
-            ) : (
-              <div className="mb-4" style={{ minHeight: 320 }}>
-                {history.length ? (
-                  history.map((entry) => <MessageBubble key={entry.id} entry={entry} />)
-                ) : (
-                  <div className="text-medium-emphasis text-center py-5">
-                    Start the conversation to see the AI's replies.
-                  </div>
-                )}
-                <div ref={bottomRef} />
-              </div>
-            )}
-
-            <CForm onSubmit={handleSend} className="mt-3">
-              <CInputGroup>
-                <CInputGroupText>
-                  <CIcon icon={cilSpeech} />
-                </CInputGroupText>
-                <CFormTextarea
-                  rows={2}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Ask HabitCoach anything about your habits"
-                  disabled={loading}
-                />
-              </CInputGroup>
-              <div className="d-flex align-items-center justify-content-between mt-2">
-                <div className="d-flex gap-2 flex-wrap">
-                  {promptExamples.map((prompt) => (
-                    <CBadge
-                      key={prompt}
-                      color="light"
-                      textColor="dark"
-                      role="button"
-                      onClick={() => setMessage(prompt)}
-                    >
-                      {prompt}
-                    </CBadge>
-                  ))}
-                </div>
-                <CButton type="submit" color="info" disabled={loading} onClick={handleSend}>
-                  {loading ? (
-                    <>
-                      <CSpinner size="sm" className="me-2" /> Sending
-                    </>
-                  ) : (
-                    <>
-                      <CIcon icon={cilSend} className="me-2" /> Send
-                    </>
-                  )}
+              <div className="d-flex align-items-center gap-2">
+                <CButton
+                  color="danger"
+                  variant="outline"
+                  size="sm"
+                  disabled={loading || initialLoading || deleting}
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  Delete conversation
                 </CButton>
+                <CBadge color="info">Live</CBadge>
               </div>
-            </CForm>
-          </CCardBody>
-        </CCard>
-      </CCol>
-      <CCol md={4}>
-        <KnowledgeCard context={context} />
-      </CCol>
-    </CRow>
+            </CCardHeader>
+            <CCardBody>
+              {error && <CAlert color="danger">{error}</CAlert>}
+              {initialLoading ? (
+                <div className="text-center py-4">
+                  <CSpinner color="info" />
+                </div>
+              ) : (
+                <div className="mb-4" style={{ minHeight: 320 }}>
+                  {history.length ? (
+                    history.map((entry) => <MessageBubble key={entry.id} entry={entry} />)
+                  ) : (
+                    <div className="text-medium-emphasis text-center py-5">
+                      Start the conversation to see the AI's replies.
+                    </div>
+                  )}
+                  <div ref={bottomRef} />
+                </div>
+              )}
+
+              <CForm onSubmit={handleSend} className="mt-3">
+                <CInputGroup>
+                  <CInputGroupText>
+                    <CIcon icon={cilSpeech} />
+                  </CInputGroupText>
+                  <CFormTextarea
+                    rows={2}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Ask HabitCoach anything about your habits"
+                    disabled={loading}
+                  />
+                </CInputGroup>
+                <div className="d-flex align-items-center justify-content-between mt-2">
+                  <div className="d-flex gap-2 flex-wrap">
+                    {promptExamples.map((prompt) => (
+                      <CBadge
+                        key={prompt}
+                        color="light"
+                        textColor="dark"
+                        role="button"
+                        onClick={() => setMessage(prompt)}
+                      >
+                        {prompt}
+                      </CBadge>
+                    ))}
+                  </div>
+                  <CButton type="submit" color="info" disabled={loading} onClick={handleSend}>
+                    {loading ? (
+                      <>
+                        <CSpinner size="sm" className="me-2" /> Sending
+                      </>
+                    ) : (
+                      <>
+                        <CIcon icon={cilSend} className="me-2" /> Send
+                      </>
+                    )}
+                  </CButton>
+                </div>
+              </CForm>
+            </CCardBody>
+          </CCard>
+        </CCol>
+        <CCol md={4}>
+          <KnowledgeCard context={context} />
+        </CCol>
+      </CRow>
+
+      <CModal
+        visible={showDeleteConfirm}
+        onClose={() => (!deleting ? setShowDeleteConfirm(false) : null)}
+        alignment="center"
+      >
+        <CModalHeader closeButton={!deleting}>
+          <CModalTitle>Delete conversation</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          Are you sure you want to delete your entire HabitCoach conversation? This will remove all chat
+          messages.
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" variant="ghost" disabled={deleting} onClick={() => setShowDeleteConfirm(false)}>
+            No
+          </CButton>
+          <CButton color="danger" disabled={deleting} onClick={handleDeleteConversation}>
+            {deleting ? (
+              <>
+                <CSpinner size="sm" className="me-2" /> Deleting
+              </>
+            ) : (
+              "Yes, delete"
+            )}
+          </CButton>
+        </CModalFooter>
+      </CModal>
+    </>
   );
 };
 
