@@ -944,6 +944,18 @@ const HistoryTab = ({ entries, loading, error, onRefresh }) => {
   const formatDate = (date) => new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   const formatTime = (date) => new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
+  const todayLabel = useMemo(
+    () =>
+      new Date().toLocaleDateString(undefined, {
+        weekday: 'long',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+    [],
+  )
+  const [selectedEntryId, setSelectedEntryId] = useState(null)
+
   const [selectedHabitIds, setSelectedHabitIds] = useState([])
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
@@ -980,6 +992,11 @@ const HistoryTab = ({ entries, loading, error, onRefresh }) => {
       .sort((a, b) => new Date(b.createdAt ?? b.progressDate) - new Date(a.createdAt ?? a.progressDate))
   }, [entries, endDate, selectedHabitIds, startDate])
 
+  const selectedEntry = useMemo(
+    () => filteredEntries.find((entry) => entry.id === selectedEntryId) ?? null,
+    [filteredEntries, selectedEntryId],
+  )
+
   const exportCsv = () => {
     const header = "habit,status,date,time,reason\n"
     const rows = filteredEntries
@@ -999,6 +1016,31 @@ const HistoryTab = ({ entries, loading, error, onRefresh }) => {
 
   return (
     <div className="mt-3">
+      <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div className="d-flex align-items-center gap-2 text-body-secondary">
+          <span className="fw-semibold text-body">Today</span>
+          <CBadge color="secondary" className="bg-body-tertiary text-dark px-3 py-2 border">
+            {todayLabel}
+          </CBadge>
+        </div>
+        <div className="text-body-secondary small">
+          {selectedEntry ? (
+            <>
+              <span className="fw-semibold text-body">{selectedEntry.habitTitle}</span> logged on{' '}
+              {new Date(selectedEntry.progressDate || selectedEntry.createdAt).toLocaleDateString(undefined, {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })}{' '}
+              at {formatTime(selectedEntry.createdAt)}
+            </>
+          ) : (
+            'Click a log to see its exact date and time'
+          )}
+        </div>
+      </div>
+
       <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-3">
         <div className="text-muted small">
           {filteredEntries.length === entries.length
@@ -1095,7 +1137,13 @@ const HistoryTab = ({ entries, loading, error, onRefresh }) => {
       ) : (
         <CListGroup flush>
           {filteredEntries.map((entry) => (
-            <CListGroupItem key={entry.id} className="py-3">
+            <CListGroupItem
+              key={entry.id}
+              className="py-3"
+              action
+              active={selectedEntryId === entry.id}
+              onClick={() => setSelectedEntryId(entry.id)}
+            >
               <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap">
                 <div className="d-flex flex-column gap-1">
                   <div className="d-flex align-items-center gap-2">
