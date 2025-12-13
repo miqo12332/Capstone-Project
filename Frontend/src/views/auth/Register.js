@@ -29,6 +29,7 @@ import {
   cilUser,
   cilEnvelopeClosed,
 } from "@coreui/icons"
+import { PASSWORD_REQUIREMENTS_TEXT, isStrongPassword } from "../../utils/passwordUtils"
 
 const goalOptions = [
   { value: "Build consistency", label: "Build consistency", description: "Stay accountable to the routines that matter most." },
@@ -123,6 +124,11 @@ const Register = () => {
     if (step === 0) {
       if (!form.name.trim() || !form.email.trim() || !form.password) {
         setMessage({ type: "danger", text: "Please add your name, email, and a password to continue." })
+        return false
+      }
+
+      if (!isStrongPassword(form.password)) {
+        setMessage({ type: "warning", text: PASSWORD_REQUIREMENTS_TEXT })
         return false
       }
     }

@@ -16,10 +16,12 @@ import { cilUser, cilLockLocked, cilSun } from "@coreui/icons"
 import { Link, useNavigate } from "react-router-dom"
 import { AuthContext } from "../../context/AuthContext"
 import { API_BASE } from "../../utils/apiConfig"
+import ResetPasswordModal from "../../components/auth/ResetPasswordModal"
 
 const Login = () => {
   const [form, setForm] = useState({ email: "", password: "" })
-  const [message, setMessage] = useState("")
+  const [message, setMessage] = useState(null)
+  const [resetModalOpen, setResetModalOpen] = useState(false)
   const navigate = useNavigate()
   const { login } = useContext(AuthContext)
 
@@ -29,7 +31,7 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setMessage("")
+    setMessage(null)
 
     try {
       const res = await fetch(`${API_BASE}/users/login`, {
@@ -41,7 +43,7 @@ const Login = () => {
       const data = await res.json()
 
       if (!res.ok) {
-        setMessage(data.error || "Login failed")
+        setMessage({ type: "danger", text: data.error || "Login failed" })
         return
       }
 
@@ -49,7 +51,7 @@ const Login = () => {
       navigate("/dashboard", { replace: true })
     } catch (err) {
       console.error("Login error:", err)
-      setMessage("❌ Error connecting to server")
+      setMessage({ type: "danger", text: "❌ Error connecting to server" })
     }
   }
 
@@ -101,10 +103,26 @@ const Login = () => {
                     <CButton type="submit" color="primary" size="lg">
                       Log in and continue
                     </CButton>
+                    <CButton
+                      color="link"
+                      className="p-0"
+                      type="button"
+                      onClick={() => setResetModalOpen(true)}
+                    >
+                      Forgot password?
+                    </CButton>
                     <div className="text-center text-body-secondary">
                       New to StepHabit? <Link to="/register">Create an account</Link>
                     </div>
-                    {message && <p className="text-center text-danger mb-0">{message}</p>}
+                    {message && (
+                      <p
+                        className={`text-center mb-0 ${
+                          message.type === "success" ? "text-success" : "text-danger"
+                        }`}
+                      >
+                        {message.text}
+                      </p>
+                    )}
                   </div>
                 </CForm>
               </CCardBody>
@@ -112,6 +130,12 @@ const Login = () => {
           </CCol>
         </CRow>
       </CContainer>
+      <ResetPasswordModal
+        visible={resetModalOpen}
+        onClose={() => setResetModalOpen(false)}
+        initialEmail={form.email}
+        onSuccess={() => setMessage({ type: "success", text: "Password updated. Please log in." })}
+      />
     </div>
   )
 }

@@ -48,9 +48,10 @@ import { HabitContext } from "../../context/HabitContext"
 import { fetchUserSettings, saveUserSettings } from "../../services/settings"
 import { getProgressAnalytics } from "../../services/analytics"
 import { API_BASE, ASSET_BASE } from "../../utils/apiConfig"
+import ResetPasswordModal from "../../components/auth/ResetPasswordModal"
 
 const UserProfile = () => {
-  const { user, login } = useContext(AuthContext)
+  const { user, login, logout } = useContext(AuthContext)
   const habitContext = useContext(HabitContext)
   const habits = habitContext?.habits || []
   const location = useLocation()
@@ -80,6 +81,7 @@ const UserProfile = () => {
   const [error, setError] = useState("")
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [settingsBaseline, setSettingsBaseline] = useState({})
+  const [resetModalOpen, setResetModalOpen] = useState(false)
   const fileInputRef = useRef(null)
   const loginRef = useRef(login)
 
@@ -288,7 +290,15 @@ const UserProfile = () => {
   }
 
   const handlePasswordReset = () => {
-    setStatus("Password reset instructions will be sent to your email.")
+    setStatus("")
+    setResetModalOpen(true)
+  }
+
+  const handleResetSuccess = () => {
+    if (typeof logout === "function") {
+      logout()
+    }
+    navigate("/login")
   }
 
   const renderAccountTab = () => (
@@ -855,6 +865,12 @@ const UserProfile = () => {
       </div>
 
       <CForm onSubmit={handleSave} className="profile-content">{renderTabContent()}</CForm>
+      <ResetPasswordModal
+        visible={resetModalOpen}
+        onClose={() => setResetModalOpen(false)}
+        initialEmail={profile.email}
+        onSuccess={handleResetSuccess}
+      />
     </CContainer>
   )
 }
