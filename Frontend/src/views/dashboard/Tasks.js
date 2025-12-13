@@ -24,13 +24,7 @@ import {
   CSpinner,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
-import {
-  cilList,
-  cilPlus,
-  cilTask,
-  cilTrash,
-  cilWatch,
-} from "@coreui/icons"
+import { cilCalendar, cilEye, cilList, cilLowVision, cilPlus, cilTask, cilTrash } from "@coreui/icons"
 
 import { createTask, deleteTask, getTasks } from "../../services/tasks"
 
@@ -256,6 +250,7 @@ const Tasks = () => {
               id: item.id || `item-${listIndex}-${itemIndex}-${Date.now()}`,
               text: item.text || "",
               done: Boolean(item.done),
+              dueDate: item.dueDate || "",
             }))
             .filter((item) => item.text.trim() !== "")
         : [],
@@ -346,6 +341,13 @@ const Tasks = () => {
     }))
   }
 
+  const handleItemDateChange = (listId, itemId, value) => {
+    updateChecklist(listId, (list) => ({
+      ...list,
+      items: list.items.map((item) => (item.id === itemId ? { ...item, dueDate: value } : item)),
+    }))
+  }
+
   const handleChecklistDateChange = (listId, value) => {
     updateChecklist(listId, (list) => ({
       ...list,
@@ -366,7 +368,7 @@ const Tasks = () => {
 
     updateChecklist(listId, (list) => ({
       ...list,
-      items: [...list.items, { id: createId("item"), text, done: false }],
+      items: [...list.items, { id: createId("item"), text, done: false, dueDate: "" }],
     }))
 
     setChecklistInputs((prev) => ({ ...prev, [listId]: "" }))
@@ -388,12 +390,6 @@ const Tasks = () => {
 
   const handleAddChecklist = () => {
     setEditChecklists((prev) => [...prev, buildChecklist(prev.length)])
-  }
-
-  const stripTags = (html) => {
-    const div = document.createElement("div")
-    div.innerHTML = html || ""
-    return div.textContent || ""
   }
 
   const checklistProgress = (list) => {
@@ -744,31 +740,37 @@ const Tasks = () => {
                           onChange={(e) => handleChecklistTitleChange(list.id, e.target.value)}
                           className="flex-grow-1"
                         />
-                        <div className="d-flex gap-2 align-items-center">
-                          <CFormInput
-                            type="date"
-                            size="sm"
-                            value={list.dueDate}
-                            onChange={(e) => handleChecklistDateChange(list.id, e.target.value)}
-                            className="bg-white"
-                            style={{ maxWidth: 150 }}
-                          />
+                        <div className="d-flex gap-2 align-items-center flex-shrink-0">
+                          <CInputGroup size="sm" className="flex-shrink-0" style={{ maxWidth: 160 }}>
+                            <CInputGroupText className="bg-white border-end-0 py-1 px-2">
+                              <CIcon icon={cilCalendar} className="text-secondary" />
+                            </CInputGroupText>
+                            <CFormInput
+                              type="date"
+                              value={list.dueDate}
+                              onChange={(e) => handleChecklistDateChange(list.id, e.target.value)}
+                              className="bg-white border-start-0 py-1"
+                            />
+                          </CInputGroup>
                           <CButton
                             size="sm"
                             color="light"
-                            variant="outline"
-                            className="text-secondary"
+                            variant="ghost"
+                            className="border text-secondary"
                             onClick={() => handleToggleHideCompleted(list.id)}
+                            title={list.hideCompleted ? "Show checked items" : "Hide checked items"}
                           >
-                            {list.hideCompleted ? "Show checked items" : "Hide checked items"}
+                            <CIcon icon={list.hideCompleted ? cilEye : cilLowVision} />
                           </CButton>
                           <CButton
                             size="sm"
-                            color="danger"
+                            color="light"
                             variant="ghost"
+                            className="border text-danger"
                             onClick={() => handleDeleteChecklist(list.id)}
+                            title="Delete checklist"
                           >
-                            Delete
+                            <CIcon icon={cilTrash} />
                           </CButton>
                         </div>
                       </div>
@@ -799,15 +801,29 @@ const Tasks = () => {
                               >
                                 {item.text}
                               </div>
-                              <CButton
-                                size="sm"
-                                color="light"
-                                variant="ghost"
-                                className="text-danger"
-                                onClick={() => handleDeleteItem(list.id, item.id)}
-                              >
-                                Delete
-                              </CButton>
+                              <div className="d-flex align-items-center gap-2 flex-shrink-0">
+                                <CInputGroup size="sm" className="flex-shrink-0" style={{ maxWidth: 150 }}>
+                                  <CInputGroupText className="bg-white border-end-0 py-1 px-2">
+                                    <CIcon icon={cilCalendar} className="text-secondary" />
+                                  </CInputGroupText>
+                                  <CFormInput
+                                    type="date"
+                                    value={item.dueDate}
+                                    onChange={(e) => handleItemDateChange(list.id, item.id, e.target.value)}
+                                    className="bg-white border-start-0 py-1"
+                                  />
+                                </CInputGroup>
+                                <CButton
+                                  size="sm"
+                                  color="light"
+                                  variant="ghost"
+                                  className="border text-danger"
+                                  onClick={() => handleDeleteItem(list.id, item.id)}
+                                  title="Delete item"
+                                >
+                                  <CIcon icon={cilTrash} />
+                                </CButton>
+                              </div>
                             </div>
                           ))
                         )}
