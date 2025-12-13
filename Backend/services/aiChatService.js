@@ -6,6 +6,7 @@ import sequelize from "../sequelize.js";
 import { buildHabitSuggestion, detectConfirmation, detectHabitIdea } from "../utils/habitNlp.js";
 import {
   Achievement,
+  BusySchedule,
   CalendarEvent,
   Friend,
   GroupChallenge,
@@ -77,6 +78,39 @@ const mapHabit = (habit) => ({
   })),
 });
 
+const mapSchedules = (habits = [], busySchedules = []) => {
+  const habitSchedules = habits.flatMap((habit) =>
+    (habit.schedules || []).map((schedule) => ({
+      id: schedule.id,
+      habitId: habit.id,
+      title: habit.title,
+      day: schedule.day,
+      starttime: schedule.starttime,
+      endtime: schedule.endtime,
+      type: "habit",
+    }))
+  );
+
+  const customSchedules = busySchedules.map((busy) => ({
+    id: busy.id,
+    habitId: null,
+    title: busy.title,
+    day: busy.day,
+    starttime: busy.starttime,
+    endtime: busy.endtime,
+    type: "custom",
+  }));
+
+  return [...habitSchedules, ...customSchedules].sort((a, b) => {
+    const dayA = a.day ? new Date(a.day).getTime() : 0;
+    const dayB = b.day ? new Date(b.day).getTime() : 0;
+
+    if (dayA !== dayB) return dayA - dayB;
+
+    return (a.starttime || "").localeCompare(b.starttime || "");
+  });
+};
+
 const loadUserContext = async (userId) => {
   const user = await User.findByPk(userId, {
     include: [
@@ -85,6 +119,7 @@ const loadUserContext = async (userId) => {
       { model: Achievement, as: "achievements" },
       { model: UserSetting, as: "settings" },
       { model: CalendarEvent, as: "calendarEvents" },
+      { model: BusySchedule, as: "busySchedules" },
       {
         model: User,
         as: "friends",
@@ -123,6 +158,16 @@ const loadUserContext = async (userId) => {
       start: event.start,
       end: event.end,
     })),
+    busySchedules: (plain.busySchedules || []).map((entry) => ({
+      id: entry.id,
+      title: entry.title,
+      day: entry.day,
+      starttime: entry.starttime,
+      endtime: entry.endtime,
+      repeat: entry.repeat,
+      customdays: entry.customdays,
+      notes: entry.notes,
+    })),
     friends: (plain.friends || []).map((friend) => ({
       id: friend.id,
       name: friend.name,
@@ -136,6 +181,7 @@ const loadUserContext = async (userId) => {
       name: challenge.name,
       description: challenge.description,
     })),
+    schedules: mapSchedules(plain.habits || [], plain.busySchedules || []),
   };
 };
 
@@ -238,6 +284,13 @@ const buildConversationMessages = (history) =>
     .map(toChatMessage)
     .filter(Boolean);
 
+const wantsSchedulingHelp = (text) => {
+  const normalized = (text || "").toLowerCase();
+  const keywords = ["schedule", "calendar", "event", "time block", "timeblock", "busy"];
+
+  return keywords.some((keyword) => normalized.includes(keyword));
+};
+
 const parseProgressDecision = (raw) => {
   if (!raw) return null;
 
@@ -300,6 +353,130 @@ const requestClaudeProgressDecision = async ({ message, userContext, history }) 
 
   const reply = await callClaude([new SystemMessage(systemInstruction), ...conversation, prompt]);
   return parseProgressDecision(reply);
+};
+
+const parseSchedulePlan = (raw) => {
+  if (!raw) return null;
+
+  try {
+    const cleaned = raw.trim().replace(/```(json)?/g, "");
+    const jsonStart = cleaned.indexOf("{");
+    const jsonEnd = cleaned.lastIndexOf("}");
+    const target = jsonStart >= 0 && jsonEnd >= 0 ? cleaned.slice(jsonStart, jsonEnd + 1) : cleaned;
+    const parsed = JSON.parse(target);
+
+    if (parsed.action !== "create-schedule") return null;
+
+    const start = parsed.start || parsed.startTime;
+    const end = parsed.end || parsed.endTime || null;
+    if (!start) return null;
+
+    const normalizedType = parsed.type === "custom" ? "custom" : "habit";
+    const habitId = normalizedType === "habit" ? Number.parseInt(parsed.habitId, 10) || null : null;
+    const title = parsed.title?.trim() || null;
+
+    return {
+      action: "create-schedule",
+      type: normalizedType,
+      habitId,
+      title,
+      start,
+      end,
+      repeat: parsed.repeat || "daily",
+      customdays: parsed.customdays || null,
+      notes: parsed.notes?.trim() || null,
+      userReply: parsed.userReply?.trim() || null,
+    };
+  } catch (error) {
+    console.error("Failed to parse schedule plan", error?.message || error);
+    return null;
+  }
+};
+
+const requestClaudeSchedulePlan = async ({ message, userContext, history }) => {
+  const habits = userContext?.habits || [];
+  const schedules = userContext?.schedules || [];
+  const calendarEvents = userContext?.calendarEvents || [];
+
+  const systemInstruction = [
+    "You are Claude, the StepHabit AI coach that can create schedules when asked.",
+    "If the user is trying to add a new event, focus block, or habit session, respond ONLY with JSON in the shape:",
+    "{ action: 'create-schedule' | 'none', type: 'habit' | 'custom', habitId?: number, title?: string, start: ISOString, end?: ISOString, repeat: 'daily' | 'weekly' | 'every3days' | 'custom' | 'once', customdays?: string, notes?: string, userReply?: string }",
+    "Use 'habit' type when they mention a known habit title. Use 'custom' for generic events.",
+    "Pick start/end times from the user's message; default to a 60-minute block if duration isn't clear.",
+    "If there is no scheduling intent, respond with { action: 'none' }.",
+    `Known habits: ${JSON.stringify(habits.map((h) => ({ id: h.id, title: h.title })))}`,
+    `Upcoming items to avoid overlaps: ${JSON.stringify([...schedules, ...calendarEvents].slice(0, 8))}`,
+  ].join("\n");
+
+  const conversation = buildConversationMessages(history);
+  const prompt = new HumanMessage(
+    [
+      "Decide if this message should create a schedule. If yes, return the schedule JSON with best-effort times.",
+      "If the time is missing, assume today's date at 09:00 local time and 60 minutes duration.",
+      `User message: ${message}`,
+    ].join("\n")
+  );
+
+  const reply = await callClaude([new SystemMessage(systemInstruction), ...conversation, prompt]);
+  return parseSchedulePlan(reply);
+};
+
+const buildScheduleTimestamps = (startInput, endInput) => {
+  const startDate = startInput ? new Date(startInput) : null;
+  const endDate = endInput ? new Date(endInput) : null;
+
+  if (!startDate || Number.isNaN(startDate.getTime())) return null;
+
+  const toTime = (value) => value.toISOString().slice(11, 16);
+
+  return {
+    day: startDate.toISOString().slice(0, 10),
+    starttime: toTime(startDate),
+    endtime: endDate && !Number.isNaN(endDate.getTime()) ? toTime(endDate) : null,
+  };
+};
+
+const createScheduleFromPlan = async ({ plan, userId }) => {
+  const timestamps = buildScheduleTimestamps(plan.start, plan.end);
+  if (!timestamps) return null;
+
+  const repeatValue = plan.repeat || "daily";
+  const basePayload = {
+    user_id: userId,
+    day: timestamps.day,
+    starttime: timestamps.starttime,
+    endtime: timestamps.endtime,
+    enddate: null,
+    repeat: repeatValue,
+    customdays: repeatValue === "custom" ? plan.customdays || null : null,
+    notes: plan.notes || null,
+  };
+
+  try {
+    if (plan.type === "habit" && plan.habitId) {
+      const created = await Schedule.create({
+        ...basePayload,
+        habit_id: plan.habitId,
+      });
+
+      const withHabit = await Schedule.findByPk(created.id, {
+        include: [{ model: Habit, as: "habit", attributes: ["id", "title"] }],
+      });
+
+      return { ...withHabit.toJSON(), type: "habit", custom_title: null };
+    }
+
+    const createdBusy = await BusySchedule.create({
+      ...basePayload,
+      title: plan.title || "Scheduled focus",
+    });
+
+    return { ...createdBusy.toJSON(), type: "custom", custom_title: createdBusy.title, habit: null };
+  } catch (error) {
+    console.error("Failed to create schedule from AI plan", error?.message || error);
+    return null;
+  }
 };
 
 const callClaude = async (messages) => {
@@ -438,6 +615,11 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     history,
   });
 
+  const shouldRequestSchedule = wantsSchedulingHelp(message);
+  const schedulePlan = shouldRequestSchedule
+    ? await requestClaudeSchedulePlan({ message, userContext, history })
+    : null;
+
   const systemInstruction = [
     "You are a warm, conversational AI assistant for the StepHabit platform.",
     "Respond with short, human-feeling paragraphs (avoid bullet lists unless requested).",
@@ -451,6 +633,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
   let replyFromClaude = progressDecision?.userReply || null;
   let loggedProgress = null;
   let finalIntent = habitAnalysis.intent;
+  let createdSchedule = null;
 
   if (progressDecision) {
     try {
@@ -476,6 +659,58 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     }
   }
 
+  if (schedulePlan?.action === "create-schedule") {
+    createdSchedule = await createScheduleFromPlan({ plan: schedulePlan, userId });
+
+    if (createdSchedule) {
+      finalIntent = "create-schedule";
+
+      const scheduleType = createdSchedule.type || (createdSchedule.habit_id ? "habit" : "custom");
+
+      if (scheduleType === "habit" && createdSchedule.habit_id && userContext?.habits) {
+        const targetHabit = userContext.habits.find((habit) => habit.id === createdSchedule.habit_id);
+        if (targetHabit) {
+          targetHabit.schedules = [
+            ...(targetHabit.schedules || []),
+            {
+              id: createdSchedule.id,
+              day: createdSchedule.day,
+              starttime: createdSchedule.starttime,
+              endtime: createdSchedule.endtime,
+            },
+          ];
+        }
+      } else if (scheduleType === "custom" && userContext) {
+        userContext.busySchedules = [
+          ...(userContext.busySchedules || []),
+          {
+            id: createdSchedule.id,
+            title: createdSchedule.custom_title || createdSchedule.title || "Scheduled focus",
+            day: createdSchedule.day,
+            starttime: createdSchedule.starttime,
+            endtime: createdSchedule.endtime,
+            repeat: createdSchedule.repeat,
+            customdays: createdSchedule.customdays,
+            notes: createdSchedule.notes,
+          },
+        ];
+      }
+
+      if (userContext) {
+        userContext.schedules = mapSchedules(userContext.habits || [], userContext.busySchedules || []);
+      }
+
+      if (!replyFromClaude) {
+        const startLabel = [createdSchedule.day, createdSchedule.starttime].filter(Boolean).join(" at ");
+        const title =
+          createdSchedule.custom_title || createdSchedule.habit?.title || createdSchedule.title || "your session";
+        replyFromClaude =
+          schedulePlan.userReply ||
+          `I scheduled ${title}${startLabel ? ` on ${startLabel}` : ""}. Want me to adjust or add notes?`;
+      }
+    }
+  }
+
   if (progressDecision && !replyFromClaude) {
     const matchedHabit = (userContext?.habits || []).find((h) => h.id === progressDecision.habitId);
     const recapPrompt = new HumanMessage(
@@ -489,7 +724,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     replyFromClaude = await callClaude([new SystemMessage(systemInstruction), ...buildConversationMessages(history), recapPrompt]);
   }
 
-  if (habitAnalysis.intent === "suggest") {
+  if (habitAnalysis.intent === "suggest" && !replyFromClaude) {
     habitSuggestion =
       (await requestClaudeHabitSuggestion({ message, userContext })) || buildHabitSuggestion(message);
 
@@ -500,7 +735,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
         history,
       });
     }
-  } else if (habitAnalysis.intent === "chat" && !loggedProgress) {
+  } else if (habitAnalysis.intent === "chat" && !loggedProgress && !replyFromClaude) {
     replyFromClaude = await callClaude(buildChatMessages({ systemInstruction, history, message }));
   }
 
@@ -514,6 +749,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     intent: finalIntent,
     habitSuggestion,
     loggedProgress,
+    createdSchedule,
     context: { dbOverview, userContext, history },
   };
 };
