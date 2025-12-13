@@ -27,6 +27,60 @@ const CLAUDE_BASE_URL = (process.env.CLAUDE_BASE_URL || "https://api.anthropic.c
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-3-5-sonnet-20240620";
 const FALLBACK_CLAUDE_MODEL = process.env.CLAUDE_FALLBACK_MODEL || "claude-3-haiku-20240307";
 const MESSAGE_HISTORY_LIMIT = 12;
+const USER_TIMEZONE = "Asia/Yerevan";
+const REFERENCE_DATE = "2025-12-13";
+
+const SCHEDULE_POLICY_PROMPT = [
+  "You are my Calendar & Schedule Assistant.",
+  "",
+  "Timezone: " + USER_TIMEZONE + " (UTC+4).",
+  "Today’s fixed reference date: " + REFERENCE_DATE + ".",
+  "All relative words (today, tomorrow, this evening) must be resolved using this date and explicitly restated.",
+  "",
+  "CRITICAL RULES (MANDATORY):",
+  "1) Never assume intent, abbreviations, or dates.",
+  "   - If the user writes “tom”, “later”, “add training”, or anything ambiguous, ASK for clarification.",
+  "   - Do NOT interpret abbreviations without confirmation.",
+  "",
+  "2) You MUST distinguish between:",
+  "   a) Drafting an event",
+  "   b) Actually adding it to the schedule",
+  "",
+  "3) You may ONLY add an event when ALL of the following are explicitly known:",
+  "   - Title",
+  "   - Exact date (YYYY-MM-DD)",
+  "   - Start time",
+  "   - End time or duration",
+  "   - Timezone",
+  "",
+  "4) When the user provides all required details in one message,",
+  "   YOU MUST:",
+  "   - Immediately create the event",
+  "   - Confirm creation explicitly",
+  "   - NOT ask follow-up questions",
+  "",
+  "5) When creating an event, respond in TWO steps:",
+  "   Step 1 — Action statement:",
+  "     “Event added to your schedule.”",
+  "   Step 2 — Event details (structured):",
+  "     - Title:",
+  "     - Date:",
+  "     - Time:",
+  "     - Timezone:",
+  "",
+  "6) NEVER say an event was added unless it actually was.",
+  "   No simulated confirmations.",
+  "   No conversational placeholders.",
+  "",
+  "7) If event creation fails for any technical reason,",
+  "   explicitly say:",
+  "   “I could not add this to your schedule due to a system limitation.”",
+  "",
+  "DEFAULT BEHAVIOR:",
+  "- No auto-scheduling",
+  "- No guessing",
+  "- No silent failures",
+].join("\n");
 
 const resolveApiKey = () =>
   process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.AI_API_KEY || null;
@@ -316,6 +370,87 @@ const detectScheduleDecline = (message) => {
 };
 
 const MINUTE_FALLBACK_DURATION = 60;
+
+const resolveScheduleTitle = (plan, userContext) => {
+  if (plan.type === "habit" && plan.habitId && userContext?.habits) {
+    const matched = userContext.habits.find((habit) => habit.id === plan.habitId);
+    if (matched?.title) return matched.title;
+  }
+
+  return plan.title?.trim() || null;
+};
+
+const findMissingScheduleDetails = ({ plan, timestamps, userContext }) => {
+  const missing = [];
+
+  if (!resolveScheduleTitle(plan, userContext)) missing.push("title");
+  if (!timestamps?.day) missing.push("date");
+  if (!timestamps?.starttime) missing.push("start time");
+  if (!timestamps?.endtime) missing.push("end time or duration");
+  if (!USER_TIMEZONE) missing.push("timezone");
+
+  return missing;
+};
+
+const formatMissingDetailPrompt = (missing) => {
+  if (!missing.length) return null;
+
+  const needs =
+    missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(", ")} and ${missing[missing.length - 1]}`;
+  return `I need the ${needs} before adding this to your schedule. What should I use?`;
+};
+
+const formatEventAddedReply = ({ title, timestamps }) => {
+  const timeRange = timestamps?.endtime
+    ? `${timestamps.starttime}–${timestamps.endtime}`
+    : `${timestamps?.starttime || "TBD"}`;
+
+  return [
+    "Event added to your schedule.",
+    "",
+    `Title: ${title || "Scheduled session"}`,
+    `Date: ${timestamps?.day || "TBD"}`,
+    `Time: ${timeRange}`,
+    `Timezone: ${USER_TIMEZONE || "your local time"}`,
+  ].join("\n");
+};
+
+const appendScheduleToContext = ({ createdSchedule, plan, userContext }) => {
+  if (!createdSchedule || !userContext) return;
+
+  const scheduleType = createdSchedule.type || (createdSchedule.habit_id ? "habit" : "custom");
+
+  if (scheduleType === "habit" && createdSchedule.habit_id && userContext.habits) {
+    const targetHabit = userContext.habits.find((habit) => habit.id === createdSchedule.habit_id);
+    if (targetHabit) {
+      targetHabit.schedules = [
+        ...(targetHabit.schedules || []),
+        {
+          id: createdSchedule.id,
+          day: createdSchedule.day,
+          starttime: createdSchedule.starttime,
+          endtime: createdSchedule.endtime,
+        },
+      ];
+    }
+  } else if (scheduleType === "custom" && userContext.busySchedules) {
+    userContext.busySchedules = [
+      ...(userContext.busySchedules || []),
+      {
+        id: createdSchedule.id,
+        title: createdSchedule.custom_title || createdSchedule.title || plan.title || "Scheduled focus",
+        day: createdSchedule.day,
+        starttime: createdSchedule.starttime,
+        endtime: createdSchedule.endtime,
+        repeat: createdSchedule.repeat,
+        customdays: createdSchedule.customdays,
+        notes: createdSchedule.notes,
+      },
+    ];
+  }
+
+  userContext.schedules = mapSchedules(userContext.habits || [], userContext.busySchedules || []);
+};
 
 const parseProgressDecision = (raw) => {
   if (!raw) return null;
@@ -727,6 +862,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     "Stay encouraging and keep the chat flowing with one clear next step in each reply.",
     "Database overview:\n" + formatTableSummary(dbOverview),
     "User context:\n" + JSON.stringify(userContext || {}, null, 2),
+    "Scheduling guardrails:\n" + SCHEDULE_POLICY_PROMPT,
   ].join("\n\n");
 
   let habitSuggestion = habitAnalysis.habitSuggestion;
@@ -761,7 +897,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
   }
 
   const summarizeSchedule = (plan, timestamps) => {
-    const summaryTitle = plan.title || "Scheduled session";
+    const summaryTitle = resolveScheduleTitle(plan, userContext) || "Scheduled session";
 
     return [
       "Summary:",
@@ -769,7 +905,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
       `- Date: ${timestamps?.day || "TBD"}`,
       `- Start: ${timestamps?.starttime || "TBD"}`,
       `- End: ${timestamps?.endtime || "TBD"}`,
-      "- Timezone: your local time",
+      `- Timezone: ${USER_TIMEZONE || "your local time"}`,
       `- Recurrence: ${plan.repeat || "once"}`,
       `- Notes: ${plan.notes || "None"}`,
       "- Location: not specified",
@@ -803,64 +939,34 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
 
       if (createdSchedule) {
         finalIntent = "create-schedule";
+        appendScheduleToContext({ createdSchedule, plan, userContext });
 
-        const scheduleType = createdSchedule.type || (createdSchedule.habit_id ? "habit" : "custom");
+        const createdTimestamps = {
+          day: createdSchedule.day,
+          starttime: createdSchedule.starttime,
+          endtime: createdSchedule.endtime,
+        };
 
-        if (scheduleType === "habit" && createdSchedule.habit_id && userContext?.habits) {
-          const targetHabit = userContext.habits.find((habit) => habit.id === createdSchedule.habit_id);
-          if (targetHabit) {
-            targetHabit.schedules = [
-              ...(targetHabit.schedules || []),
-              {
-                id: createdSchedule.id,
-                day: createdSchedule.day,
-                starttime: createdSchedule.starttime,
-                endtime: createdSchedule.endtime,
-              },
-            ];
-          }
-        } else if (scheduleType === "custom" && userContext) {
-          userContext.busySchedules = [
-            ...(userContext.busySchedules || []),
-            {
-              id: createdSchedule.id,
-              title: createdSchedule.custom_title || createdSchedule.title || "Scheduled focus",
-              day: createdSchedule.day,
-              starttime: createdSchedule.starttime,
-              endtime: createdSchedule.endtime,
-              repeat: createdSchedule.repeat,
-              customdays: createdSchedule.customdays,
-              notes: createdSchedule.notes,
-            },
-          ];
-        }
-
-        if (userContext) {
-          userContext.schedules = mapSchedules(userContext.habits || [], userContext.busySchedules || []);
-        }
-
-        if (!replyFromClaude) {
-          replyFromClaude = [
-            "Created.",
-            summarizeSchedule(plan, {
-              day: createdSchedule.day,
-              starttime: createdSchedule.starttime,
-              endtime: createdSchedule.endtime,
-            }),
-          ].join("\n");
-        }
+        const title = resolveScheduleTitle(plan, userContext) || createdSchedule.custom_title || plan.title;
+        replyFromClaude = formatEventAddedReply({ title, timestamps: createdTimestamps });
+      } else {
+        replyFromClaude = "I could not add this to your schedule due to a system limitation.";
       }
     }
   }
 
   if (!createdSchedule && schedulePlan?.action === "create-schedule") {
     const { timestamps: plannedTimestamps, conflicts } = findScheduleConflicts(schedulePlan, userContext);
+    const missingDetails = findMissingScheduleDetails({ plan: schedulePlan, timestamps: plannedTimestamps, userContext });
 
     if (!plannedTimestamps) {
       finalIntent = "clarify-schedule";
       replyFromClaude =
         schedulePlan.userReply ||
         "I need the exact date and start time to schedule this. Which date and start time should I use?";
+    } else if (missingDetails.length) {
+      finalIntent = "clarify-schedule";
+      replyFromClaude = schedulePlan.userReply || formatMissingDetailPrompt(missingDetails);
     } else if (conflicts.length) {
       finalIntent = "clarify-schedule";
 
@@ -875,13 +981,19 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
         schedulePlan.userReply ||
         `That time overlaps with ${conflictSummary}. Do you want a different slot instead of ${proposedTime}?`;
     } else {
-      finalIntent = "propose-schedule";
-      proposedSchedulePlan = { plan: schedulePlan, timestamps: plannedTimestamps };
+      createdSchedule = await createScheduleFromPlan({ plan: schedulePlan, userId });
 
-      if (!replyFromClaude) {
-        replyFromClaude = [summarizeSchedule(schedulePlan, plannedTimestamps), "Confirm: create this event? (Yes/No)"].join(
-          "\n"
-        );
+      if (createdSchedule) {
+        finalIntent = "create-schedule";
+        appendScheduleToContext({ createdSchedule, plan: schedulePlan, userContext });
+
+        replyFromClaude = formatEventAddedReply({
+          title: resolveScheduleTitle(schedulePlan, userContext) || createdSchedule.custom_title || schedulePlan.title,
+          timestamps: plannedTimestamps,
+        });
+      } else {
+        finalIntent = "clarify-schedule";
+        replyFromClaude = "I could not add this to your schedule due to a system limitation.";
       }
     }
   }
