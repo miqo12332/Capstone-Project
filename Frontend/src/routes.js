@@ -45,7 +45,6 @@ const routes = [
   { path: "/community", name: "Community", element: Community },
   { path: "/friends", name: "Community", element: Community },
   { path: "/messages", name: "Community", element: Community },
-  { path: "/leaderboard", name: "Community", element: Community },
   { path: "/group-challenges", name: "Community", element: Community },
 
   // ===== Support =====
