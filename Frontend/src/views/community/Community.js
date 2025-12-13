@@ -8,7 +8,7 @@ import {
   CTabPane,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
-import { cilChatBubble, cilGroup, cilSpeedometer, cilUser } from "@coreui/icons"
+import { cilChatBubble, cilGroup, cilUser } from "@coreui/icons"
 import { useLocation, useNavigate } from "react-router-dom"
 import { AuthContext } from "../../context/AuthContext"
 import { fetchFriends } from "../../services/friends"
@@ -18,15 +18,12 @@ import { fetchChallenges } from "../../services/challenges"
 import Friends from "./Friends"
 import Messages from "./Messages"
 import GroupChallenges from "./GroupChallenges"
-import Leaderboard from "./Leaderboard"
-
 import "./Community.css"
 
 const tabRoutes = {
   friends: "/community",
   messages: "/messages",
   challenges: "/group-challenges",
-  leaderboard: "/leaderboard",
 }
 
 const pathToTab = {
@@ -34,7 +31,6 @@ const pathToTab = {
   "/friends": "friends",
   "/messages": "messages",
   "/group-challenges": "challenges",
-  "/leaderboard": "leaderboard",
 }
 
 const getTabFromPath = (pathname) => pathToTab[pathname?.replace(/\/$/, "")] || "friends"
@@ -113,7 +109,6 @@ const Community = () => {
       friends: "Add, search, and remove friends to grow your circle.",
       messages: "DM friends to share progress and encouragement.",
       challenges: "Join group challenges to stay accountable together.",
-      leaderboard: "Track weekly streaks and completion scores.",
     }),
     []
   )
@@ -135,11 +130,6 @@ const Community = () => {
         label: "Challenges",
         accent: "Team up, set dates, and power through together.",
       },
-      leaderboard: {
-        icon: cilSpeedometer,
-        label: "Leaderboard",
-        accent: "Celebrate consistency and cheer on the top performers.",
-      },
     }),
     []
   )
@@ -151,7 +141,6 @@ const Community = () => {
     { label: "Friends", value: formatValue(friendTotal), detail: "Your friends" },
     { label: "Messages", value: formatValue(unreadMessages), detail: "Unread" },
     { label: "Challenges", value: formatValue(joinedChallenges), detail: "Joined" },
-    { label: "Leaderboard", value: "", detail: "" },
   ]
 
   return (
@@ -161,7 +150,7 @@ const Community = () => {
           <div>
             <h1 className="h3 mb-1">Community</h1>
             <p className="text-body-secondary mb-0">
-              Friends, messages, challenges, and leaderboards in one place.
+              Friends, messages, and challenges in one place.
             </p>
           </div>
           <div className="d-flex flex-wrap gap-2 justify-content-end">
@@ -218,9 +207,6 @@ const Community = () => {
         </CTabPane>
         <CTabPane visible={activeTab === "challenges"}>
           <GroupChallenges />
-        </CTabPane>
-        <CTabPane visible={activeTab === "leaderboard"}>
-          <Leaderboard />
         </CTabPane>
       </CTabContent>
     </div>
