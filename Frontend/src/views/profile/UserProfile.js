@@ -144,9 +144,18 @@ const UserProfile = () => {
           gender: payload.gender || "",
         })
         const settings = payload.settings || {}
+        const storedColorMode =
+          typeof window !== "undefined" ? localStorage.getItem(THEME_STORAGE_KEY) : null
+        const mappedColorModeTheme = mapColorModeToTheme(colorMode)
+        const mappedSettingsTheme = settings.theme
+        const resolvedTheme =
+          mappedSettingsTheme && storedColorMode !== null
+            ? mappedColorModeToTheme(storedColorMode)
+            : mappedSettingsTheme || mappedColorModeTheme
+
         setSettingsBaseline(settings)
         setPreferences({
-          theme: settings.theme || mapColorModeToTheme(colorMode),
+          theme: resolvedTheme || "light",
           aiTone: settings.aiTone || settings.ai_tone || "balanced",
           supportStyle: settings.supportStyle || settings.support_style || "celebrate",
         })
@@ -165,7 +174,6 @@ const UserProfile = () => {
         })
         setAvatarUrl(payload.avatar ? `${ASSET_BASE}${payload.avatar}` : "/uploads/default-avatar.png")
         setError("")
-        setColorMode(mapThemeToColorMode(settings.theme || mapColorModeToTheme(colorMode)))
         if (typeof loginRef.current === "function") {
           loginRef.current(payload)
         }
