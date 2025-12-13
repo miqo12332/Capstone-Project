@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   CAlert,
   CButton,
@@ -10,7 +10,6 @@ import {
   CFormInput,
   CFormLabel,
   CFormSwitch,
-  CFormTextarea,
   CInputGroup,
   CInputGroupText,
   CListGroup,
@@ -67,6 +66,7 @@ const Tasks = () => {
   })
   const [editTitle, setEditTitle] = useState("")
   const [editNotes, setEditNotes] = useState("")
+  const editorRef = useRef(null)
 
   const user = JSON.parse(localStorage.getItem("user") || "{}")
   const userId = user?.id
@@ -210,6 +210,7 @@ const Tasks = () => {
           ...task,
           name: edits.name?.trim() || task.name,
           notes: edits.notes || "",
+          status: edits.status || task.status || "pending",
         }
       }),
     [taskEdits, tasks],
@@ -247,9 +248,38 @@ const Tasks = () => {
 
     const trimmedTitle = editTitle.trim() || selectedTask.name
     saveTaskEdits(selectedTask.id, { name: trimmedTitle, notes: editNotes })
-    setTasks((prev) => prev.map((task) => (task.id === selectedTask.id ? { ...task, name: trimmedTitle } : task)))
+    setTasks((prev) =>
+      prev.map((task) => (task.id === selectedTask.id ? { ...task, name: trimmedTitle } : task)),
+    )
     setSelectedTask((prev) => (prev ? { ...prev, name: trimmedTitle, notes: editNotes } : prev))
     setFeedback({ type: "success", message: "Task updated. Changes are stored on this device." })
+  }
+
+  const cycleStatus = (status) => {
+    if (status === "done") return "missed"
+    if (status === "missed") return "pending"
+    return "done"
+  }
+
+  const handleToggleStatus = (task) => {
+    const nextStatus = cycleStatus(task.status)
+    saveTaskEdits(task.id, { status: nextStatus })
+    setTasks((prev) => prev.map((item) => (item.id === task.id ? { ...item, status: nextStatus } : item)))
+    if (selectedTask?.id === task.id) {
+      setSelectedTask((prev) => (prev ? { ...prev, status: nextStatus } : prev))
+    }
+  }
+
+  const stripTags = (html) => {
+    const div = document.createElement("div")
+    div.innerHTML = html || ""
+    return div.textContent || ""
+  }
+
+  const applyFormat = (command, value = null) => {
+    if (!editorRef.current) return
+    editorRef.current.focus()
+    document.execCommand(command, false, value)
   }
 
   return (
@@ -303,7 +333,8 @@ const Tasks = () => {
           ) : (
             <>
               <div className="mb-3 text-body-secondary small">
-                Drag tasks to reorder them. Click a task name to see its details.
+                Drag to reorder. Tap the circle to toggle done/missed. Click a task name to open a simple
+                editor.
               </div>
               <CListGroup className="shadow-sm">
                 {displayTasks.map((task) => (
@@ -319,17 +350,35 @@ const Tasks = () => {
                     }`}
                   >
                     <div className="d-flex align-items-center gap-3 flex-grow-1">
-                      <span
-                        className="rounded-circle"
-                        style={{
-                          width: 18,
-                          height: 18,
-                          display: "inline-block",
-                          cursor: "grab",
-                          border: `2px solid ${task.color || "#d1d5db"}`,
-                        }}
-                        aria-label={`Task color ${task.color || "purple"}`}
-                      />
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStatus(task)}
+                        className="border-0 p-0 bg-transparent"
+                        aria-label={`Toggle status for ${task.name}`}
+                        style={{ lineHeight: 0 }}
+                      >
+                        <span
+                          className="rounded-circle position-relative"
+                          style={{
+                            width: 20,
+                            height: 20,
+                            display: "inline-block",
+                            cursor: "pointer",
+                            border: `2px solid ${task.color || "#d1d5db"}`,
+                            backgroundColor: task.status === "done" ? task.color : "transparent",
+                            opacity: task.status === "missed" ? 0.35 : 1,
+                          }}
+                        >
+                          {task.status === "missed" ? (
+                            <span
+                              className="position-absolute top-50 start-50 translate-middle text-secondary"
+                              style={{ fontSize: 12 }}
+                            >
+                              ×
+                            </span>
+                          ) : null}
+                        </span>
+                      </button>
                       <button
                         type="button"
                         className="btn btn-link text-decoration-none text-start p-0"
@@ -337,13 +386,16 @@ const Tasks = () => {
                       >
                         <div className="fw-semibold text-wrap">{task.name}</div>
                         {task.notes ? (
-                          <div className="text-body-secondary small text-truncate" style={{ maxWidth: 260 }}>
-                            {task.notes}
+                          <div className="text-body-secondary small text-truncate" style={{ maxWidth: 320 }}>
+                            {stripTags(task.notes)}
                           </div>
                         ) : null}
+                        <div className="text-body-secondary small mt-1" style={{ opacity: 0.7 }}>
+                          Created {new Date(task.created_at).toLocaleDateString()}
+                        </div>
                       </button>
                     </div>
-                    <div className="text-body-secondary small d-flex align-items-center gap-3 flex-wrap justify-content-end">
+                    <div className="d-flex align-items-center gap-2">
                       <CButton
                         color="danger"
                         variant="ghost"
@@ -354,10 +406,6 @@ const Tasks = () => {
                       >
                         <CIcon icon={cilTrash} />
                       </CButton>
-                      <div className="d-flex align-items-center gap-2">
-                        <CIcon icon={cilWatch} className="text-primary" />
-                        <span>Created {new Date(task.created_at).toLocaleDateString()}</span>
-                      </div>
                     </div>
                   </CListGroupItem>
                 ))}
@@ -520,14 +568,36 @@ const Tasks = () => {
         <CModalBody className="pt-2">
           {selectedTask && (
             <CForm className="d-flex flex-column gap-3">
+              <div className="d-flex align-items-center gap-2 small text-body-secondary flex-wrap">
+                <span className="text-uppercase fw-semibold">Format</span>
+                <CButton color="light" size="sm" variant="outline" onClick={() => applyFormat("fontSize", 2)}>
+                  A-
+                </CButton>
+                <CButton color="light" size="sm" variant="outline" onClick={() => applyFormat("fontSize", 3)}>
+                  A
+                </CButton>
+                <CButton color="light" size="sm" variant="outline" onClick={() => applyFormat("fontSize", 4)}>
+                  A+
+                </CButton>
+                <CButton color="light" size="sm" variant="outline" onClick={() => applyFormat("insertUnorderedList")}
+                  >
+                  • List
+                </CButton>
+                <CButton color="light" size="sm" variant="outline" onClick={() => applyFormat("indent")}
+                  >
+                  ↳
+                </CButton>
+              </div>
               <div>
                 <CFormLabel className="text-medium-emphasis">Notes</CFormLabel>
-                <CFormTextarea
-                  rows={8}
-                  placeholder="Capture ideas, plans, and reminders—just like a note."
-                  value={editNotes}
-                  onChange={(e) => setEditNotes(e.target.value)}
-                  className="bg-body-secondary border-0"
+                <div
+                  ref={editorRef}
+                  contentEditable
+                  className="bg-body-secondary border rounded p-3"
+                  style={{ minHeight: 180, borderColor: "#e5e7eb" }}
+                  placeholder="Capture ideas, subpoints, and quick thoughts."
+                  dangerouslySetInnerHTML={{ __html: editNotes }}
+                  onInput={(e) => setEditNotes(e.currentTarget.innerHTML)}
                 />
               </div>
               <div className="small text-body-secondary">
