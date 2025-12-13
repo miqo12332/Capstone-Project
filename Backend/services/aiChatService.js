@@ -291,6 +291,8 @@ const wantsSchedulingHelp = (text) => {
   return keywords.some((keyword) => normalized.includes(keyword));
 };
 
+const MINUTE_FALLBACK_DURATION = 60;
+
 const parseProgressDecision = (raw) => {
   if (!raw) return null;
 
@@ -420,6 +422,76 @@ const requestClaudeSchedulePlan = async ({ message, userContext, history }) => {
 
   const reply = await callClaude([new SystemMessage(systemInstruction), ...conversation, prompt]);
   return parseSchedulePlan(reply);
+};
+
+const toMinutes = (timeString) => {
+  if (!timeString || typeof timeString !== "string") return null;
+
+  const [hours, minutes] = timeString.split(":").map((value) => Number.parseInt(value, 10));
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+
+  return hours * 60 + minutes;
+};
+
+const toTimeWindow = ({ day, starttime, endtime }) => {
+  const startMinutes = toMinutes(starttime);
+  if (startMinutes === null || !day) return null;
+
+  const endMinutes = endtime ? toMinutes(endtime) : startMinutes + MINUTE_FALLBACK_DURATION;
+
+  return { day, startMinutes, endMinutes };
+};
+
+const windowsOverlap = (first, second) => {
+  if (!first || !second) return false;
+  if (first.day !== second.day) return false;
+
+  return first.startMinutes < second.endMinutes && second.startMinutes < first.endMinutes;
+};
+
+const findScheduleConflicts = (plan, userContext) => {
+  const candidateTimestamps = buildScheduleTimestamps(plan.start, plan.end);
+  if (!candidateTimestamps) return { timestamps: null, conflicts: [] };
+
+  const candidateWindow = toTimeWindow({
+    day: candidateTimestamps.day,
+    starttime: candidateTimestamps.starttime,
+    endtime: candidateTimestamps.endtime,
+  });
+
+  const conflicts = [];
+
+  const considerEntry = (entry, title) => {
+    const window = toTimeWindow({
+      day: entry.day,
+      starttime: entry.starttime,
+      endtime: entry.endtime,
+    });
+
+    if (windowsOverlap(candidateWindow, window)) {
+      const label = [entry.day, entry.starttime].filter(Boolean).join(" at ");
+      conflicts.push({ title: title || "scheduled item", label });
+    }
+  };
+
+  for (const schedule of userContext?.schedules || []) {
+    considerEntry(schedule, schedule.title || (schedule.type === "habit" ? "habit session" : "schedule"));
+  }
+
+  for (const event of userContext?.calendarEvents || []) {
+    const timestamps = buildScheduleTimestamps(event.start, event.end);
+    considerEntry(
+      {
+        day: timestamps?.day,
+        starttime: timestamps?.starttime,
+        endtime: timestamps?.endtime,
+      },
+      event.title || "calendar event"
+    );
+  }
+
+  return { timestamps: candidateTimestamps, conflicts };
 };
 
 const buildScheduleTimestamps = (startInput, endInput) => {
@@ -660,53 +732,74 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
   }
 
   if (schedulePlan?.action === "create-schedule") {
-    createdSchedule = await createScheduleFromPlan({ plan: schedulePlan, userId });
+    const { timestamps: plannedTimestamps, conflicts } = findScheduleConflicts(schedulePlan, userContext);
 
-    if (createdSchedule) {
-      finalIntent = "create-schedule";
+    if (conflicts.length) {
+      finalIntent = "clarify-schedule";
 
-      const scheduleType = createdSchedule.type || (createdSchedule.habit_id ? "habit" : "custom");
+      if (!replyFromClaude) {
+        const conflictSummary = conflicts
+          .slice(0, 2)
+          .map((conflict) => `${conflict.title}${conflict.label ? ` (${conflict.label})` : ""}`)
+          .join(" and ");
 
-      if (scheduleType === "habit" && createdSchedule.habit_id && userContext?.habits) {
-        const targetHabit = userContext.habits.find((habit) => habit.id === createdSchedule.habit_id);
-        if (targetHabit) {
-          targetHabit.schedules = [
-            ...(targetHabit.schedules || []),
+        const proposedTime = plannedTimestamps
+          ? [plannedTimestamps.day, plannedTimestamps.starttime].filter(Boolean).join(" at ")
+          : "that time";
+
+        replyFromClaude =
+          schedulePlan.userReply ||
+          `That time overlaps with ${conflictSummary}. Do you want me to go ahead with ${proposedTime} or pick a different slot?`;
+      }
+    } else {
+      createdSchedule = await createScheduleFromPlan({ plan: schedulePlan, userId });
+
+      if (createdSchedule) {
+        finalIntent = "create-schedule";
+
+        const scheduleType = createdSchedule.type || (createdSchedule.habit_id ? "habit" : "custom");
+
+        if (scheduleType === "habit" && createdSchedule.habit_id && userContext?.habits) {
+          const targetHabit = userContext.habits.find((habit) => habit.id === createdSchedule.habit_id);
+          if (targetHabit) {
+            targetHabit.schedules = [
+              ...(targetHabit.schedules || []),
+              {
+                id: createdSchedule.id,
+                day: createdSchedule.day,
+                starttime: createdSchedule.starttime,
+                endtime: createdSchedule.endtime,
+              },
+            ];
+          }
+        } else if (scheduleType === "custom" && userContext) {
+          userContext.busySchedules = [
+            ...(userContext.busySchedules || []),
             {
               id: createdSchedule.id,
+              title: createdSchedule.custom_title || createdSchedule.title || "Scheduled focus",
               day: createdSchedule.day,
               starttime: createdSchedule.starttime,
               endtime: createdSchedule.endtime,
+              repeat: createdSchedule.repeat,
+              customdays: createdSchedule.customdays,
+              notes: createdSchedule.notes,
             },
           ];
         }
-      } else if (scheduleType === "custom" && userContext) {
-        userContext.busySchedules = [
-          ...(userContext.busySchedules || []),
-          {
-            id: createdSchedule.id,
-            title: createdSchedule.custom_title || createdSchedule.title || "Scheduled focus",
-            day: createdSchedule.day,
-            starttime: createdSchedule.starttime,
-            endtime: createdSchedule.endtime,
-            repeat: createdSchedule.repeat,
-            customdays: createdSchedule.customdays,
-            notes: createdSchedule.notes,
-          },
-        ];
-      }
 
-      if (userContext) {
-        userContext.schedules = mapSchedules(userContext.habits || [], userContext.busySchedules || []);
-      }
+        if (userContext) {
+          userContext.schedules = mapSchedules(userContext.habits || [], userContext.busySchedules || []);
+        }
 
-      if (!replyFromClaude) {
-        const startLabel = [createdSchedule.day, createdSchedule.starttime].filter(Boolean).join(" at ");
-        const title =
-          createdSchedule.custom_title || createdSchedule.habit?.title || createdSchedule.title || "your session";
-        replyFromClaude =
-          schedulePlan.userReply ||
-          `I scheduled ${title}${startLabel ? ` on ${startLabel}` : ""}. Want me to adjust or add notes?`;
+        if (!replyFromClaude) {
+          const startLabel = [createdSchedule.day, createdSchedule.starttime].filter(Boolean).join(" at ");
+          const title =
+            createdSchedule.custom_title || createdSchedule.habit?.title || createdSchedule.title || "your session";
+          replyFromClaude =
+            schedulePlan.userReply ||
+            `I scheduled ${title}${startLabel ? ` on ${startLabel}` : ""}. Want me to adjust or add notes?`;
+        }
       }
     }
   }
