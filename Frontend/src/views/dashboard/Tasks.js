@@ -237,6 +237,7 @@ const Tasks = () => {
     title: index === 0 ? "Checklist" : `Checklist ${index + 1}`,
     items: [],
     hideCompleted: false,
+    dueDate: "",
   })
 
   const sanitizeChecklists = (lists) => {
@@ -248,6 +249,7 @@ const Tasks = () => {
       id: list.id || `cl-${listIndex}-${Date.now()}`,
       title: list.title || `Checklist ${listIndex + 1}`,
       hideCompleted: Boolean(list.hideCompleted),
+      dueDate: list.dueDate || "",
       items: Array.isArray(list.items)
         ? list.items
             .map((item, itemIndex) => ({
@@ -260,12 +262,18 @@ const Tasks = () => {
     }))
   }
 
+  const stripTags = (html) => {
+    const div = document.createElement("div")
+    div.innerHTML = html || ""
+    return div.textContent || ""
+  }
+
   useEffect(() => {
     if (!selectedTask) return
     const edits = taskEdits[selectedTask.id] || {}
     setEditTitle(edits.name || selectedTask.name || "")
-    const description = edits.description ?? edits.notes ?? ""
-    setEditDescription(description)
+    const description = edits.description ?? edits.notes ?? selectedTask.notes ?? ""
+    setEditDescription(stripTags(description))
     const safeChecklists = sanitizeChecklists(edits.checklists)
     setEditChecklists(safeChecklists)
     setChecklistInputs(
@@ -335,6 +343,13 @@ const Tasks = () => {
     updateChecklist(listId, (list) => ({
       ...list,
       items: list.items.map((item) => (item.id === itemId ? { ...item, done: !item.done } : item)),
+    }))
+  }
+
+  const handleChecklistDateChange = (listId, value) => {
+    updateChecklist(listId, (list) => ({
+      ...list,
+      dueDate: value,
     }))
   }
 
@@ -729,7 +744,15 @@ const Tasks = () => {
                           onChange={(e) => handleChecklistTitleChange(list.id, e.target.value)}
                           className="flex-grow-1"
                         />
-                        <div className="d-flex gap-2">
+                        <div className="d-flex gap-2 align-items-center">
+                          <CFormInput
+                            type="date"
+                            size="sm"
+                            value={list.dueDate}
+                            onChange={(e) => handleChecklistDateChange(list.id, e.target.value)}
+                            className="bg-white"
+                            style={{ maxWidth: 150 }}
+                          />
                           <CButton
                             size="sm"
                             color="light"
@@ -809,16 +832,10 @@ const Tasks = () => {
 
               <div className="d-flex align-items-center gap-2 flex-wrap">
                 <CButton color="primary" onClick={handleSaveDetails}>
-                  Add
+                  Save
                 </CButton>
                 <CButton color="secondary" variant="ghost" onClick={closeDetails}>
                   Cancel
-                </CButton>
-                <CButton color="light" variant="outline">
-                  Assign
-                </CButton>
-                <CButton color="light" variant="outline">
-                  Due date
                 </CButton>
               </div>
             </CForm>
