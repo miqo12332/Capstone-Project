@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 import {
   CAlert,
-  CBadge,
   CButton,
   CCard,
   CCardBody,
@@ -12,10 +11,6 @@ import {
   CFormLabel,
   CFormSwitch,
   CFormTextarea,
-  CDropdown,
-  CDropdownItem,
-  CDropdownMenu,
-  CDropdownToggle,
   CInputGroup,
   CInputGroupText,
   CListGroup,
@@ -25,23 +20,18 @@ import {
   CModalFooter,
   CModalHeader,
   CModalTitle,
-  CRow,
   CSpinner,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
 import {
-  cilCheckCircle,
   cilList,
   cilPlus,
-  cilSend,
   cilTask,
   cilTrash,
   cilWatch,
-  cilXCircle,
 } from "@coreui/icons"
 
-import { createTask, deleteTask, getTasks, updateTaskStatus } from "../../services/tasks"
-import { sendReasoningRequest } from "../../services/ai"
+import { createTask, deleteTask, getTasks } from "../../services/tasks"
 
 const defaultDraft = {
   name: "",
@@ -56,12 +46,6 @@ const defaultDraft = {
   status: "pending",
 }
 
-const formatDuration = (minutes) => {
-  if (!minutes) return "n/a"
-  if (minutes % 60 === 0) return `${minutes / 60} hr${minutes === 60 ? "" : "s"}`
-  return `${minutes} mins`
-}
-
 const Tasks = () => {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
@@ -70,16 +54,19 @@ const Tasks = () => {
   const [draft, setDraft] = useState(() => ({ ...defaultDraft }))
   const [feedback, setFeedback] = useState(null)
   const [selectedTask, setSelectedTask] = useState(null)
-  const [subpoints, setSubpoints] = useState({})
-  const [subpointInput, setSubpointInput] = useState("")
-  const [aiMessage, setAiMessage] = useState("")
-  const [aiHistory, setAiHistory] = useState({})
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiError, setAiError] = useState(null)
   const [draggedId, setDraggedId] = useState(null)
-  const [updatingStatusId, setUpdatingStatusId] = useState(null)
   const [confirmDeleteTask, setConfirmDeleteTask] = useState(null)
   const [deletingTaskId, setDeletingTaskId] = useState(null)
+  const [taskEdits, setTaskEdits] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("taskEdits") || "{}")
+    } catch (error) {
+      console.error("Failed to read stored edits", error)
+      return {}
+    }
+  })
+  const [editTitle, setEditTitle] = useState("")
+  const [editNotes, setEditNotes] = useState("")
 
   const user = JSON.parse(localStorage.getItem("user") || "{}")
   const userId = user?.id
@@ -160,16 +147,10 @@ const Tasks = () => {
 
   const openDetails = (task) => {
     setSelectedTask(task)
-    setSubpointInput("")
-    setAiMessage("")
-    setAiError(null)
   }
 
   const closeDetails = () => {
     setSelectedTask(null)
-    setSubpointInput("")
-    setAiMessage("")
-    setAiError(null)
   }
 
   const handleDeleteTask = async () => {
@@ -190,85 +171,6 @@ const Tasks = () => {
     } finally {
       setDeletingTaskId(null)
       setConfirmDeleteTask(null)
-    }
-  }
-
-  const handleUpdateStatus = async (taskId, status) => {
-    setFeedback(null)
-    setUpdatingStatusId(taskId)
-
-    try {
-      const updated = await updateTaskStatus(taskId, status)
-      setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: updated.status } : task)))
-      setSelectedTask((prev) => (prev?.id === taskId ? { ...prev, status: updated.status } : prev))
-      setFeedback({ type: "success", message: `Task marked as ${status}.` })
-    } catch (error) {
-      console.error("Failed to update task status", error)
-      setFeedback({ type: "danger", message: error.message || "Unable to update task status." })
-    } finally {
-      setUpdatingStatusId(null)
-    }
-  }
-
-  const taskSubpoints = selectedTask ? subpoints[selectedTask.id] || [] : []
-  const taskHistory = selectedTask ? aiHistory[selectedTask.id] || [] : []
-
-  const handleAddSubpoint = () => {
-    const trimmed = subpointInput.trim()
-    if (!selectedTask || !trimmed) return
-
-    setSubpoints((prev) => ({
-      ...prev,
-      [selectedTask.id]: [...(prev[selectedTask.id] || []), trimmed],
-    }))
-    setSubpointInput("")
-  }
-
-  const handleSendAi = async () => {
-    if (!selectedTask) return
-    const trimmed = aiMessage.trim()
-    if (!trimmed) return
-
-    const baseHistory = aiHistory[selectedTask.id] || []
-    const optimisticHistory = [
-      ...baseHistory,
-      { role: "user", content: trimmed, id: `local-${Date.now()}` },
-    ]
-
-    setAiHistory((prev) => ({ ...prev, [selectedTask.id]: optimisticHistory }))
-    setAiMessage("")
-    setAiLoading(true)
-    setAiError(null)
-
-    try {
-      const snapshot = {
-        task: selectedTask,
-        subpoints: taskSubpoints,
-        totalTasks: tasks.length,
-      }
-
-      const response = await sendReasoningRequest({
-        snapshot,
-        insightText: "Help me work on this task",
-        history: optimisticHistory,
-      })
-
-      const assistantMessage = {
-        role: "assistant",
-        content: response.reply,
-        id: `assistant-${Date.now()}`,
-      }
-
-      setAiHistory((prev) => ({
-        ...prev,
-        [selectedTask.id]: [...optimisticHistory, assistantMessage],
-      }))
-    } catch (error) {
-      console.error("Failed to send AI request", error)
-      setAiError(error.message || "Unable to talk with the AI right now.")
-      setAiHistory((prev) => ({ ...prev, [selectedTask.id]: baseHistory }))
-    } finally {
-      setAiLoading(false)
     }
   }
 
@@ -300,17 +202,54 @@ const Tasks = () => {
     setDraggedId(null)
   }
 
-  const renderStatusBadge = (status) => {
-    const colorMap = {
-      done: "success",
-      missed: "danger",
-      pending: "secondary",
-    }
-    return (
-      <CBadge color={colorMap[status] || "secondary"} shape="rounded-pill">
-        {status || "pending"}
-      </CBadge>
-    )
+  const displayTasks = useMemo(
+    () =>
+      tasks.map((task) => {
+        const edits = taskEdits[task.id] || {}
+        return {
+          ...task,
+          name: edits.name?.trim() || task.name,
+          notes: edits.notes || "",
+        }
+      }),
+    [taskEdits, tasks],
+  )
+
+  useEffect(() => {
+    if (!selectedTask) return
+
+    setSelectedTask((prev) => {
+      if (!prev) return prev
+      const latest = displayTasks.find((task) => task.id === prev.id)
+      if (!latest) return prev
+      const hasChanged = latest.name !== prev.name || latest.notes !== prev.notes
+      return hasChanged ? latest : prev
+    })
+  }, [displayTasks, selectedTask])
+
+  useEffect(() => {
+    if (!selectedTask) return
+    const edits = taskEdits[selectedTask.id] || {}
+    setEditTitle(edits.name || selectedTask.name || "")
+    setEditNotes(edits.notes || "")
+  }, [selectedTask, taskEdits])
+
+  const saveTaskEdits = (taskId, updates) => {
+    setTaskEdits((prev) => {
+      const next = { ...prev, [taskId]: { ...(prev[taskId] || {}), ...updates } }
+      localStorage.setItem("taskEdits", JSON.stringify(next))
+      return next
+    })
+  }
+
+  const handleSaveDetails = () => {
+    if (!selectedTask) return
+
+    const trimmedTitle = editTitle.trim() || selectedTask.name
+    saveTaskEdits(selectedTask.id, { name: trimmedTitle, notes: editNotes })
+    setTasks((prev) => prev.map((task) => (task.id === selectedTask.id ? { ...task, name: trimmedTitle } : task)))
+    setSelectedTask((prev) => (prev ? { ...prev, name: trimmedTitle, notes: editNotes } : prev))
+    setFeedback({ type: "success", message: "Task updated. Changes are stored on this device." })
   }
 
   return (
@@ -367,7 +306,7 @@ const Tasks = () => {
                 Drag tasks to reorder them. Click a task name to see its details.
               </div>
               <CListGroup className="shadow-sm">
-                {tasks.map((task) => (
+                {displayTasks.map((task) => (
                   <CListGroupItem
                     key={task.id}
                     draggable
@@ -381,13 +320,13 @@ const Tasks = () => {
                   >
                     <div className="d-flex align-items-center gap-3 flex-grow-1">
                       <span
-                        className="rounded-circle border"
+                        className="rounded-circle"
                         style={{
-                          backgroundColor: task.color || "#4f46e5",
-                          width: 16,
-                          height: 16,
+                          width: 18,
+                          height: 18,
                           display: "inline-block",
                           cursor: "grab",
+                          border: `2px solid ${task.color || "#d1d5db"}`,
                         }}
                         aria-label={`Task color ${task.color || "purple"}`}
                       />
@@ -397,54 +336,24 @@ const Tasks = () => {
                         onClick={() => openDetails(task)}
                       >
                         <div className="fw-semibold text-wrap">{task.name}</div>
+                        {task.notes ? (
+                          <div className="text-body-secondary small text-truncate" style={{ maxWidth: 260 }}>
+                            {task.notes}
+                          </div>
+                        ) : null}
                       </button>
                     </div>
                     <div className="text-body-secondary small d-flex align-items-center gap-3 flex-wrap justify-content-end">
-                      <div className="d-flex align-items-center gap-1">
-                        {renderStatusBadge(task.status)}
-                        <CDropdown alignment="end" variant="btn-group">
-                          <CDropdownToggle
-                            color="light"
-                            size="sm"
-                            className="d-flex align-items-center gap-2"
-                            disabled={updatingStatusId === task.id}
-                          >
-                            {updatingStatusId === task.id ? (
-                              <CSpinner size="sm" />
-                            ) : (
-                              <CIcon icon={cilCheckCircle} className="text-success" />
-                            )}
-                            <span>Update</span>
-                          </CDropdownToggle>
-                          <CDropdownMenu>
-                            <CDropdownItem
-                              disabled={updatingStatusId === task.id}
-                              onClick={() => handleUpdateStatus(task.id, "done")}
-                              className="d-flex align-items-center gap-2"
-                            >
-                              <CIcon icon={cilCheckCircle} className="text-success" />
-                              Mark done
-                            </CDropdownItem>
-                            <CDropdownItem
-                              disabled={updatingStatusId === task.id}
-                              onClick={() => handleUpdateStatus(task.id, "missed")}
-                              className="d-flex align-items-center gap-2"
-                            >
-                              <CIcon icon={cilXCircle} className="text-danger" />
-                              Mark missed
-                            </CDropdownItem>
-                          </CDropdownMenu>
-                        </CDropdown>
-                        <CButton
-                          color="danger"
-                          variant="ghost"
-                          size="sm"
-                          className="p-2 d-flex align-items-center justify-content-center"
-                          onClick={() => setConfirmDeleteTask(task)}
-                        >
-                          <CIcon icon={cilTrash} />
-                        </CButton>
-                      </div>
+                      <CButton
+                        color="danger"
+                        variant="ghost"
+                        size="sm"
+                        className="p-2 d-flex align-items-center justify-content-center"
+                        onClick={() => setConfirmDeleteTask(task)}
+                        aria-label={`Delete ${task.name}`}
+                      >
+                        <CIcon icon={cilTrash} />
+                      </CButton>
                       <div className="d-flex align-items-center gap-2">
                         <CIcon icon={cilWatch} className="text-primary" />
                         <span>Created {new Date(task.created_at).toLocaleDateString()}</span>
@@ -582,177 +491,61 @@ const Tasks = () => {
         </CModalFooter>
       </CModal>
 
-      <CModal
-        alignment="center"
-        visible={Boolean(selectedTask)}
-        onClose={closeDetails}
-        size="lg"
-      >
-        <CModalHeader closeButton>
-          <CModalTitle>
-            Talk about: {selectedTask?.name}
-            <div className="text-medium-emphasis small fw-normal">
-              Share details, add subpoints, and chat with the AI.
+      <CModal alignment="center" visible={Boolean(selectedTask)} onClose={closeDetails} size="lg">
+        <CModalHeader closeButton className="border-0 pb-1">
+          <CModalTitle className="w-100">
+            <div className="d-flex align-items-center gap-3">
+              <span
+                className="rounded-circle"
+                style={{
+                  width: 22,
+                  height: 22,
+                  border: `2px solid ${selectedTask?.color || "#d1d5db"}`,
+                  display: "inline-block",
+                }}
+                aria-hidden
+              />
+              <div className="w-100">
+                <div className="text-uppercase text-medium-emphasis small mb-1">Task</div>
+                <CFormInput
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Task title"
+                  className="border-0 border-bottom rounded-0 shadow-0 ps-0"
+                />
+              </div>
             </div>
-            {selectedTask && <div className="mt-2">{renderStatusBadge(selectedTask.status)}</div>}
           </CModalTitle>
         </CModalHeader>
-        <CModalBody>
+        <CModalBody className="pt-2">
           {selectedTask && (
-            <CRow className="g-3">
-              <CCol md={6}>
-                <CCard className="border-0 bg-body-secondary mb-3">
-                  <CCardBody>
-                    <div className="d-flex align-items-center justify-content-between mb-2">
-                      <div>
-                        <div className="fw-semibold">Task details</div>
-                        <small className="text-body-secondary">Quick snapshot for the AI.</small>
-                      </div>
-                      {selectedTask.split_up && (
-                        <CBadge color="info" shape="rounded-pill">
-                          Split up
-                        </CBadge>
-                      )}
-                    </div>
-                    <div className="text-body-secondary small mb-2">
-                      Duration {formatDuration(selectedTask.duration_minutes)}
-                      {selectedTask.min_duration_minutes
-                        ? ` • Min ${formatDuration(selectedTask.min_duration_minutes)}`
-                        : ""}
-                      {selectedTask.max_duration_minutes
-                        ? ` • Max ${formatDuration(selectedTask.max_duration_minutes)}`
-                        : ""}
-                    </div>
-                    <div className="d-flex flex-wrap gap-2 small">
-                      {selectedTask.hours_label && (
-                        <CBadge color="light">{selectedTask.hours_label}</CBadge>
-                      )}
-                      {selectedTask.schedule_after && (
-                        <CBadge color="light">
-                          Start after {new Date(selectedTask.schedule_after).toLocaleString()}
-                        </CBadge>
-                      )}
-                      {selectedTask.due_date && (
-                        <CBadge color="warning" textColor="dark">
-                          Due {new Date(selectedTask.due_date).toLocaleString()}
-                        </CBadge>
-                      )}
-                    </div>
-                  </CCardBody>
-                </CCard>
-
-                <div className="mb-2 d-flex align-items-center justify-content-between">
-                  <div>
-                    <div className="fw-semibold">Subpoints</div>
-                    <small className="text-body-secondary">
-                      Break the task down before asking the AI.
-                    </small>
-                  </div>
-                  <CBadge color="light" textColor="dark">
-                    {taskSubpoints.length || 0} added
-                  </CBadge>
-                </div>
-
-                <CInputGroup className="mb-2">
-                  <CFormInput
-                    placeholder="Add a subpoint"
-                    value={subpointInput}
-                    onChange={(e) => setSubpointInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault()
-                        handleAddSubpoint()
-                      }
-                    }}
-                  />
-                  <CButton color="primary" variant="outline" onClick={handleAddSubpoint}>
-                    Add
-                  </CButton>
-                </CInputGroup>
-
-                <CListGroup className="mb-3">
-                  {taskSubpoints.length ? (
-                    taskSubpoints.map((point, idx) => (
-                      <CListGroupItem key={`${selectedTask.id}-point-${idx}`}>
-                        {point}
-                      </CListGroupItem>
-                    ))
-                  ) : (
-                    <CListGroupItem className="text-body-secondary">
-                      No subpoints yet. Create a couple so the AI can be specific.
-                    </CListGroupItem>
-                  )}
-                </CListGroup>
-              </CCol>
-
-              <CCol md={6}>
-                <div className="d-flex align-items-center justify-content-between mb-2">
-                  <div>
-                    <div className="fw-semibold">Ask the AI</div>
-                    <small className="text-body-secondary">
-                      The AI sees this task, your subpoints, and recent messages.
-                    </small>
-                  </div>
-                  {aiLoading && <CSpinner size="sm" color="info" />}
-                </div>
-
-                <div
-                  className="border rounded p-3 mb-3 bg-body-secondary"
-                  style={{ minHeight: 220, maxHeight: 320, overflowY: "auto" }}
-                >
-                  {taskHistory.length ? (
-                    taskHistory.map((entry) => (
-                      <div key={entry.id} className="mb-3">
-                        <small className="text-uppercase text-medium-emphasis fw-semibold d-block mb-1">
-                          {entry.role === "user" ? "You" : "AI"}
-                        </small>
-                        <div
-                          className={`p-2 rounded-4 ${
-                            entry.role === "assistant" ? "bg-white" : "bg-primary text-white"
-                          }`}
-                        >
-                          {entry.content}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-body-secondary text-center">
-                      Ask a question to start planning this task with the AI.
-                    </div>
-                  )}
-                </div>
-
-                {aiError && <CAlert color="danger">{aiError}</CAlert>}
-
-                <CInputGroup>
-                  <CFormTextarea
-                    rows={2}
-                    placeholder="Ask for help, break down steps, or request coaching"
-                    value={aiMessage}
-                    onChange={(e) => setAiMessage(e.target.value)}
-                    disabled={aiLoading}
-                  />
-                  <CButton color="primary" disabled={aiLoading} onClick={handleSendAi}>
-                    {aiLoading ? (
-                      <>
-                        <CSpinner size="sm" className="me-2" /> Sending
-                      </>
-                    ) : (
-                      <>
-                        <CIcon icon={cilSend} className="me-2" /> Send
-                      </>
-                    )}
-                  </CButton>
-                </CInputGroup>
-              </CCol>
-            </CRow>
+            <CForm className="d-flex flex-column gap-3">
+              <div>
+                <CFormLabel className="text-medium-emphasis">Notes</CFormLabel>
+                <CFormTextarea
+                  rows={8}
+                  placeholder="Capture ideas, plans, and reminders—just like a note."
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  className="bg-body-secondary border-0"
+                />
+              </div>
+              <div className="small text-body-secondary">
+                Changes are kept on this device so you can jot things down quickly.
+              </div>
+            </CForm>
           )}
         </CModalBody>
-        <CModalFooter>
-          <div className="text-body-secondary small">AI requests use your task snapshot and notes.</div>
-          <CButton color="secondary" variant="ghost" onClick={closeDetails}>
-            Close
-          </CButton>
+        <CModalFooter className="border-0 d-flex justify-content-between">
+          <div className="text-body-secondary small">Tap save to keep your edits visible in the list.</div>
+          <div className="d-flex gap-2">
+            <CButton color="secondary" variant="ghost" onClick={closeDetails}>
+              Close
+            </CButton>
+            <CButton color="primary" onClick={handleSaveDetails}>
+              Save
+            </CButton>
+          </div>
         </CModalFooter>
       </CModal>
 
