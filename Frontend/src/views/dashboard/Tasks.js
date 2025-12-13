@@ -12,6 +12,10 @@ import {
   CFormLabel,
   CFormSwitch,
   CFormTextarea,
+  CDropdown,
+  CDropdownItem,
+  CDropdownMenu,
+  CDropdownToggle,
   CInputGroup,
   CInputGroupText,
   CListGroup,
@@ -25,7 +29,16 @@ import {
   CSpinner,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
-import { cilList, cilPlus, cilSend, cilTask, cilWatch } from "@coreui/icons"
+import {
+  cilCheckCircle,
+  cilList,
+  cilPlus,
+  cilSend,
+  cilTask,
+  cilTrash,
+  cilWatch,
+  cilXCircle,
+} from "@coreui/icons"
 
 import { createTask, deleteTask, getTasks, updateTaskStatus } from "../../services/tasks"
 import { sendReasoningRequest } from "../../services/ai"
@@ -333,9 +346,6 @@ const Tasks = () => {
               <small className="text-body-secondary">{tasks.length} total</small>
             </div>
           </div>
-          <CButton color="primary" onClick={() => setShowModal(true)}>
-            <CIcon icon={cilPlus} className="me-2" /> Add task
-          </CButton>
         </CCardHeader>
         <CCardBody>
           {loading ? (
@@ -392,31 +402,47 @@ const Tasks = () => {
                     <div className="text-body-secondary small d-flex align-items-center gap-3 flex-wrap justify-content-end">
                       <div className="d-flex align-items-center gap-1">
                         {renderStatusBadge(task.status)}
-                        <CButton
-                          color="success"
-                          variant="outline"
-                          size="sm"
-                          disabled={updatingStatusId === task.id}
-                          onClick={() => handleUpdateStatus(task.id, "done")}
-                        >
-                          {updatingStatusId === task.id ? <CSpinner size="sm" /> : "Done"}
-                        </CButton>
-                        <CButton
-                          color="danger"
-                          variant="outline"
-                          size="sm"
-                          disabled={updatingStatusId === task.id}
-                          onClick={() => handleUpdateStatus(task.id, "missed")}
-                        >
-                          {updatingStatusId === task.id ? <CSpinner size="sm" /> : "Missed"}
-                        </CButton>
+                        <CDropdown alignment="end" variant="btn-group">
+                          <CDropdownToggle
+                            color="light"
+                            size="sm"
+                            className="d-flex align-items-center gap-2"
+                            disabled={updatingStatusId === task.id}
+                          >
+                            {updatingStatusId === task.id ? (
+                              <CSpinner size="sm" />
+                            ) : (
+                              <CIcon icon={cilCheckCircle} className="text-success" />
+                            )}
+                            <span>Update</span>
+                          </CDropdownToggle>
+                          <CDropdownMenu>
+                            <CDropdownItem
+                              disabled={updatingStatusId === task.id}
+                              onClick={() => handleUpdateStatus(task.id, "done")}
+                              className="d-flex align-items-center gap-2"
+                            >
+                              <CIcon icon={cilCheckCircle} className="text-success" />
+                              Mark done
+                            </CDropdownItem>
+                            <CDropdownItem
+                              disabled={updatingStatusId === task.id}
+                              onClick={() => handleUpdateStatus(task.id, "missed")}
+                              className="d-flex align-items-center gap-2"
+                            >
+                              <CIcon icon={cilXCircle} className="text-danger" />
+                              Mark missed
+                            </CDropdownItem>
+                          </CDropdownMenu>
+                        </CDropdown>
                         <CButton
                           color="danger"
                           variant="ghost"
                           size="sm"
+                          className="p-2 d-flex align-items-center justify-content-center"
                           onClick={() => setConfirmDeleteTask(task)}
                         >
-                          Delete
+                          <CIcon icon={cilTrash} />
                         </CButton>
                       </div>
                       <div className="d-flex align-items-center gap-2">
