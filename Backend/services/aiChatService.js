@@ -376,23 +376,31 @@ const parseScheduleDecision = (raw) => {
 
     if (parsed.action !== "create-schedule") return null;
 
-    const type = parsed.type === "habit" ? "habit" : parsed.type === "busy" ? "busy" : null;
-    const day = parsed.day?.trim();
-    const starttime = parsed.starttime?.trim();
-    const endtime = parsed.endtime?.trim() || null;
-    const notes = parsed.notes?.trim() || null;
-    const repeat = parsed.repeat?.trim() || "once";
-    const userReply = parsed.userReply?.trim() || null;
-    const customdays = parsed.customdays?.trim() || null;
+    const typeRaw = parsed.type || parsed.kind || parsed.scheduleType;
+    const type = typeRaw === "habit" ? "habit" : typeRaw === "busy" ? "busy" : null;
+
+    const day = (parsed.day || parsed.date || parsed.dayDate || parsed.calendarDate)?.trim();
+    const starttime =
+      parsed.starttime || parsed.start_time || parsed.start || parsed.startTime || parsed.time || null;
+    const endtime =
+      parsed.endtime || parsed.end_time || parsed.end || parsed.endTime || parsed.finish || parsed.until || null;
+
+    const title = (parsed.title || parsed.name || parsed.custom_title || parsed.summary || "").trim();
+    const repeat = (parsed.repeat || parsed.recurrence || parsed.frequency || "once").trim();
+    const customdays = (parsed.customdays || parsed.custom_days || parsed.days || "").trim() || null;
+    const notes = (parsed.notes || parsed.note || parsed.description || "").trim() || null;
+    const userReply = (parsed.userReply || parsed.reply || "").trim() || null;
+    const habitId =
+      parsed.habitId || parsed.habit_id || parsed.habit?.id || parsed.habitIdRaw || parsed.habitRef || null;
 
     if (!type || !day || !starttime) return null;
-    if (type === "habit" && !parsed.habitId) return null;
-    if (type === "busy" && !parsed.title) return null;
+    if (type === "habit" && !habitId) return null;
+    if (type === "busy" && !title) return null;
 
     const normalized = normalizeScheduleDecision({
       type,
-      habitId: parsed.habitId ? Number.parseInt(parsed.habitId, 10) : null,
-      title: parsed.title?.trim() || null,
+      habitId: habitId ? Number.parseInt(habitId, 10) : null,
+      title: title || null,
       day,
       starttime,
       endtime,
