@@ -19,6 +19,8 @@ import {
   CModalFooter,
   CModalHeader,
   CModalTitle,
+  CProgress,
+  CProgressBar,
   CSpinner,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
@@ -65,9 +67,9 @@ const Tasks = () => {
     }
   })
   const [editTitle, setEditTitle] = useState("")
-  const [editNotes, setEditNotes] = useState("")
-  const [textColor, setTextColor] = useState("#111827")
-  const editorRef = useRef(null)
+  const [editDescription, setEditDescription] = useState("")
+  const [editChecklists, setEditChecklists] = useState([])
+  const [checklistInputs, setChecklistInputs] = useState({})
 
   const user = JSON.parse(localStorage.getItem("user") || "{}")
   const userId = user?.id
@@ -207,10 +209,11 @@ const Tasks = () => {
     () =>
       tasks.map((task) => {
         const edits = taskEdits[task.id] || {}
+        const description = edits.description ?? edits.notes ?? ""
         return {
           ...task,
           name: edits.name?.trim() || task.name,
-          notes: edits.notes || "",
+          notes: description,
           status: edits.status || task.status || "pending",
         }
       }),
@@ -229,11 +232,48 @@ const Tasks = () => {
     })
   }, [displayTasks, selectedTask])
 
+  const buildChecklist = (index = 0) => ({
+    id: `cl-${Date.now()}-${index}`,
+    title: index === 0 ? "Checklist" : `Checklist ${index + 1}`,
+    items: [],
+    hideCompleted: false,
+  })
+
+  const sanitizeChecklists = (lists) => {
+    if (!Array.isArray(lists) || lists.length === 0) {
+      return [buildChecklist()]
+    }
+
+    return lists.map((list, listIndex) => ({
+      id: list.id || `cl-${listIndex}-${Date.now()}`,
+      title: list.title || `Checklist ${listIndex + 1}`,
+      hideCompleted: Boolean(list.hideCompleted),
+      items: Array.isArray(list.items)
+        ? list.items
+            .map((item, itemIndex) => ({
+              id: item.id || `item-${listIndex}-${itemIndex}-${Date.now()}`,
+              text: item.text || "",
+              done: Boolean(item.done),
+            }))
+            .filter((item) => item.text.trim() !== "")
+        : [],
+    }))
+  }
+
   useEffect(() => {
     if (!selectedTask) return
     const edits = taskEdits[selectedTask.id] || {}
     setEditTitle(edits.name || selectedTask.name || "")
-    setEditNotes(edits.notes || "")
+    const description = edits.description ?? edits.notes ?? ""
+    setEditDescription(description)
+    const safeChecklists = sanitizeChecklists(edits.checklists)
+    setEditChecklists(safeChecklists)
+    setChecklistInputs(
+      safeChecklists.reduce((acc, list) => {
+        acc[list.id] = ""
+        return acc
+      }, {}),
+    )
   }, [selectedTask, taskEdits])
 
   const saveTaskEdits = (taskId, updates) => {
@@ -248,11 +288,21 @@ const Tasks = () => {
     if (!selectedTask) return
 
     const trimmedTitle = editTitle.trim() || selectedTask.name
-    saveTaskEdits(selectedTask.id, { name: trimmedTitle, notes: editNotes })
+    const payload = {
+      name: trimmedTitle,
+      description: editDescription,
+      checklists: editChecklists,
+    }
+
+    saveTaskEdits(selectedTask.id, payload)
     setTasks((prev) =>
-      prev.map((task) => (task.id === selectedTask.id ? { ...task, name: trimmedTitle } : task)),
+      prev.map((task) =>
+        task.id === selectedTask.id ? { ...task, name: trimmedTitle, notes: editDescription } : task,
+      ),
     )
-    setSelectedTask((prev) => (prev ? { ...prev, name: trimmedTitle, notes: editNotes } : prev))
+    setSelectedTask((prev) =>
+      prev ? { ...prev, name: trimmedTitle, notes: editDescription, checklists: editChecklists } : prev,
+    )
     setFeedback({ type: "success", message: "Task updated. Changes are stored on this device." })
   }
 
@@ -271,21 +321,76 @@ const Tasks = () => {
     }
   }
 
+  const createId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+  const updateChecklist = (listId, updater) => {
+    setEditChecklists((prev) => prev.map((list) => (list.id === listId ? updater(list) : list)))
+  }
+
+  const handleChecklistTitleChange = (listId, title) => {
+    updateChecklist(listId, (list) => ({ ...list, title }))
+  }
+
+  const handleToggleItem = (listId, itemId) => {
+    updateChecklist(listId, (list) => ({
+      ...list,
+      items: list.items.map((item) => (item.id === itemId ? { ...item, done: !item.done } : item)),
+    }))
+  }
+
+  const handleDeleteItem = (listId, itemId) => {
+    updateChecklist(listId, (list) => ({
+      ...list,
+      items: list.items.filter((item) => item.id !== itemId),
+    }))
+  }
+
+  const handleAddItem = (listId) => {
+    const text = (checklistInputs[listId] || "").trim()
+    if (!text) return
+
+    updateChecklist(listId, (list) => ({
+      ...list,
+      items: [...list.items, { id: createId("item"), text, done: false }],
+    }))
+
+    setChecklistInputs((prev) => ({ ...prev, [listId]: "" }))
+  }
+
+  const handleToggleHideCompleted = (listId) => {
+    updateChecklist(listId, (list) => ({ ...list, hideCompleted: !list.hideCompleted }))
+  }
+
+  const handleDeleteChecklist = (listId) => {
+    setEditChecklists((prev) => {
+      const remaining = prev.filter((list) => list.id !== listId)
+      if (remaining.length === 0) {
+        return [buildChecklist()]
+      }
+      return remaining
+    })
+  }
+
+  const handleAddChecklist = () => {
+    setEditChecklists((prev) => [...prev, buildChecklist(prev.length)])
+  }
+
   const stripTags = (html) => {
     const div = document.createElement("div")
     div.innerHTML = html || ""
     return div.textContent || ""
   }
 
-  const applyFormat = (command, value = null) => {
-    if (!editorRef.current) return
-    editorRef.current.focus()
-    document.execCommand(command, false, value)
+  const checklistProgress = (list) => {
+    if (!list.items.length) return 0
+    const doneCount = list.items.filter((item) => item.done).length
+    return Math.round((doneCount / list.items.length) * 100)
   }
 
-  const handleColorChange = (value) => {
-    setTextColor(value)
-    applyFormat("foreColor", value)
+  const formatDate = (value) => {
+    if (!value) return "today"
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? "today" : date.toLocaleDateString()
   }
 
   return (
@@ -412,7 +517,7 @@ const Tasks = () => {
                           className="text-body-secondary"
                           style={{ opacity: 0.55, fontSize: "0.75rem", letterSpacing: 0.2 }}
                         >
-                          Created {new Date(task.created_at).toLocaleDateString()}
+                          Created {formatDate(task.created_at)}
                         </div>
                       </button>
                     </div>
@@ -588,71 +693,133 @@ const Tasks = () => {
         </CModalHeader>
         <CModalBody className="pt-2">
           {selectedTask && (
-            <CForm className="d-flex flex-column gap-3">
-              <div className="p-2 rounded-3 border bg-white shadow-sm d-flex align-items-center flex-wrap gap-2">
-                <div className="d-flex align-items-center gap-1">
-                  {[2, 3, 4].map((size) => (
-                    <button
-                      key={size}
-                      type="button"
-                      className="btn btn-sm btn-outline-secondary rounded-pill px-3"
-                      onClick={() => applyFormat("fontSize", size)}
-                    >
-                      {size === 2 ? "A-" : size === 3 ? "A" : "A+"}
-                    </button>
-                  ))}
-                </div>
-                <div className="d-flex align-items-center gap-2 px-2 py-1 rounded-pill bg-light border">
-                  <span className="text-uppercase small text-secondary fw-semibold">Text</span>
-                  <input
-                    type="color"
-                    value={textColor}
-                    onChange={(e) => handleColorChange(e.target.value)}
-                    className="form-control form-control-color p-1"
-                    style={{ width: 42 }}
-                    aria-label="Choose text color"
-                  />
-                </div>
-                <div className="d-flex align-items-center gap-1">
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1"
-                    onClick={() => applyFormat("insertUnorderedList")}
-                  >
-                    <span style={{ fontSize: 18, lineHeight: 1 }}>•</span>
-                    <span>List</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary rounded-pill px-3"
-                    onClick={() => applyFormat("indent")}
-                  >
-                    ↳
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary rounded-pill px-3"
-                    onClick={() => applyFormat("outdent")}
-                  >
-                    ↰
-                  </button>
-                </div>
+            <CForm className="d-flex flex-column gap-4">
+              <div className="small text-body-secondary" style={{ opacity: 0.65 }}>
+                Created {formatDate(selectedTask.created_at)}
               </div>
+
               <div>
-                <CFormLabel className="text-medium-emphasis">Notes</CFormLabel>
-                <div
-                  ref={editorRef}
-                  contentEditable
-                  className="border rounded-3 p-3 shadow-sm"
-                  style={{ minHeight: 200, borderColor: "#e5e7eb", backgroundColor: "#f8fafc" }}
-                  placeholder="Capture ideas, subpoints, and quick thoughts."
-                  dangerouslySetInnerHTML={{ __html: editNotes }}
-                  onInput={(e) => setEditNotes(e.currentTarget.innerHTML)}
+                <CFormLabel className="text-medium-emphasis">Description</CFormLabel>
+                <textarea
+                  className="form-control rounded-3 border-0 bg-light"
+                  style={{ minHeight: 120 }}
+                  placeholder="Add a more detailed description..."
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
                 />
               </div>
-              <div className="small text-body-secondary">
-                Use keyboard shortcuts for bold, italic, and underline. Changes are kept on this device so you can jot
-                things down quickly.
+
+              <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div className="fw-semibold">Checklists</div>
+                <CButton color="light" size="sm" className="text-primary" onClick={handleAddChecklist}>
+                  + Add checklist
+                </CButton>
+              </div>
+
+              <div className="d-flex flex-column gap-3">
+                {editChecklists.map((list) => {
+                  const progress = checklistProgress(list)
+                  const visibleItems = list.hideCompleted ? list.items.filter((item) => !item.done) : list.items
+
+                  return (
+                    <div key={list.id} className="border rounded-3 p-3 bg-light">
+                      <div className="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
+                        <CFormInput
+                          value={list.title}
+                          onChange={(e) => handleChecklistTitleChange(list.id, e.target.value)}
+                          className="flex-grow-1"
+                        />
+                        <div className="d-flex gap-2">
+                          <CButton
+                            size="sm"
+                            color="light"
+                            variant="outline"
+                            className="text-secondary"
+                            onClick={() => handleToggleHideCompleted(list.id)}
+                          >
+                            {list.hideCompleted ? "Show checked items" : "Hide checked items"}
+                          </CButton>
+                          <CButton
+                            size="sm"
+                            color="danger"
+                            variant="ghost"
+                            onClick={() => handleDeleteChecklist(list.id)}
+                          >
+                            Delete
+                          </CButton>
+                        </div>
+                      </div>
+
+                      <div className="d-flex align-items-center gap-2 mb-3">
+                        <CProgress className="flex-grow-1" height={8} color="primary">
+                          <CProgressBar value={progress} />
+                        </CProgress>
+                        <span className="small text-body-secondary">{progress}%</span>
+                      </div>
+
+                      <div className="d-flex flex-column gap-2">
+                        {visibleItems.length === 0 ? (
+                          <div className="text-body-secondary small">No items yet</div>
+                        ) : (
+                          visibleItems.map((item) => (
+                            <div key={item.id} className="d-flex align-items-center gap-2">
+                              <input
+                                type="checkbox"
+                                className="form-check-input"
+                                checked={item.done}
+                                onChange={() => handleToggleItem(list.id, item.id)}
+                              />
+                              <div
+                                className={`flex-grow-1 ${
+                                  item.done ? "text-decoration-line-through text-body-secondary" : ""
+                                }`}
+                              >
+                                {item.text}
+                              </div>
+                              <CButton
+                                size="sm"
+                                color="light"
+                                variant="ghost"
+                                className="text-danger"
+                                onClick={() => handleDeleteItem(list.id, item.id)}
+                              >
+                                Delete
+                              </CButton>
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      <div className="d-flex align-items-center gap-2 mt-3">
+                        <CFormInput
+                          placeholder="Add an item"
+                          value={checklistInputs[list.id] || ""}
+                          onChange={(e) =>
+                            setChecklistInputs((prev) => ({ ...prev, [list.id]: e.target.value || "" }))
+                          }
+                        />
+                        <CButton color="primary" variant="outline" onClick={() => handleAddItem(list.id)}>
+                          Add
+                        </CButton>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="d-flex align-items-center gap-2 flex-wrap">
+                <CButton color="primary" onClick={handleSaveDetails}>
+                  Add
+                </CButton>
+                <CButton color="secondary" variant="ghost" onClick={closeDetails}>
+                  Cancel
+                </CButton>
+                <CButton color="light" variant="outline">
+                  Assign
+                </CButton>
+                <CButton color="light" variant="outline">
+                  Due date
+                </CButton>
               </div>
             </CForm>
           )}
