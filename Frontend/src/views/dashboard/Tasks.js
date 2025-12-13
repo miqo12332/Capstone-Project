@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 import {
   CAlert,
-  CBadge,
   CButton,
   CCard,
   CCardBody,
@@ -11,11 +10,6 @@ import {
   CFormInput,
   CFormLabel,
   CFormSwitch,
-  CFormTextarea,
-  CDropdown,
-  CDropdownItem,
-  CDropdownMenu,
-  CDropdownToggle,
   CInputGroup,
   CInputGroupText,
   CListGroup,
@@ -25,23 +19,14 @@ import {
   CModalFooter,
   CModalHeader,
   CModalTitle,
-  CRow,
+  CProgress,
+  CProgressBar,
   CSpinner,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
-import {
-  cilCheckCircle,
-  cilList,
-  cilPlus,
-  cilSend,
-  cilTask,
-  cilTrash,
-  cilWatch,
-  cilXCircle,
-} from "@coreui/icons"
+import { cilCalendar, cilEye, cilList, cilLowVision, cilPlus, cilTask, cilTrash } from "@coreui/icons"
 
-import { createTask, deleteTask, getTasks, updateTaskStatus } from "../../services/tasks"
-import { sendReasoningRequest } from "../../services/ai"
+import { createTask, deleteTask, getTasks } from "../../services/tasks"
 
 const defaultDraft = {
   name: "",
@@ -56,12 +41,6 @@ const defaultDraft = {
   status: "pending",
 }
 
-const formatDuration = (minutes) => {
-  if (!minutes) return "n/a"
-  if (minutes % 60 === 0) return `${minutes / 60} hr${minutes === 60 ? "" : "s"}`
-  return `${minutes} mins`
-}
-
 const Tasks = () => {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
@@ -70,16 +49,21 @@ const Tasks = () => {
   const [draft, setDraft] = useState(() => ({ ...defaultDraft }))
   const [feedback, setFeedback] = useState(null)
   const [selectedTask, setSelectedTask] = useState(null)
-  const [subpoints, setSubpoints] = useState({})
-  const [subpointInput, setSubpointInput] = useState("")
-  const [aiMessage, setAiMessage] = useState("")
-  const [aiHistory, setAiHistory] = useState({})
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiError, setAiError] = useState(null)
   const [draggedId, setDraggedId] = useState(null)
-  const [updatingStatusId, setUpdatingStatusId] = useState(null)
   const [confirmDeleteTask, setConfirmDeleteTask] = useState(null)
   const [deletingTaskId, setDeletingTaskId] = useState(null)
+  const [taskEdits, setTaskEdits] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("taskEdits") || "{}")
+    } catch (error) {
+      console.error("Failed to read stored edits", error)
+      return {}
+    }
+  })
+  const [editTitle, setEditTitle] = useState("")
+  const [editDescription, setEditDescription] = useState("")
+  const [editChecklists, setEditChecklists] = useState([])
+  const [checklistInputs, setChecklistInputs] = useState({})
 
   const user = JSON.parse(localStorage.getItem("user") || "{}")
   const userId = user?.id
@@ -160,16 +144,10 @@ const Tasks = () => {
 
   const openDetails = (task) => {
     setSelectedTask(task)
-    setSubpointInput("")
-    setAiMessage("")
-    setAiError(null)
   }
 
   const closeDetails = () => {
     setSelectedTask(null)
-    setSubpointInput("")
-    setAiMessage("")
-    setAiError(null)
   }
 
   const handleDeleteTask = async () => {
@@ -190,85 +168,6 @@ const Tasks = () => {
     } finally {
       setDeletingTaskId(null)
       setConfirmDeleteTask(null)
-    }
-  }
-
-  const handleUpdateStatus = async (taskId, status) => {
-    setFeedback(null)
-    setUpdatingStatusId(taskId)
-
-    try {
-      const updated = await updateTaskStatus(taskId, status)
-      setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: updated.status } : task)))
-      setSelectedTask((prev) => (prev?.id === taskId ? { ...prev, status: updated.status } : prev))
-      setFeedback({ type: "success", message: `Task marked as ${status}.` })
-    } catch (error) {
-      console.error("Failed to update task status", error)
-      setFeedback({ type: "danger", message: error.message || "Unable to update task status." })
-    } finally {
-      setUpdatingStatusId(null)
-    }
-  }
-
-  const taskSubpoints = selectedTask ? subpoints[selectedTask.id] || [] : []
-  const taskHistory = selectedTask ? aiHistory[selectedTask.id] || [] : []
-
-  const handleAddSubpoint = () => {
-    const trimmed = subpointInput.trim()
-    if (!selectedTask || !trimmed) return
-
-    setSubpoints((prev) => ({
-      ...prev,
-      [selectedTask.id]: [...(prev[selectedTask.id] || []), trimmed],
-    }))
-    setSubpointInput("")
-  }
-
-  const handleSendAi = async () => {
-    if (!selectedTask) return
-    const trimmed = aiMessage.trim()
-    if (!trimmed) return
-
-    const baseHistory = aiHistory[selectedTask.id] || []
-    const optimisticHistory = [
-      ...baseHistory,
-      { role: "user", content: trimmed, id: `local-${Date.now()}` },
-    ]
-
-    setAiHistory((prev) => ({ ...prev, [selectedTask.id]: optimisticHistory }))
-    setAiMessage("")
-    setAiLoading(true)
-    setAiError(null)
-
-    try {
-      const snapshot = {
-        task: selectedTask,
-        subpoints: taskSubpoints,
-        totalTasks: tasks.length,
-      }
-
-      const response = await sendReasoningRequest({
-        snapshot,
-        insightText: "Help me work on this task",
-        history: optimisticHistory,
-      })
-
-      const assistantMessage = {
-        role: "assistant",
-        content: response.reply,
-        id: `assistant-${Date.now()}`,
-      }
-
-      setAiHistory((prev) => ({
-        ...prev,
-        [selectedTask.id]: [...optimisticHistory, assistantMessage],
-      }))
-    } catch (error) {
-      console.error("Failed to send AI request", error)
-      setAiError(error.message || "Unable to talk with the AI right now.")
-      setAiHistory((prev) => ({ ...prev, [selectedTask.id]: baseHistory }))
-    } finally {
-      setAiLoading(false)
     }
   }
 
@@ -300,17 +199,209 @@ const Tasks = () => {
     setDraggedId(null)
   }
 
-  const renderStatusBadge = (status) => {
-    const colorMap = {
-      done: "success",
-      missed: "danger",
-      pending: "secondary",
+  const displayTasks = useMemo(
+    () =>
+      tasks.map((task) => {
+        const edits = taskEdits[task.id] || {}
+        const description = edits.description ?? edits.notes ?? ""
+        return {
+          ...task,
+          name: edits.name?.trim() || task.name,
+          notes: description,
+          status: edits.status || task.status || "pending",
+        }
+      }),
+    [taskEdits, tasks],
+  )
+
+  useEffect(() => {
+    if (!selectedTask) return
+
+    setSelectedTask((prev) => {
+      if (!prev) return prev
+      const latest = displayTasks.find((task) => task.id === prev.id)
+      if (!latest) return prev
+      const hasChanged = latest.name !== prev.name || latest.notes !== prev.notes
+      return hasChanged ? latest : prev
+    })
+  }, [displayTasks, selectedTask])
+
+  const buildChecklist = (index = 0) => ({
+    id: `cl-${Date.now()}-${index}`,
+    title: index === 0 ? "Checklist" : `Checklist ${index + 1}`,
+    items: [],
+    hideCompleted: false,
+    dueDate: "",
+  })
+
+  const sanitizeChecklists = (lists) => {
+    if (!Array.isArray(lists) || lists.length === 0) {
+      return [buildChecklist()]
     }
-    return (
-      <CBadge color={colorMap[status] || "secondary"} shape="rounded-pill">
-        {status || "pending"}
-      </CBadge>
+
+    return lists.map((list, listIndex) => ({
+      id: list.id || `cl-${listIndex}-${Date.now()}`,
+      title: list.title || `Checklist ${listIndex + 1}`,
+      hideCompleted: Boolean(list.hideCompleted),
+      dueDate: list.dueDate || "",
+      items: Array.isArray(list.items)
+        ? list.items
+            .map((item, itemIndex) => ({
+              id: item.id || `item-${listIndex}-${itemIndex}-${Date.now()}`,
+              text: item.text || "",
+              done: Boolean(item.done),
+              dueDate: item.dueDate || "",
+            }))
+            .filter((item) => item.text.trim() !== "")
+        : [],
+    }))
+  }
+
+  const stripTags = (html) => {
+    const div = document.createElement("div")
+    div.innerHTML = html || ""
+    return div.textContent || ""
+  }
+
+  useEffect(() => {
+    if (!selectedTask) return
+    const edits = taskEdits[selectedTask.id] || {}
+    setEditTitle(edits.name || selectedTask.name || "")
+    const description = edits.description ?? edits.notes ?? selectedTask.notes ?? ""
+    setEditDescription(stripTags(description))
+    const safeChecklists = sanitizeChecklists(edits.checklists)
+    setEditChecklists(safeChecklists)
+    setChecklistInputs(
+      safeChecklists.reduce((acc, list) => {
+        acc[list.id] = ""
+        return acc
+      }, {}),
     )
+  }, [selectedTask, taskEdits])
+
+  const saveTaskEdits = (taskId, updates) => {
+    setTaskEdits((prev) => {
+      const next = { ...prev, [taskId]: { ...(prev[taskId] || {}), ...updates } }
+      localStorage.setItem("taskEdits", JSON.stringify(next))
+      return next
+    })
+  }
+
+  const handleSaveDetails = () => {
+    if (!selectedTask) return
+
+    const trimmedTitle = editTitle.trim() || selectedTask.name
+    const payload = {
+      name: trimmedTitle,
+      description: editDescription,
+      checklists: editChecklists,
+    }
+
+    saveTaskEdits(selectedTask.id, payload)
+    setTasks((prev) =>
+      prev.map((task) =>
+        task.id === selectedTask.id ? { ...task, name: trimmedTitle, notes: editDescription } : task,
+      ),
+    )
+    setSelectedTask((prev) =>
+      prev ? { ...prev, name: trimmedTitle, notes: editDescription, checklists: editChecklists } : prev,
+    )
+    setFeedback({ type: "success", message: "Task updated. Changes are stored on this device." })
+  }
+
+  const cycleStatus = (status) => {
+    if (status === "done") return "missed"
+    if (status === "missed") return "pending"
+    return "done"
+  }
+
+  const handleToggleStatus = (task) => {
+    const nextStatus = cycleStatus(task.status)
+    saveTaskEdits(task.id, { status: nextStatus })
+    setTasks((prev) => prev.map((item) => (item.id === task.id ? { ...item, status: nextStatus } : item)))
+    if (selectedTask?.id === task.id) {
+      setSelectedTask((prev) => (prev ? { ...prev, status: nextStatus } : prev))
+    }
+  }
+
+  const createId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+  const updateChecklist = (listId, updater) => {
+    setEditChecklists((prev) => prev.map((list) => (list.id === listId ? updater(list) : list)))
+  }
+
+  const handleChecklistTitleChange = (listId, title) => {
+    updateChecklist(listId, (list) => ({ ...list, title }))
+  }
+
+  const handleToggleItem = (listId, itemId) => {
+    updateChecklist(listId, (list) => ({
+      ...list,
+      items: list.items.map((item) => (item.id === itemId ? { ...item, done: !item.done } : item)),
+    }))
+  }
+
+  const handleItemDateChange = (listId, itemId, value) => {
+    updateChecklist(listId, (list) => ({
+      ...list,
+      items: list.items.map((item) => (item.id === itemId ? { ...item, dueDate: value } : item)),
+    }))
+  }
+
+  const handleChecklistDateChange = (listId, value) => {
+    updateChecklist(listId, (list) => ({
+      ...list,
+      dueDate: value,
+    }))
+  }
+
+  const handleDeleteItem = (listId, itemId) => {
+    updateChecklist(listId, (list) => ({
+      ...list,
+      items: list.items.filter((item) => item.id !== itemId),
+    }))
+  }
+
+  const handleAddItem = (listId) => {
+    const text = (checklistInputs[listId] || "").trim()
+    if (!text) return
+
+    updateChecklist(listId, (list) => ({
+      ...list,
+      items: [...list.items, { id: createId("item"), text, done: false, dueDate: "" }],
+    }))
+
+    setChecklistInputs((prev) => ({ ...prev, [listId]: "" }))
+  }
+
+  const handleToggleHideCompleted = (listId) => {
+    updateChecklist(listId, (list) => ({ ...list, hideCompleted: !list.hideCompleted }))
+  }
+
+  const handleDeleteChecklist = (listId) => {
+    setEditChecklists((prev) => {
+      const remaining = prev.filter((list) => list.id !== listId)
+      if (remaining.length === 0) {
+        return [buildChecklist()]
+      }
+      return remaining
+    })
+  }
+
+  const handleAddChecklist = () => {
+    setEditChecklists((prev) => [...prev, buildChecklist(prev.length)])
+  }
+
+  const checklistProgress = (list) => {
+    if (!list.items.length) return 0
+    const doneCount = list.items.filter((item) => item.done).length
+    return Math.round((doneCount / list.items.length) * 100)
+  }
+
+  const formatDate = (value) => {
+    if (!value) return "today"
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? "today" : date.toLocaleDateString()
   }
 
   return (
@@ -364,10 +455,11 @@ const Tasks = () => {
           ) : (
             <>
               <div className="mb-3 text-body-secondary small">
-                Drag tasks to reorder them. Click a task name to see its details.
+                Drag to reorder. Tap the circle to toggle done/missed. Click a task name to open a simple
+                editor.
               </div>
               <CListGroup className="shadow-sm">
-                {tasks.map((task) => (
+                {displayTasks.map((task) => (
                   <CListGroupItem
                     key={task.id}
                     draggable
@@ -380,75 +472,77 @@ const Tasks = () => {
                     }`}
                   >
                     <div className="d-flex align-items-center gap-3 flex-grow-1">
-                      <span
-                        className="rounded-circle border"
-                        style={{
-                          backgroundColor: task.color || "#4f46e5",
-                          width: 16,
-                          height: 16,
-                          display: "inline-block",
-                          cursor: "grab",
-                        }}
-                        aria-label={`Task color ${task.color || "purple"}`}
-                      />
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStatus(task)}
+                        className="border-0 p-0 bg-transparent"
+                        aria-label={`Toggle status for ${task.name}`}
+                        style={{ lineHeight: 0 }}
+                      >
+                        <span
+                          className="rounded-circle position-relative shadow-sm"
+                          style={{
+                            width: 20,
+                            height: 20,
+                            display: "inline-block",
+                            cursor: "pointer",
+                            border: `2px solid ${task.color || "#d1d5db"}`,
+                            backgroundColor: task.status === "done" ? "#eef2ff" : "transparent",
+                            opacity: task.status === "missed" ? 0.35 : 1,
+                          }}
+                        >
+                          {task.status === "done" ? (
+                            <span
+                              className="position-absolute top-50 start-50 translate-middle"
+                              style={{
+                                fontSize: 14,
+                                fontWeight: 700,
+                                color: "#111827",
+                              }}
+                            >
+                              ✓
+                            </span>
+                          ) : null}
+                          {task.status === "missed" ? (
+                            <span
+                              className="position-absolute top-50 start-50 translate-middle text-secondary"
+                              style={{ fontSize: 12 }}
+                            >
+                              ×
+                            </span>
+                          ) : null}
+                        </span>
+                      </button>
                       <button
                         type="button"
                         className="btn btn-link text-decoration-none text-start p-0"
                         onClick={() => openDetails(task)}
                       >
                         <div className="fw-semibold text-wrap">{task.name}</div>
+                        {task.notes ? (
+                          <div className="text-body-secondary small text-truncate" style={{ maxWidth: 320 }}>
+                            {stripTags(task.notes)}
+                          </div>
+                        ) : null}
+                        <div
+                          className="text-body-secondary"
+                          style={{ opacity: 0.55, fontSize: "0.75rem", letterSpacing: 0.2 }}
+                        >
+                          Created {formatDate(task.created_at)}
+                        </div>
                       </button>
                     </div>
-                    <div className="text-body-secondary small d-flex align-items-center gap-3 flex-wrap justify-content-end">
-                      <div className="d-flex align-items-center gap-1">
-                        {renderStatusBadge(task.status)}
-                        <CDropdown alignment="end" variant="btn-group">
-                          <CDropdownToggle
-                            color="light"
-                            size="sm"
-                            className="d-flex align-items-center gap-2"
-                            disabled={updatingStatusId === task.id}
-                          >
-                            {updatingStatusId === task.id ? (
-                              <CSpinner size="sm" />
-                            ) : (
-                              <CIcon icon={cilCheckCircle} className="text-success" />
-                            )}
-                            <span>Update</span>
-                          </CDropdownToggle>
-                          <CDropdownMenu>
-                            <CDropdownItem
-                              disabled={updatingStatusId === task.id}
-                              onClick={() => handleUpdateStatus(task.id, "done")}
-                              className="d-flex align-items-center gap-2"
-                            >
-                              <CIcon icon={cilCheckCircle} className="text-success" />
-                              Mark done
-                            </CDropdownItem>
-                            <CDropdownItem
-                              disabled={updatingStatusId === task.id}
-                              onClick={() => handleUpdateStatus(task.id, "missed")}
-                              className="d-flex align-items-center gap-2"
-                            >
-                              <CIcon icon={cilXCircle} className="text-danger" />
-                              Mark missed
-                            </CDropdownItem>
-                          </CDropdownMenu>
-                        </CDropdown>
-                        <CButton
-                          color="danger"
-                          variant="ghost"
-                          size="sm"
-                          className="p-2 d-flex align-items-center justify-content-center"
-                          onClick={() => setConfirmDeleteTask(task)}
-                        >
-                          <CIcon icon={cilTrash} />
-                        </CButton>
-                      </div>
-                      <div className="d-flex align-items-center gap-2">
-                        <CIcon icon={cilWatch} className="text-primary" />
-                        <span>Created {new Date(task.created_at).toLocaleDateString()}</span>
-                      </div>
+                    <div className="d-flex align-items-center gap-2">
+                      <CButton
+                        color="danger"
+                        variant="ghost"
+                        size="sm"
+                        className="p-2 d-flex align-items-center justify-content-center"
+                        onClick={() => setConfirmDeleteTask(task)}
+                        aria-label={`Delete ${task.name}`}
+                      >
+                        <CIcon icon={cilTrash} />
+                      </CButton>
                     </div>
                   </CListGroupItem>
                 ))}
@@ -582,177 +676,197 @@ const Tasks = () => {
         </CModalFooter>
       </CModal>
 
-      <CModal
-        alignment="center"
-        visible={Boolean(selectedTask)}
-        onClose={closeDetails}
-        size="lg"
-      >
-        <CModalHeader closeButton>
-          <CModalTitle>
-            Talk about: {selectedTask?.name}
-            <div className="text-medium-emphasis small fw-normal">
-              Share details, add subpoints, and chat with the AI.
+      <CModal alignment="center" visible={Boolean(selectedTask)} onClose={closeDetails} size="lg">
+        <CModalHeader closeButton className="border-0 pb-1">
+          <CModalTitle className="w-100">
+            <div className="d-flex align-items-center gap-3">
+              <span
+                className="rounded-circle"
+                style={{
+                  width: 22,
+                  height: 22,
+                  border: `2px solid ${selectedTask?.color || "#d1d5db"}`,
+                  display: "inline-block",
+                }}
+                aria-hidden
+              />
+              <div className="w-100">
+                <div className="text-uppercase text-medium-emphasis small mb-1">Task</div>
+                <CFormInput
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Task title"
+                  className="border-0 border-bottom rounded-0 shadow-0 ps-0"
+                />
+              </div>
             </div>
-            {selectedTask && <div className="mt-2">{renderStatusBadge(selectedTask.status)}</div>}
           </CModalTitle>
         </CModalHeader>
-        <CModalBody>
+        <CModalBody className="pt-2">
           {selectedTask && (
-            <CRow className="g-3">
-              <CCol md={6}>
-                <CCard className="border-0 bg-body-secondary mb-3">
-                  <CCardBody>
-                    <div className="d-flex align-items-center justify-content-between mb-2">
-                      <div>
-                        <div className="fw-semibold">Task details</div>
-                        <small className="text-body-secondary">Quick snapshot for the AI.</small>
-                      </div>
-                      {selectedTask.split_up && (
-                        <CBadge color="info" shape="rounded-pill">
-                          Split up
-                        </CBadge>
-                      )}
-                    </div>
-                    <div className="text-body-secondary small mb-2">
-                      Duration {formatDuration(selectedTask.duration_minutes)}
-                      {selectedTask.min_duration_minutes
-                        ? ` • Min ${formatDuration(selectedTask.min_duration_minutes)}`
-                        : ""}
-                      {selectedTask.max_duration_minutes
-                        ? ` • Max ${formatDuration(selectedTask.max_duration_minutes)}`
-                        : ""}
-                    </div>
-                    <div className="d-flex flex-wrap gap-2 small">
-                      {selectedTask.hours_label && (
-                        <CBadge color="light">{selectedTask.hours_label}</CBadge>
-                      )}
-                      {selectedTask.schedule_after && (
-                        <CBadge color="light">
-                          Start after {new Date(selectedTask.schedule_after).toLocaleString()}
-                        </CBadge>
-                      )}
-                      {selectedTask.due_date && (
-                        <CBadge color="warning" textColor="dark">
-                          Due {new Date(selectedTask.due_date).toLocaleString()}
-                        </CBadge>
-                      )}
-                    </div>
-                  </CCardBody>
-                </CCard>
+            <CForm className="d-flex flex-column gap-4">
+              <div className="small text-body-secondary" style={{ opacity: 0.65 }}>
+                Created {formatDate(selectedTask.created_at)}
+              </div>
 
-                <div className="mb-2 d-flex align-items-center justify-content-between">
-                  <div>
-                    <div className="fw-semibold">Subpoints</div>
-                    <small className="text-body-secondary">
-                      Break the task down before asking the AI.
-                    </small>
-                  </div>
-                  <CBadge color="light" textColor="dark">
-                    {taskSubpoints.length || 0} added
-                  </CBadge>
-                </div>
+              <div>
+                <CFormLabel className="text-medium-emphasis">Description</CFormLabel>
+                <textarea
+                  className="form-control rounded-3 border-0 bg-light"
+                  style={{ minHeight: 120 }}
+                  placeholder="Add a more detailed description..."
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                />
+              </div>
 
-                <CInputGroup className="mb-2">
-                  <CFormInput
-                    placeholder="Add a subpoint"
-                    value={subpointInput}
-                    onChange={(e) => setSubpointInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault()
-                        handleAddSubpoint()
-                      }
-                    }}
-                  />
-                  <CButton color="primary" variant="outline" onClick={handleAddSubpoint}>
-                    Add
-                  </CButton>
-                </CInputGroup>
+              <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div className="fw-semibold">Checklists</div>
+                <CButton color="light" size="sm" className="text-primary" onClick={handleAddChecklist}>
+                  + Add checklist
+                </CButton>
+              </div>
 
-                <CListGroup className="mb-3">
-                  {taskSubpoints.length ? (
-                    taskSubpoints.map((point, idx) => (
-                      <CListGroupItem key={`${selectedTask.id}-point-${idx}`}>
-                        {point}
-                      </CListGroupItem>
-                    ))
-                  ) : (
-                    <CListGroupItem className="text-body-secondary">
-                      No subpoints yet. Create a couple so the AI can be specific.
-                    </CListGroupItem>
-                  )}
-                </CListGroup>
-              </CCol>
+              <div className="d-flex flex-column gap-3">
+                {editChecklists.map((list) => {
+                  const progress = checklistProgress(list)
+                  const visibleItems = list.hideCompleted ? list.items.filter((item) => !item.done) : list.items
 
-              <CCol md={6}>
-                <div className="d-flex align-items-center justify-content-between mb-2">
-                  <div>
-                    <div className="fw-semibold">Ask the AI</div>
-                    <small className="text-body-secondary">
-                      The AI sees this task, your subpoints, and recent messages.
-                    </small>
-                  </div>
-                  {aiLoading && <CSpinner size="sm" color="info" />}
-                </div>
-
-                <div
-                  className="border rounded p-3 mb-3 bg-body-secondary"
-                  style={{ minHeight: 220, maxHeight: 320, overflowY: "auto" }}
-                >
-                  {taskHistory.length ? (
-                    taskHistory.map((entry) => (
-                      <div key={entry.id} className="mb-3">
-                        <small className="text-uppercase text-medium-emphasis fw-semibold d-block mb-1">
-                          {entry.role === "user" ? "You" : "AI"}
-                        </small>
-                        <div
-                          className={`p-2 rounded-4 ${
-                            entry.role === "assistant" ? "bg-white" : "bg-primary text-white"
-                          }`}
-                        >
-                          {entry.content}
+                  return (
+                    <div key={list.id} className="border rounded-3 p-3 bg-light">
+                      <div className="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
+                        <CFormInput
+                          value={list.title}
+                          onChange={(e) => handleChecklistTitleChange(list.id, e.target.value)}
+                          className="flex-grow-1"
+                        />
+                        <div className="d-flex gap-2 align-items-center flex-shrink-0">
+                          <CInputGroup size="sm" className="flex-shrink-0" style={{ maxWidth: 160 }}>
+                            <CInputGroupText className="bg-white border-end-0 py-1 px-2">
+                              <CIcon icon={cilCalendar} className="text-secondary" />
+                            </CInputGroupText>
+                            <CFormInput
+                              type="date"
+                              value={list.dueDate}
+                              onChange={(e) => handleChecklistDateChange(list.id, e.target.value)}
+                              className="bg-white border-start-0 py-1"
+                            />
+                          </CInputGroup>
+                          <CButton
+                            size="sm"
+                            color="light"
+                            variant="ghost"
+                            className="border text-secondary"
+                            onClick={() => handleToggleHideCompleted(list.id)}
+                            title={list.hideCompleted ? "Show checked items" : "Hide checked items"}
+                          >
+                            <CIcon icon={list.hideCompleted ? cilEye : cilLowVision} />
+                          </CButton>
+                          <CButton
+                            size="sm"
+                            color="light"
+                            variant="ghost"
+                            className="border text-danger"
+                            onClick={() => handleDeleteChecklist(list.id)}
+                            title="Delete checklist"
+                          >
+                            <CIcon icon={cilTrash} />
+                          </CButton>
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-body-secondary text-center">
-                      Ask a question to start planning this task with the AI.
+
+                      <div className="d-flex align-items-center gap-2 mb-3">
+                        <CProgress className="flex-grow-1" height={8} color="primary">
+                          <CProgressBar value={progress} />
+                        </CProgress>
+                        <span className="small text-body-secondary">{progress}%</span>
+                      </div>
+
+                      <div className="d-flex flex-column gap-2">
+                        {visibleItems.length === 0 ? (
+                          <div className="text-body-secondary small">No items yet</div>
+                        ) : (
+                          visibleItems.map((item) => (
+                            <div key={item.id} className="d-flex align-items-center gap-2">
+                              <input
+                                type="checkbox"
+                                className="form-check-input"
+                                checked={item.done}
+                                onChange={() => handleToggleItem(list.id, item.id)}
+                              />
+                              <div
+                                className={`flex-grow-1 ${
+                                  item.done ? "text-decoration-line-through text-body-secondary" : ""
+                                }`}
+                              >
+                                {item.text}
+                              </div>
+                              <div className="d-flex align-items-center gap-2 flex-shrink-0">
+                                <CInputGroup size="sm" className="flex-shrink-0" style={{ maxWidth: 150 }}>
+                                  <CInputGroupText className="bg-white border-end-0 py-1 px-2">
+                                    <CIcon icon={cilCalendar} className="text-secondary" />
+                                  </CInputGroupText>
+                                  <CFormInput
+                                    type="date"
+                                    value={item.dueDate}
+                                    onChange={(e) => handleItemDateChange(list.id, item.id, e.target.value)}
+                                    className="bg-white border-start-0 py-1"
+                                  />
+                                </CInputGroup>
+                                <CButton
+                                  size="sm"
+                                  color="light"
+                                  variant="ghost"
+                                  className="border text-danger"
+                                  onClick={() => handleDeleteItem(list.id, item.id)}
+                                  title="Delete item"
+                                >
+                                  <CIcon icon={cilTrash} />
+                                </CButton>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      <div className="d-flex align-items-center gap-2 mt-3">
+                        <CFormInput
+                          placeholder="Add an item"
+                          value={checklistInputs[list.id] || ""}
+                          onChange={(e) =>
+                            setChecklistInputs((prev) => ({ ...prev, [list.id]: e.target.value || "" }))
+                          }
+                        />
+                        <CButton color="primary" variant="outline" onClick={() => handleAddItem(list.id)}>
+                          Add
+                        </CButton>
+                      </div>
                     </div>
-                  )}
-                </div>
+                  )
+                })}
+              </div>
 
-                {aiError && <CAlert color="danger">{aiError}</CAlert>}
-
-                <CInputGroup>
-                  <CFormTextarea
-                    rows={2}
-                    placeholder="Ask for help, break down steps, or request coaching"
-                    value={aiMessage}
-                    onChange={(e) => setAiMessage(e.target.value)}
-                    disabled={aiLoading}
-                  />
-                  <CButton color="primary" disabled={aiLoading} onClick={handleSendAi}>
-                    {aiLoading ? (
-                      <>
-                        <CSpinner size="sm" className="me-2" /> Sending
-                      </>
-                    ) : (
-                      <>
-                        <CIcon icon={cilSend} className="me-2" /> Send
-                      </>
-                    )}
-                  </CButton>
-                </CInputGroup>
-              </CCol>
-            </CRow>
+              <div className="d-flex align-items-center gap-2 flex-wrap">
+                <CButton color="primary" onClick={handleSaveDetails}>
+                  Save
+                </CButton>
+                <CButton color="secondary" variant="ghost" onClick={closeDetails}>
+                  Cancel
+                </CButton>
+              </div>
+            </CForm>
           )}
         </CModalBody>
-        <CModalFooter>
-          <div className="text-body-secondary small">AI requests use your task snapshot and notes.</div>
-          <CButton color="secondary" variant="ghost" onClick={closeDetails}>
-            Close
-          </CButton>
+        <CModalFooter className="border-0 d-flex justify-content-between">
+          <div className="text-body-secondary small">Tap save to keep your edits visible in the list.</div>
+          <div className="d-flex gap-2">
+            <CButton color="secondary" variant="ghost" onClick={closeDetails}>
+              Close
+            </CButton>
+            <CButton color="primary" onClick={handleSaveDetails}>
+              Save
+            </CButton>
+          </div>
         </CModalFooter>
       </CModal>
 
