@@ -500,12 +500,14 @@ const buildScheduleTimestamps = (startInput, endInput) => {
 
   if (!startDate || Number.isNaN(startDate.getTime())) return null;
 
-  const toTime = (value) => value.toISOString().slice(11, 16);
+  const pad = (value) => String(value).padStart(2, "0");
+  const formatDate = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const formatTime = (date) => `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 
   return {
-    day: startDate.toISOString().slice(0, 10),
-    starttime: toTime(startDate),
-    endtime: endDate && !Number.isNaN(endDate.getTime()) ? toTime(endDate) : null,
+    day: formatDate(startDate),
+    starttime: formatTime(startDate),
+    endtime: endDate && !Number.isNaN(endDate.getTime()) ? formatTime(endDate) : null,
   };
 };
 
