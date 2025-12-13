@@ -25,6 +25,7 @@ import assistantRoutes from "./routes/assistantRoutes.js";
 import calendarRoutes from "./routes/calendarRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import aiRoutes from "./routes/ai.js";
+import scheduleAgentRoutes from "./routes/scheduleAgentRoutes.js";
 
 // === Node path handling for ES modules ===
 import path from "path";
@@ -66,6 +67,7 @@ app.use("/api/ai-chat", aiChatRoutes);
 app.use("/api/assistant", assistantRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/schedule-agent", scheduleAgentRoutes);
 app.use("/ai", aiRoutes);
 
 // === Global Error Handler ===
