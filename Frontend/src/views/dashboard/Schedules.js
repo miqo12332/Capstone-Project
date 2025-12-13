@@ -22,10 +22,11 @@ import {
   CBadge,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
-import { cilClock, cilCalendar, cilLoopCircular, cilPlus, cilNotes } from "@coreui/icons"
+import { cilClock, cilCalendar, cilLoopCircular, cilPlus, cilNotes, cilSend } from "@coreui/icons"
 import { emitDataRefresh, REFRESH_SCOPES, useDataRefresh } from "../../utils/refreshBus"
 import { API_BASE } from "../../utils/apiConfig"
 import { fetchCalendarOverview, syncCalendar } from "../../services/calendar"
+import { sendScheduleAgentMessage } from "../../services/scheduleAgent"
 import "./Schedules.css"
 
 const MySchedule = () => {
@@ -44,6 +45,10 @@ const MySchedule = () => {
   const [calendarFileName, setCalendarFileName] = useState("")
   const [calendarFileText, setCalendarFileText] = useState("")
   const calendarFileInputRef = useRef(null)
+  const [agentInput, setAgentInput] = useState("")
+  const [agentReply, setAgentReply] = useState("")
+  const [agentError, setAgentError] = useState("")
+  const [agentLoading, setAgentLoading] = useState(false)
 
   const formattedCalendarEvents = useMemo(() => {
     const sorted = [...calendarEvents].sort((a, b) => {
@@ -299,6 +304,33 @@ const MySchedule = () => {
     }
   }
 
+  const handleAgentSubmit = async () => {
+    if (!user?.id || !agentInput.trim()) return
+
+    try {
+      setAgentLoading(true)
+      setAgentError("")
+      setAgentReply("")
+
+      const result = await sendScheduleAgentMessage(user.id, agentInput.trim())
+      setAgentReply(result.reply || "")
+
+      if (Array.isArray(result?.schedules)) {
+        setSchedules(result.schedules)
+      }
+
+      if (result?.createdSchedule) {
+        emitDataRefresh(REFRESH_SCOPES.SCHEDULES, { reason: "ai-schedule-added" })
+      }
+
+      setAgentInput("")
+    } catch (err) {
+      setAgentError(err.message || "Habit AI is unavailable right now")
+    } finally {
+      setAgentLoading(false)
+    }
+  }
+
   useDataRefresh([REFRESH_SCOPES.HABITS], loadHabits)
 
   return (
@@ -537,6 +569,83 @@ const MySchedule = () => {
                 </div>
               </CCardBody>
             </CCard>
+          </CCardBody>
+        </CCard>
+
+        <CCard className="shadow-sm border-0 mt-4">
+          <CCardHeader className="fw-semibold d-flex align-items-center gap-2">
+            <CIcon icon={cilCalendar} className="text-primary" />
+            Habit AI schedule helper
+          </CCardHeader>
+          <CCardBody className="d-flex flex-column gap-3">
+            <div className="text-body-secondary small">
+              Give Habit AI the exact event details. It only schedules events and follows the strict
+              EVENT_CREATED / EVENT_NOT_CREATED format. Required fields: title, date (YYYY-MM-DD),
+              start time, end time, timezone.
+            </div>
+
+            {agentError && <CAlert color="danger">{agentError}</CAlert>}
+            {agentReply && (
+              <CAlert color={agentReply.startsWith("EVENT_CREATED") ? "success" : "info"}>
+                <pre className="mb-0 small">{agentReply}</pre>
+              </CAlert>
+            )}
+
+            <div>
+              <CFormLabel className="text-uppercase text-muted fw-semibold small">
+                What should Habit AI schedule?
+              </CFormLabel>
+              <CFormTextarea
+                rows={3}
+                value={agentInput}
+                disabled={agentLoading}
+                onChange={(e) => setAgentInput(e.target.value)}
+                placeholder="Example: Add 'Project kickoff' on 2024-11-05 from 10:00 to 11:00 Asia/Yerevan"
+              />
+            </div>
+
+            <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
+              <div className="small text-body-secondary">
+                The agent knows about existing events to avoid overlaps and asks one question if details
+                are missing.
+              </div>
+              <CButton
+                color="primary"
+                onClick={handleAgentSubmit}
+                disabled={agentLoading || !agentInput.trim()}
+              >
+                {agentLoading ? (
+                  <>
+                    <CSpinner size="sm" className="me-2" /> Sending
+                  </>
+                ) : (
+                  <>
+                    <CIcon icon={cilSend} className="me-2" /> Send to Habit AI
+                  </>
+                )}
+              </CButton>
+            </div>
+
+            <div>
+              <div className="fw-semibold mb-2">Upcoming schedule snapshot</div>
+              {schedules.length === 0 ? (
+                <div className="text-body-secondary small">
+                  No saved time blocks yet. Add one so Habit AI can spot overlaps.
+                </div>
+              ) : (
+                <CListGroup flush className="small">
+                  {schedules.slice(0, 6).map((entry) => (
+                    <CListGroupItem key={`${entry.type}-${entry.id}`} className="py-2 px-0 border-0">
+                      <div className="fw-semibold">{entry.custom_title || entry.habit?.title || "Untitled"}</div>
+                      <div className="text-body-secondary">
+                        {entry.day} • {entry.starttime}
+                        {entry.endtime ? ` - ${entry.endtime}` : ""}
+                      </div>
+                    </CListGroupItem>
+                  ))}
+                </CListGroup>
+              )}
+            </div>
           </CCardBody>
         </CCard>
       </CCol>
