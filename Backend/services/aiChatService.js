@@ -6,7 +6,6 @@ import sequelize from "../sequelize.js";
 import { buildHabitSuggestion, detectConfirmation, detectHabitIdea } from "../utils/habitNlp.js";
 import {
   Achievement,
-  BusySchedule,
   CalendarEvent,
   Friend,
   GroupChallenge,
@@ -17,11 +16,7 @@ import {
   User,
   UserSetting,
 } from "../models/index.js";
-import {
-  findPendingHabitSuggestion,
-  findPendingSchedulePlan,
-  getChatHistory,
-} from "./memoryService.js";
+import { findPendingHabitSuggestion, getChatHistory } from "./memoryService.js";
 
 const CLAUDE_BASE_URL = (process.env.CLAUDE_BASE_URL || "https://api.anthropic.com").replace(/\/$/, "");
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-3-5-sonnet-20240620";
@@ -136,39 +131,6 @@ const mapHabit = (habit) => ({
   })),
 });
 
-const mapSchedules = (habits = [], busySchedules = []) => {
-  const habitSchedules = habits.flatMap((habit) =>
-    (habit.schedules || []).map((schedule) => ({
-      id: schedule.id,
-      habitId: habit.id,
-      title: habit.title,
-      day: schedule.day,
-      starttime: schedule.starttime,
-      endtime: schedule.endtime,
-      type: "habit",
-    }))
-  );
-
-  const customSchedules = busySchedules.map((busy) => ({
-    id: busy.id,
-    habitId: null,
-    title: busy.title,
-    day: busy.day,
-    starttime: busy.starttime,
-    endtime: busy.endtime,
-    type: "custom",
-  }));
-
-  return [...habitSchedules, ...customSchedules].sort((a, b) => {
-    const dayA = a.day ? new Date(a.day).getTime() : 0;
-    const dayB = b.day ? new Date(b.day).getTime() : 0;
-
-    if (dayA !== dayB) return dayA - dayB;
-
-    return (a.starttime || "").localeCompare(b.starttime || "");
-  });
-};
-
 const loadUserContext = async (userId) => {
   const user = await User.findByPk(userId, {
     include: [
@@ -177,7 +139,6 @@ const loadUserContext = async (userId) => {
       { model: Achievement, as: "achievements" },
       { model: UserSetting, as: "settings" },
       { model: CalendarEvent, as: "calendarEvents" },
-      { model: BusySchedule, as: "busySchedules" },
       {
         model: User,
         as: "friends",
@@ -216,16 +177,6 @@ const loadUserContext = async (userId) => {
       start: event.start,
       end: event.end,
     })),
-    busySchedules: (plain.busySchedules || []).map((entry) => ({
-      id: entry.id,
-      title: entry.title,
-      day: entry.day,
-      starttime: entry.starttime,
-      endtime: entry.endtime,
-      repeat: entry.repeat,
-      customdays: entry.customdays,
-      notes: entry.notes,
-    })),
     friends: (plain.friends || []).map((friend) => ({
       id: friend.id,
       name: friend.name,
@@ -239,7 +190,6 @@ const loadUserContext = async (userId) => {
       name: challenge.name,
       description: challenge.description,
     })),
-    schedules: mapSchedules(plain.habits || [], plain.busySchedules || []),
   };
 };
 
@@ -342,116 +292,6 @@ const buildConversationMessages = (history) =>
     .map(toChatMessage)
     .filter(Boolean);
 
-const wantsSchedulingHelp = (text) => {
-  const normalized = (text || "").toLowerCase();
-  const keywords = ["schedule", "calendar", "event", "time block", "timeblock", "busy"];
-
-  return keywords.some((keyword) => normalized.includes(keyword));
-};
-
-const detectScheduleConfirmation = (message) => {
-  const normalized = (message || "").toLowerCase();
-
-  if (!normalized.includes("create")) return false;
-
-  return (
-    normalized.includes("create it now") ||
-    normalized.includes("yes") ||
-    normalized.includes("ok") ||
-    normalized.includes("okay") ||
-    normalized.includes("sure")
-  );
-};
-
-const detectScheduleDecline = (message) => {
-  const normalized = (message || "").toLowerCase();
-
-  return normalized.includes("no") && (normalized.includes("create") || normalized.includes("schedule"));
-};
-
-const MINUTE_FALLBACK_DURATION = 60;
-
-const resolveScheduleTitle = (plan, userContext) => {
-  if (plan.type === "habit" && plan.habitId && userContext?.habits) {
-    const matched = userContext.habits.find((habit) => habit.id === plan.habitId);
-    if (matched?.title) return matched.title;
-  }
-
-  return plan.title?.trim() || null;
-};
-
-const findMissingScheduleDetails = ({ plan, timestamps, userContext }) => {
-  const missing = [];
-
-  if (!resolveScheduleTitle(plan, userContext)) missing.push("title");
-  if (!timestamps?.day) missing.push("date");
-  if (!timestamps?.starttime) missing.push("start time");
-  if (!timestamps?.endtime) missing.push("end time or duration");
-  if (!USER_TIMEZONE) missing.push("timezone");
-
-  return missing;
-};
-
-const formatMissingDetailPrompt = (missing) => {
-  if (!missing.length) return null;
-
-  const needs =
-    missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(", ")} and ${missing[missing.length - 1]}`;
-  return `I need the ${needs} before adding this to your schedule. What should I use?`;
-};
-
-const formatEventAddedReply = ({ title, timestamps }) => {
-  const timeRange = timestamps?.endtime
-    ? `${timestamps.starttime}–${timestamps.endtime}`
-    : `${timestamps?.starttime || "TBD"}`;
-
-  return [
-    "Event added to your schedule.",
-    "",
-    `Title: ${title || "Scheduled session"}`,
-    `Date: ${timestamps?.day || "TBD"}`,
-    `Time: ${timeRange}`,
-    `Timezone: ${USER_TIMEZONE || "your local time"}`,
-  ].join("\n");
-};
-
-const appendScheduleToContext = ({ createdSchedule, plan, userContext }) => {
-  if (!createdSchedule || !userContext) return;
-
-  const scheduleType = createdSchedule.type || (createdSchedule.habit_id ? "habit" : "custom");
-
-  if (scheduleType === "habit" && createdSchedule.habit_id && userContext.habits) {
-    const targetHabit = userContext.habits.find((habit) => habit.id === createdSchedule.habit_id);
-    if (targetHabit) {
-      targetHabit.schedules = [
-        ...(targetHabit.schedules || []),
-        {
-          id: createdSchedule.id,
-          day: createdSchedule.day,
-          starttime: createdSchedule.starttime,
-          endtime: createdSchedule.endtime,
-        },
-      ];
-    }
-  } else if (scheduleType === "custom" && userContext.busySchedules) {
-    userContext.busySchedules = [
-      ...(userContext.busySchedules || []),
-      {
-        id: createdSchedule.id,
-        title: createdSchedule.custom_title || createdSchedule.title || plan.title || "Scheduled focus",
-        day: createdSchedule.day,
-        starttime: createdSchedule.starttime,
-        endtime: createdSchedule.endtime,
-        repeat: createdSchedule.repeat,
-        customdays: createdSchedule.customdays,
-        notes: createdSchedule.notes,
-      },
-    ];
-  }
-
-  userContext.schedules = mapSchedules(userContext.habits || [], userContext.busySchedules || []);
-};
-
 const parseProgressDecision = (raw) => {
   if (!raw) return null;
 
@@ -514,201 +354,6 @@ const requestClaudeProgressDecision = async ({ message, userContext, history }) 
 
   const reply = await callClaude([new SystemMessage(systemInstruction), ...conversation, prompt]);
   return parseProgressDecision(reply);
-};
-
-const parseSchedulePlan = (raw) => {
-  if (!raw) return null;
-
-  try {
-    const cleaned = raw.trim().replace(/```(json)?/g, "");
-    const jsonStart = cleaned.indexOf("{");
-    const jsonEnd = cleaned.lastIndexOf("}");
-    const target = jsonStart >= 0 && jsonEnd >= 0 ? cleaned.slice(jsonStart, jsonEnd + 1) : cleaned;
-    const parsed = JSON.parse(target);
-
-    if (parsed.action !== "create-schedule") return null;
-
-    const start = parsed.start || parsed.startTime;
-    const end = parsed.end || parsed.endTime || null;
-
-    const normalizedType = parsed.type === "custom" ? "custom" : "habit";
-    const habitId = normalizedType === "habit" ? Number.parseInt(parsed.habitId, 10) || null : null;
-    const title = parsed.title?.trim() || null;
-
-    return {
-      action: "create-schedule",
-      type: normalizedType,
-      habitId,
-      title,
-      start,
-      end,
-      repeat: parsed.repeat || "daily",
-      customdays: parsed.customdays || null,
-      notes: parsed.notes?.trim() || null,
-      userReply: parsed.userReply?.trim() || null,
-    };
-  } catch (error) {
-    console.error("Failed to parse schedule plan", error?.message || error);
-    return null;
-  }
-};
-
-const requestClaudeSchedulePlan = async ({ message, userContext, history }) => {
-  const habits = userContext?.habits || [];
-  const schedules = userContext?.schedules || [];
-  const calendarEvents = userContext?.calendarEvents || [];
-
-  const systemInstruction = [
-    "You are Claude, the StepHabit AI coach that can create schedules when asked.",
-    "If the user is trying to add a new event, focus block, or habit session, respond ONLY with JSON in the shape:",
-    "{ action: 'create-schedule' | 'none', type: 'habit' | 'custom', habitId?: number, title?: string, start: ISOString, end?: ISOString, repeat: 'daily' | 'weekly' | 'every3days' | 'custom' | 'once', customdays?: string, notes?: string, userReply?: string }",
-    "Use 'habit' type when they mention a known habit title. Use 'custom' for generic events.",
-    "Do not guess dates or times. If a start or end time is missing, set it to null and include a short userReply asking for the missing detail (date and/or start time).",
-    "If there is no scheduling intent, respond with { action: 'none' }.",
-    `Known habits: ${JSON.stringify(habits.map((h) => ({ id: h.id, title: h.title })))}`,
-    `Upcoming items to avoid overlaps: ${JSON.stringify([...schedules, ...calendarEvents].slice(0, 8))}`,
-  ].join("\n");
-
-  const conversation = buildConversationMessages(history);
-  const prompt = new HumanMessage(
-    [
-      "Decide if this message should create a schedule. If yes, return the schedule JSON with best-effort times.",
-      "If date or time is unclear, keep it null and ask the user for the missing pieces via userReply.",
-      `User message: ${message}`,
-    ].join("\n")
-  );
-
-  const reply = await callClaude([new SystemMessage(systemInstruction), ...conversation, prompt]);
-  return parseSchedulePlan(reply);
-};
-
-const toMinutes = (timeString) => {
-  if (!timeString || typeof timeString !== "string") return null;
-
-  const [hours, minutes] = timeString.split(":").map((value) => Number.parseInt(value, 10));
-
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
-
-  return hours * 60 + minutes;
-};
-
-const toTimeWindow = ({ day, starttime, endtime }) => {
-  const startMinutes = toMinutes(starttime);
-  if (startMinutes === null || !day) return null;
-
-  const endMinutes = endtime ? toMinutes(endtime) : startMinutes + MINUTE_FALLBACK_DURATION;
-
-  return { day, startMinutes, endMinutes };
-};
-
-const windowsOverlap = (first, second) => {
-  if (!first || !second) return false;
-  if (first.day !== second.day) return false;
-
-  return first.startMinutes < second.endMinutes && second.startMinutes < first.endMinutes;
-};
-
-const findScheduleConflicts = (plan, userContext) => {
-  const candidateTimestamps = buildScheduleTimestamps(plan.start, plan.end);
-  if (!candidateTimestamps) return { timestamps: null, conflicts: [] };
-
-  const candidateWindow = toTimeWindow({
-    day: candidateTimestamps.day,
-    starttime: candidateTimestamps.starttime,
-    endtime: candidateTimestamps.endtime,
-  });
-
-  const conflicts = [];
-
-  const considerEntry = (entry, title) => {
-    const window = toTimeWindow({
-      day: entry.day,
-      starttime: entry.starttime,
-      endtime: entry.endtime,
-    });
-
-    if (windowsOverlap(candidateWindow, window)) {
-      const label = [entry.day, entry.starttime].filter(Boolean).join(" at ");
-      conflicts.push({ title: title || "scheduled item", label });
-    }
-  };
-
-  for (const schedule of userContext?.schedules || []) {
-    considerEntry(schedule, schedule.title || (schedule.type === "habit" ? "habit session" : "schedule"));
-  }
-
-  for (const event of userContext?.calendarEvents || []) {
-    const timestamps = buildScheduleTimestamps(event.start, event.end);
-    considerEntry(
-      {
-        day: timestamps?.day,
-        starttime: timestamps?.starttime,
-        endtime: timestamps?.endtime,
-      },
-      event.title || "calendar event"
-    );
-  }
-
-  return { timestamps: candidateTimestamps, conflicts };
-};
-
-const buildScheduleTimestamps = (startInput, endInput) => {
-  const startDate = startInput ? new Date(startInput) : null;
-  const endDate = endInput ? new Date(endInput) : null;
-
-  if (!startDate || Number.isNaN(startDate.getTime())) return null;
-
-  const pad = (value) => String(value).padStart(2, "0");
-  const formatDate = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-  const formatTime = (date) => `${pad(date.getHours())}:${pad(date.getMinutes())}`;
-
-  return {
-    day: formatDate(startDate),
-    starttime: formatTime(startDate),
-    endtime: endDate && !Number.isNaN(endDate.getTime()) ? formatTime(endDate) : null,
-  };
-};
-
-const createScheduleFromPlan = async ({ plan, userId }) => {
-  const timestamps = buildScheduleTimestamps(plan.start, plan.end);
-  if (!timestamps) return null;
-
-  const repeatValue = plan.repeat || "daily";
-  const basePayload = {
-    user_id: userId,
-    day: timestamps.day,
-    starttime: timestamps.starttime,
-    endtime: timestamps.endtime,
-    enddate: null,
-    repeat: repeatValue,
-    customdays: repeatValue === "custom" ? plan.customdays || null : null,
-    notes: plan.notes || null,
-  };
-
-  try {
-    if (plan.type === "habit" && plan.habitId) {
-      const created = await Schedule.create({
-        ...basePayload,
-        habit_id: plan.habitId,
-      });
-
-      const withHabit = await Schedule.findByPk(created.id, {
-        include: [{ model: Habit, as: "habit", attributes: ["id", "title"] }],
-      });
-
-      return { ...withHabit.toJSON(), type: "habit", custom_title: null };
-    }
-
-    const createdBusy = await BusySchedule.create({
-      ...basePayload,
-      title: plan.title || "Scheduled focus",
-    });
-
-    return { ...createdBusy.toJSON(), type: "custom", custom_title: createdBusy.title, habit: null };
-  } catch (error) {
-    console.error("Failed to create schedule from AI plan", error?.message || error);
-    return null;
-  }
 };
 
 const callClaude = async (messages) => {
@@ -840,9 +485,6 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
   ]);
 
   const habitAnalysis = analyzeHabitIntent(message, history);
-  const pendingSchedulePlan = findPendingSchedulePlan(history);
-  const scheduleConfirmationRequested = pendingSchedulePlan && detectScheduleConfirmation(message);
-  const scheduleDeclined = pendingSchedulePlan && detectScheduleDecline(message);
 
   const progressDecision = await requestClaudeProgressDecision({
     message,
@@ -850,27 +492,20 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     history,
   });
 
-  const shouldRequestSchedule = wantsSchedulingHelp(message);
-  const schedulePlan = shouldRequestSchedule
-    ? await requestClaudeSchedulePlan({ message, userContext, history })
-    : null;
-
   const systemInstruction = [
     "You are a warm, conversational AI assistant for the StepHabit platform.",
     "Respond with short, human-feeling paragraphs (avoid bullet lists unless requested).",
     "You can see the database overview and the current user's context—use them naturally in conversation.",
     "Stay encouraging and keep the chat flowing with one clear next step in each reply.",
+    "Scheduling guardrails:\n" + SCHEDULE_POLICY_PROMPT,
     "Database overview:\n" + formatTableSummary(dbOverview),
     "User context:\n" + JSON.stringify(userContext || {}, null, 2),
-    "Scheduling guardrails:\n" + SCHEDULE_POLICY_PROMPT,
   ].join("\n\n");
 
   let habitSuggestion = habitAnalysis.habitSuggestion;
   let replyFromClaude = progressDecision?.userReply || null;
   let loggedProgress = null;
   let finalIntent = habitAnalysis.intent;
-  let createdSchedule = null;
-  let proposedSchedulePlan = null;
 
   if (progressDecision) {
     try {
@@ -896,108 +531,6 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     }
   }
 
-  const summarizeSchedule = (plan, timestamps) => {
-    const summaryTitle = resolveScheduleTitle(plan, userContext) || "Scheduled session";
-
-    return [
-      "Summary:",
-      `- Title: ${summaryTitle}`,
-      `- Date: ${timestamps?.day || "TBD"}`,
-      `- Start: ${timestamps?.starttime || "TBD"}`,
-      `- End: ${timestamps?.endtime || "TBD"}`,
-      `- Timezone: ${USER_TIMEZONE || "your local time"}`,
-      `- Recurrence: ${plan.repeat || "once"}`,
-      `- Notes: ${plan.notes || "None"}`,
-      "- Location: not specified",
-      "- Reminders: not set",
-    ].join("\n");
-  };
-
-  if (scheduleDeclined && !replyFromClaude) {
-    finalIntent = "decline-schedule";
-    replyFromClaude = "No problem—nothing was added. What date and start time would you like instead?";
-  }
-
-  if (scheduleConfirmationRequested && pendingSchedulePlan && !createdSchedule) {
-    const { plan } = pendingSchedulePlan;
-    const { timestamps, conflicts } = findScheduleConflicts(plan, userContext);
-
-    if (!timestamps) {
-      finalIntent = "clarify-schedule";
-      replyFromClaude = "I still need the exact date and start time before I can create this event.";
-    } else if (conflicts.length) {
-      finalIntent = "clarify-schedule";
-
-      const conflictSummary = conflicts
-        .slice(0, 2)
-        .map((conflict) => `${conflict.title}${conflict.label ? ` (${conflict.label})` : ""}`)
-        .join(" and ");
-
-      replyFromClaude = `That slot overlaps with ${conflictSummary}. Want to pick a different time?`;
-    } else {
-      createdSchedule = await createScheduleFromPlan({ plan, userId });
-
-      if (createdSchedule) {
-        finalIntent = "create-schedule";
-        appendScheduleToContext({ createdSchedule, plan, userContext });
-
-        const createdTimestamps = {
-          day: createdSchedule.day,
-          starttime: createdSchedule.starttime,
-          endtime: createdSchedule.endtime,
-        };
-
-        const title = resolveScheduleTitle(plan, userContext) || createdSchedule.custom_title || plan.title;
-        replyFromClaude = formatEventAddedReply({ title, timestamps: createdTimestamps });
-      } else {
-        replyFromClaude = "I could not add this to your schedule due to a system limitation.";
-      }
-    }
-  }
-
-  if (!createdSchedule && schedulePlan?.action === "create-schedule") {
-    const { timestamps: plannedTimestamps, conflicts } = findScheduleConflicts(schedulePlan, userContext);
-    const missingDetails = findMissingScheduleDetails({ plan: schedulePlan, timestamps: plannedTimestamps, userContext });
-
-    if (!plannedTimestamps) {
-      finalIntent = "clarify-schedule";
-      replyFromClaude =
-        schedulePlan.userReply ||
-        "I need the exact date and start time to schedule this. Which date and start time should I use?";
-    } else if (missingDetails.length) {
-      finalIntent = "clarify-schedule";
-      replyFromClaude = schedulePlan.userReply || formatMissingDetailPrompt(missingDetails);
-    } else if (conflicts.length) {
-      finalIntent = "clarify-schedule";
-
-      const conflictSummary = conflicts
-        .slice(0, 2)
-        .map((conflict) => `${conflict.title}${conflict.label ? ` (${conflict.label})` : ""}`)
-        .join(" and ");
-
-      const proposedTime = [plannedTimestamps.day, plannedTimestamps.starttime].filter(Boolean).join(" at ");
-
-      replyFromClaude =
-        schedulePlan.userReply ||
-        `That time overlaps with ${conflictSummary}. Do you want a different slot instead of ${proposedTime}?`;
-    } else {
-      createdSchedule = await createScheduleFromPlan({ plan: schedulePlan, userId });
-
-      if (createdSchedule) {
-        finalIntent = "create-schedule";
-        appendScheduleToContext({ createdSchedule, plan: schedulePlan, userContext });
-
-        replyFromClaude = formatEventAddedReply({
-          title: resolveScheduleTitle(schedulePlan, userContext) || createdSchedule.custom_title || schedulePlan.title,
-          timestamps: plannedTimestamps,
-        });
-      } else {
-        finalIntent = "clarify-schedule";
-        replyFromClaude = "I could not add this to your schedule due to a system limitation.";
-      }
-    }
-  }
-
   if (progressDecision && !replyFromClaude) {
     const matchedHabit = (userContext?.habits || []).find((h) => h.id === progressDecision.habitId);
     const recapPrompt = new HumanMessage(
@@ -1011,7 +544,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     replyFromClaude = await callClaude([new SystemMessage(systemInstruction), ...buildConversationMessages(history), recapPrompt]);
   }
 
-  if (habitAnalysis.intent === "suggest" && !replyFromClaude) {
+  if (habitAnalysis.intent === "suggest") {
     habitSuggestion =
       (await requestClaudeHabitSuggestion({ message, userContext })) || buildHabitSuggestion(message);
 
@@ -1022,7 +555,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
         history,
       });
     }
-  } else if (habitAnalysis.intent === "chat" && !loggedProgress && !replyFromClaude) {
+  } else if (habitAnalysis.intent === "chat" && !loggedProgress) {
     replyFromClaude = await callClaude(buildChatMessages({ systemInstruction, history, message }));
   }
 
@@ -1036,8 +569,6 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     intent: finalIntent,
     habitSuggestion,
     loggedProgress,
-    createdSchedule,
-    proposedSchedulePlan,
     context: { dbOverview, userContext, history },
   };
 };

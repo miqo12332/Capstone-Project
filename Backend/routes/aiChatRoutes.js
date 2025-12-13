@@ -50,15 +50,7 @@ router.post("/message", async (req, res) => {
     const history = await getChatHistory(userId, 50);
     await saveMessage({ userId, role: "user", content: message });
 
-    const {
-      reply,
-      context,
-      intent,
-      habitSuggestion,
-      loggedProgress,
-      createdSchedule,
-      proposedSchedulePlan,
-    } = await generateAiChatReply({
+    const { reply, context, intent, habitSuggestion, loggedProgress } = await generateAiChatReply({
       userId,
       message,
       history,
@@ -99,12 +91,6 @@ router.post("/message", async (req, res) => {
       metadata = { ...(metadata || {}), habitSuggestion };
     } else if (intent === "log-progress" && loggedProgress) {
       metadata = { ...(metadata || {}), loggedProgress };
-    } else if (intent === "create-schedule" && createdSchedule) {
-      metadata = { ...(metadata || {}), createdSchedule };
-    } else if (intent === "propose-schedule" && proposedSchedulePlan) {
-      metadata = { ...(metadata || {}), pendingSchedulePlan: proposedSchedulePlan };
-    } else if (intent === "decline-schedule") {
-      metadata = { ...(metadata || {}), clearedPendingSchedulePlan: true };
     }
 
     await saveMessage({
@@ -116,14 +102,7 @@ router.post("/message", async (req, res) => {
 
     const latestHistory = await getChatHistory(userId, 50);
 
-    return res.json({
-      reply: finalReply,
-      history: latestHistory,
-      context,
-      createdHabit,
-      createdSchedule,
-      loggedProgress,
-    });
+    return res.json({ reply: finalReply, history: latestHistory, context, createdHabit, loggedProgress });
   } catch (error) {
     console.error("/ai-chat/message failed", error);
     return res.status(500).json({ error: "Unable to process AI chat message" });
