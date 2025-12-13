@@ -20,6 +20,7 @@ import {
   CListGroupItem,
   CRow,
   CSpinner,
+  useColorModes,
 } from "@coreui/react";
 import CIcon from "@coreui/icons-react";
 import {
@@ -27,6 +28,7 @@ import {
   cilCalendar,
   cilCheckCircle,
   cilClock,
+  cilContrast,
   cilEnvelopeClosed,
   cilList,
   cilMoon,
@@ -37,8 +39,24 @@ import {
 import { AuthContext } from "../../context/AuthContext";
 import { fetchUserSettings, saveUserSettings } from "../../services/settings";
 
+const THEME_STORAGE_KEY = "coreui-free-react-admin-template-theme";
+const COLOR_MODE_EVENT = "coreui-color-mode-updated";
+
+const mapThemeToColorMode = (theme) => {
+  if (theme === "dark") return "dark";
+  if (theme === "auto") return "auto";
+  return "light";
+};
+
+const mapColorModeToTheme = (colorMode) => {
+  if (colorMode === "dark") return "dark";
+  if (colorMode === "auto") return "auto";
+  return "light";
+};
+
 const Settings = () => {
   const { user, login } = useContext(AuthContext);
+  const { colorMode, setColorMode } = useColorModes(THEME_STORAGE_KEY);
   const [profile, setProfile] = useState({
     name: "",
     email: "",
@@ -53,7 +71,7 @@ const Settings = () => {
     emailNotifications: true,
     pushNotifications: false,
     shareActivity: true,
-    theme: "light",
+    theme: mapColorModeToTheme(colorMode),
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -89,6 +107,27 @@ const Settings = () => {
   );
 
   useEffect(() => {
+    const mappedTheme = mapColorModeToTheme(colorMode);
+    setPreferences((prev) =>
+      prev.theme === mappedTheme ? prev : { ...prev, theme: mappedTheme }
+    );
+  }, [colorMode]);
+
+  useEffect(() => {
+    const handleColorModeChange = (event) => {
+      if (!event.detail) return;
+      const mappedTheme = mapColorModeToTheme(event.detail);
+      setPreferences((prev) =>
+        prev.theme === mappedTheme ? prev : { ...prev, theme: mappedTheme }
+      );
+      setColorMode(event.detail);
+    };
+
+    window.addEventListener(COLOR_MODE_EVENT, handleColorModeChange);
+    return () => window.removeEventListener(COLOR_MODE_EVENT, handleColorModeChange);
+  }, [setColorMode]);
+
+  useEffect(() => {
     const loadSettings = async () => {
       if (!user) {
         setLoading(false);
@@ -107,15 +146,15 @@ const Settings = () => {
           gender: payload.gender || "",
           bio: payload.bio || "",
         });
-        setPreferences({
-          timezone: payload.settings?.timezone || "UTC",
-          dailyReminderTime: payload.settings?.dailyReminderTime || "",
-          weeklySummaryDay: payload.settings?.weeklySummaryDay || "Sunday",
-          emailNotifications: Boolean(payload.settings?.emailNotifications ?? true),
-          pushNotifications: Boolean(payload.settings?.pushNotifications ?? false),
-          shareActivity: Boolean(payload.settings?.shareActivity ?? true),
-          theme: payload.settings?.theme || "light",
-        });
+      setPreferences({
+        timezone: payload.settings?.timezone || "UTC",
+        dailyReminderTime: payload.settings?.dailyReminderTime || "",
+        weeklySummaryDay: payload.settings?.weeklySummaryDay || "Sunday",
+        emailNotifications: Boolean(payload.settings?.emailNotifications ?? true),
+        pushNotifications: Boolean(payload.settings?.pushNotifications ?? false),
+        shareActivity: Boolean(payload.settings?.shareActivity ?? true),
+        theme: mapColorModeToTheme(payload.settings?.theme || colorMode),
+      });
       } catch (err) {
         console.error(err);
         setError("We couldn't load your settings. Please try again.");
@@ -125,7 +164,7 @@ const Settings = () => {
     };
 
     loadSettings();
-  }, [user]);
+  }, [colorMode, user]);
 
   const handleProfileChange = (field, value) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
@@ -138,6 +177,16 @@ const Settings = () => {
   const handleBooleanPreference = (field) => {
     setPreferences((prev) => ({ ...prev, [field]: !prev[field] }));
   };
+
+  useEffect(() => {
+    const nextColorMode = mapThemeToColorMode(preferences.theme);
+    setColorMode(nextColorMode);
+    window.dispatchEvent(
+      new CustomEvent(COLOR_MODE_EVENT, {
+        detail: nextColorMode,
+      })
+    );
+  }, [preferences.theme, setColorMode]);
 
   const handleSave = async (event) => {
     event.preventDefault();
@@ -175,7 +224,7 @@ const Settings = () => {
         emailNotifications: Boolean(updated.settings?.emailNotifications ?? true),
         pushNotifications: Boolean(updated.settings?.pushNotifications ?? false),
         shareActivity: Boolean(updated.settings?.shareActivity ?? true),
-        theme: updated.settings?.theme || "light",
+        theme: updated.settings?.theme || mapColorModeToTheme(colorMode),
       });
 
       if (login) {
@@ -367,8 +416,20 @@ const Settings = () => {
               <CListGroup flush className="small border-top pt-3">
                 <CListGroupItem className="border-0 px-0 d-flex justify-content-between align-items-center">
                   Theme preference
-                  <CBadge color={preferences.theme === "dark" ? "dark" : "primary"}>
-                    {preferences.theme === "dark" ? "Dark" : "Light"}
+                  <CBadge
+                    color={
+                      preferences.theme === "dark"
+                        ? "dark"
+                        : preferences.theme === "auto"
+                        ? "secondary"
+                        : "primary"
+                    }
+                  >
+                    {preferences.theme === "dark"
+                      ? "Dark"
+                      : preferences.theme === "auto"
+                      ? "Auto"
+                      : "Light"}
                   </CBadge>
                 </CListGroupItem>
                 <CListGroupItem className="border-0 px-0 d-flex justify-content-between align-items-center">
@@ -472,6 +533,19 @@ const Settings = () => {
                   label={
                     <span className="d-flex align-items-center">
                       <CIcon icon={cilMoon} className="me-2 text-primary" /> Deep focus
+                    </span>
+                  }
+                />
+                <CFormCheck
+                  type="radio"
+                  name="theme"
+                  id="theme-auto"
+                  value="auto"
+                  checked={preferences.theme === "auto"}
+                  onChange={(event) => handlePreferenceChange("theme", event.target.value)}
+                  label={
+                    <span className="d-flex align-items-center">
+                      <CIcon icon={cilContrast} className="me-2 text-body-secondary" /> Auto
                     </span>
                   }
                 />
