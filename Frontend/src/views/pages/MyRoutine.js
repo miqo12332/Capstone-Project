@@ -112,6 +112,7 @@ const MyRoutine = ({ onSyncClick }) => {
           title:
             schedule.custom_title ||
             schedule.habit?.title ||
+            schedule.title ||
             schedule.notes ||
             "Planned time block",
           start,

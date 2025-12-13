@@ -619,7 +619,10 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
 
         createdSchedule = {
           ...(busy.toJSON ? busy.toJSON() : busy),
-          type: "busy",
+          type: "custom",
+          habit: null,
+          habit_id: null,
+          custom_title: busy.title,
         };
 
         if (userContext?.busySchedules) {
