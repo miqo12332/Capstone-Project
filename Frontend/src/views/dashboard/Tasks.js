@@ -66,6 +66,7 @@ const Tasks = () => {
   })
   const [editTitle, setEditTitle] = useState("")
   const [editNotes, setEditNotes] = useState("")
+  const [textColor, setTextColor] = useState("#111827")
   const editorRef = useRef(null)
 
   const user = JSON.parse(localStorage.getItem("user") || "{}")
@@ -280,6 +281,11 @@ const Tasks = () => {
     if (!editorRef.current) return
     editorRef.current.focus()
     document.execCommand(command, false, value)
+  }
+
+  const handleColorChange = (value) => {
+    setTextColor(value)
+    applyFormat("foreColor", value)
   }
 
   return (
@@ -584,50 +590,53 @@ const Tasks = () => {
           {selectedTask && (
             <CForm className="d-flex flex-column gap-3">
               <div className="p-2 rounded-3 border bg-white shadow-sm d-flex align-items-center flex-wrap gap-2">
-                <span className="text-uppercase text-secondary fw-semibold small me-1">Format</span>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary rounded-pill px-3"
-                  onClick={() => applyFormat("fontSize", 2)}
-                >
-                  A-
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary rounded-pill px-3"
-                  onClick={() => applyFormat("fontSize", 3)}
-                >
-                  A
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary rounded-pill px-3"
-                  onClick={() => applyFormat("fontSize", 4)}
-                >
-                  A+
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1"
-                  onClick={() => applyFormat("insertUnorderedList")}
-                >
-                  <span style={{ fontSize: 18, lineHeight: 1 }}>•</span>
-                  <span>List</span>
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary rounded-pill px-3"
-                  onClick={() => applyFormat("indent")}
-                >
-                  ↳
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary rounded-pill px-3"
-                  onClick={() => applyFormat("outdent")}
-                >
-                  ↰
-                </button>
+                <div className="d-flex align-items-center gap-1">
+                  {[2, 3, 4].map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      className="btn btn-sm btn-outline-secondary rounded-pill px-3"
+                      onClick={() => applyFormat("fontSize", size)}
+                    >
+                      {size === 2 ? "A-" : size === 3 ? "A" : "A+"}
+                    </button>
+                  ))}
+                </div>
+                <div className="d-flex align-items-center gap-2 px-2 py-1 rounded-pill bg-light border">
+                  <span className="text-uppercase small text-secondary fw-semibold">Text</span>
+                  <input
+                    type="color"
+                    value={textColor}
+                    onChange={(e) => handleColorChange(e.target.value)}
+                    className="form-control form-control-color p-1"
+                    style={{ width: 42 }}
+                    aria-label="Choose text color"
+                  />
+                </div>
+                <div className="d-flex align-items-center gap-1">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1"
+                    onClick={() => applyFormat("insertUnorderedList")}
+                  >
+                    <span style={{ fontSize: 18, lineHeight: 1 }}>•</span>
+                    <span>List</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary rounded-pill px-3"
+                    onClick={() => applyFormat("indent")}
+                  >
+                    ↳
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary rounded-pill px-3"
+                    onClick={() => applyFormat("outdent")}
+                  >
+                    ↰
+                  </button>
+                </div>
               </div>
               <div>
                 <CFormLabel className="text-medium-emphasis">Notes</CFormLabel>
@@ -642,7 +651,8 @@ const Tasks = () => {
                 />
               </div>
               <div className="small text-body-secondary">
-                Changes are kept on this device so you can jot things down quickly.
+                Use keyboard shortcuts for bold, italic, and underline. Changes are kept on this device so you can jot
+                things down quickly.
               </div>
             </CForm>
           )}
