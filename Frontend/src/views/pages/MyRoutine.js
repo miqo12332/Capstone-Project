@@ -34,6 +34,22 @@ const toDateKey = (date) => {
   return `${year}-${month}-${day}`;
 };
 
+const toLocalDateTime = (day, time) => {
+  if (!day || !time) return null;
+
+  const [year, month, date] = day.split("-").map((part) => Number.parseInt(part, 10));
+  if (!year || !month || !date) return null;
+
+  const sanitizedTime = time.replace(/[zZ]/g, "");
+  const [hours, minutes] = sanitizedTime.split(":");
+  const hourNum = Number.parseInt(hours, 10);
+  const minuteNum = Number.parseInt(minutes, 10) || 0;
+
+  if (Number.isNaN(hourNum) || Number.isNaN(minuteNum)) return null;
+
+  return new Date(year, month - 1, date, hourNum, minuteNum, 0, 0);
+};
+
 const formatTimeRange = (entry) => {
   if (entry.allDay) return "All day";
   if (!entry.start) return "Time to be confirmed";
@@ -100,11 +116,9 @@ const MyRoutine = ({ onSyncClick }) => {
   const routineEntries = useMemo(
     () =>
       schedules.map((schedule) => {
-        const start = schedule.day
-          ? new Date(`${schedule.day}T${schedule.starttime || "00:00"}`)
-          : null;
+        const start = toLocalDateTime(schedule.day, schedule.starttime || "00:00");
         const end = schedule.day && schedule.endtime
-          ? new Date(`${schedule.day}T${schedule.endtime}`)
+          ? toLocalDateTime(schedule.day, schedule.endtime)
           : null;
         return {
           id: `schedule-${schedule.id}`,
