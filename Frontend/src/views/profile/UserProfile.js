@@ -152,7 +152,7 @@ const UserProfile = () => {
         const mappedSettingsTheme = settings.theme
         const resolvedTheme =
           mappedSettingsTheme && storedColorMode !== null
-            ? mappedColorModeToTheme(storedColorMode)
+            ? mapColorModeToTheme(storedColorMode)
             : mappedSettingsTheme || mappedColorModeTheme
 
         setSettingsBaseline(settings)
