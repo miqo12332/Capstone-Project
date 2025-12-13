@@ -23,6 +23,7 @@ import {
   CProgressBar,
   CRow,
   CSpinner,
+  useColorModes,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
 import {
@@ -49,20 +50,35 @@ import { fetchUserSettings, saveUserSettings } from "../../services/settings"
 import { getProgressAnalytics } from "../../services/analytics"
 import { API_BASE, ASSET_BASE } from "../../utils/apiConfig"
 
+const THEME_STORAGE_KEY = "coreui-free-react-admin-template-theme"
+
+const mapThemeToColorMode = (theme) => {
+  if (theme === "dark") return "dark"
+  if (theme === "system") return "auto"
+  return "light"
+}
+
+const mapColorModeToTheme = (colorMode) => {
+  if (colorMode === "dark") return "dark"
+  if (colorMode === "auto") return "system"
+  return "light"
+}
+
 const UserProfile = () => {
   const { user, login } = useContext(AuthContext)
   const habitContext = useContext(HabitContext)
   const habits = habitContext?.habits || []
   const location = useLocation()
   const navigate = useNavigate()
+  const { colorMode, setColorMode } = useColorModes(THEME_STORAGE_KEY)
 
   const [activeTab, setActiveTab] = useState(location.state?.tab || "account")
   const [profile, setProfile] = useState({ name: "", email: "", gender: "" })
-  const [preferences, setPreferences] = useState({
-    theme: "light",
+  const [preferences, setPreferences] = useState(() => ({
+    theme: mapColorModeToTheme(colorMode),
     aiTone: "balanced",
     supportStyle: "celebrate",
-  })
+  }))
   const [notificationPrefs, setNotificationPrefs] = useState({
     emailAlerts: true,
     pushReminders: true,
@@ -128,9 +144,18 @@ const UserProfile = () => {
           gender: payload.gender || "",
         })
         const settings = payload.settings || {}
+        const storedColorMode =
+          typeof window !== "undefined" ? localStorage.getItem(THEME_STORAGE_KEY) : null
+        const mappedColorModeTheme = mapColorModeToTheme(colorMode)
+        const mappedSettingsTheme = settings.theme
+        const resolvedTheme =
+          mappedSettingsTheme && storedColorMode !== null
+            ? mappedColorModeToTheme(storedColorMode)
+            : mappedSettingsTheme || mappedColorModeTheme
+
         setSettingsBaseline(settings)
         setPreferences({
-          theme: settings.theme || "light",
+          theme: resolvedTheme || "light",
           aiTone: settings.aiTone || settings.ai_tone || "balanced",
           supportStyle: settings.supportStyle || settings.support_style || "celebrate",
         })
@@ -168,6 +193,17 @@ const UserProfile = () => {
       controller.abort()
     }
   }, [user?.id])
+
+  useEffect(() => {
+    setColorMode(mapThemeToColorMode(preferences.theme))
+  }, [preferences.theme, setColorMode])
+
+  useEffect(() => {
+    const mappedTheme = mapColorModeToTheme(colorMode)
+    setPreferences((prev) =>
+      prev.theme === mappedTheme ? prev : { ...prev, theme: mappedTheme },
+    )
+  }, [colorMode])
 
   useEffect(() => {
     const loadAnalytics = async () => {
