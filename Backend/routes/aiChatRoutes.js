@@ -50,7 +50,15 @@ router.post("/message", async (req, res) => {
     const history = await getChatHistory(userId, 50);
     await saveMessage({ userId, role: "user", content: message });
 
-    const { reply, context, intent, habitSuggestion, loggedProgress, createdSchedule } = await generateAiChatReply({
+    const {
+      reply,
+      context,
+      intent,
+      habitSuggestion,
+      loggedProgress,
+      createdSchedule,
+      proposedSchedulePlan,
+    } = await generateAiChatReply({
       userId,
       message,
       history,
@@ -93,6 +101,10 @@ router.post("/message", async (req, res) => {
       metadata = { ...(metadata || {}), loggedProgress };
     } else if (intent === "create-schedule" && createdSchedule) {
       metadata = { ...(metadata || {}), createdSchedule };
+    } else if (intent === "propose-schedule" && proposedSchedulePlan) {
+      metadata = { ...(metadata || {}), pendingSchedulePlan: proposedSchedulePlan };
+    } else if (intent === "decline-schedule") {
+      metadata = { ...(metadata || {}), clearedPendingSchedulePlan: true };
     }
 
     await saveMessage({

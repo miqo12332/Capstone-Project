@@ -60,6 +60,18 @@ export function findPendingHabitSuggestion(history) {
   return null;
 }
 
+export function findPendingSchedulePlan(history) {
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const entry = history[i];
+    if (entry.role !== "assistant") continue;
+    if (entry.metadata?.createdSchedule) return null;
+    if (entry.metadata?.clearedPendingSchedulePlan) return null;
+    if (entry.metadata?.pendingSchedulePlan) return entry.metadata.pendingSchedulePlan;
+  }
+
+  return null;
+}
+
 function mapRecord(record) {
   const plain = record.get({ plain: true });
   return {

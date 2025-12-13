@@ -17,7 +17,11 @@ import {
   User,
   UserSetting,
 } from "../models/index.js";
-import { findPendingHabitSuggestion, getChatHistory } from "./memoryService.js";
+import {
+  findPendingHabitSuggestion,
+  findPendingSchedulePlan,
+  getChatHistory,
+} from "./memoryService.js";
 
 const CLAUDE_BASE_URL = (process.env.CLAUDE_BASE_URL || "https://api.anthropic.com").replace(/\/$/, "");
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-3-5-sonnet-20240620";
@@ -291,6 +295,26 @@ const wantsSchedulingHelp = (text) => {
   return keywords.some((keyword) => normalized.includes(keyword));
 };
 
+const detectScheduleConfirmation = (message) => {
+  const normalized = (message || "").toLowerCase();
+
+  if (!normalized.includes("create")) return false;
+
+  return (
+    normalized.includes("create it now") ||
+    normalized.includes("yes") ||
+    normalized.includes("ok") ||
+    normalized.includes("okay") ||
+    normalized.includes("sure")
+  );
+};
+
+const detectScheduleDecline = (message) => {
+  const normalized = (message || "").toLowerCase();
+
+  return normalized.includes("no") && (normalized.includes("create") || normalized.includes("schedule"));
+};
+
 const MINUTE_FALLBACK_DURATION = 60;
 
 const parseProgressDecision = (raw) => {
@@ -371,7 +395,6 @@ const parseSchedulePlan = (raw) => {
 
     const start = parsed.start || parsed.startTime;
     const end = parsed.end || parsed.endTime || null;
-    if (!start) return null;
 
     const normalizedType = parsed.type === "custom" ? "custom" : "habit";
     const habitId = normalizedType === "habit" ? Number.parseInt(parsed.habitId, 10) || null : null;
@@ -405,7 +428,7 @@ const requestClaudeSchedulePlan = async ({ message, userContext, history }) => {
     "If the user is trying to add a new event, focus block, or habit session, respond ONLY with JSON in the shape:",
     "{ action: 'create-schedule' | 'none', type: 'habit' | 'custom', habitId?: number, title?: string, start: ISOString, end?: ISOString, repeat: 'daily' | 'weekly' | 'every3days' | 'custom' | 'once', customdays?: string, notes?: string, userReply?: string }",
     "Use 'habit' type when they mention a known habit title. Use 'custom' for generic events.",
-    "Pick start/end times from the user's message; default to a 60-minute block if duration isn't clear.",
+    "Do not guess dates or times. If a start or end time is missing, set it to null and include a short userReply asking for the missing detail (date and/or start time).",
     "If there is no scheduling intent, respond with { action: 'none' }.",
     `Known habits: ${JSON.stringify(habits.map((h) => ({ id: h.id, title: h.title })))}`,
     `Upcoming items to avoid overlaps: ${JSON.stringify([...schedules, ...calendarEvents].slice(0, 8))}`,
@@ -415,7 +438,7 @@ const requestClaudeSchedulePlan = async ({ message, userContext, history }) => {
   const prompt = new HumanMessage(
     [
       "Decide if this message should create a schedule. If yes, return the schedule JSON with best-effort times.",
-      "If the time is missing, assume today's date at 09:00 local time and 60 minutes duration.",
+      "If date or time is unclear, keep it null and ask the user for the missing pieces via userReply.",
       `User message: ${message}`,
     ].join("\n")
   );
@@ -682,6 +705,9 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
   ]);
 
   const habitAnalysis = analyzeHabitIntent(message, history);
+  const pendingSchedulePlan = findPendingSchedulePlan(history);
+  const scheduleConfirmationRequested = pendingSchedulePlan && detectScheduleConfirmation(message);
+  const scheduleDeclined = pendingSchedulePlan && detectScheduleDecline(message);
 
   const progressDecision = await requestClaudeProgressDecision({
     message,
@@ -708,6 +734,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
   let loggedProgress = null;
   let finalIntent = habitAnalysis.intent;
   let createdSchedule = null;
+  let proposedSchedulePlan = null;
 
   if (progressDecision) {
     try {
@@ -733,28 +760,46 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     }
   }
 
-  if (schedulePlan?.action === "create-schedule") {
-    const { timestamps: plannedTimestamps, conflicts } = findScheduleConflicts(schedulePlan, userContext);
+  const summarizeSchedule = (plan, timestamps) => {
+    const summaryTitle = plan.title || "Scheduled session";
 
-    if (conflicts.length) {
+    return [
+      "Summary:",
+      `- Title: ${summaryTitle}`,
+      `- Date: ${timestamps?.day || "TBD"}`,
+      `- Start: ${timestamps?.starttime || "TBD"}`,
+      `- End: ${timestamps?.endtime || "TBD"}`,
+      "- Timezone: your local time",
+      `- Recurrence: ${plan.repeat || "once"}`,
+      `- Notes: ${plan.notes || "None"}`,
+      "- Location: not specified",
+      "- Reminders: not set",
+    ].join("\n");
+  };
+
+  if (scheduleDeclined && !replyFromClaude) {
+    finalIntent = "decline-schedule";
+    replyFromClaude = "No problem—nothing was added. What date and start time would you like instead?";
+  }
+
+  if (scheduleConfirmationRequested && pendingSchedulePlan && !createdSchedule) {
+    const { plan } = pendingSchedulePlan;
+    const { timestamps, conflicts } = findScheduleConflicts(plan, userContext);
+
+    if (!timestamps) {
+      finalIntent = "clarify-schedule";
+      replyFromClaude = "I still need the exact date and start time before I can create this event.";
+    } else if (conflicts.length) {
       finalIntent = "clarify-schedule";
 
-      if (!replyFromClaude) {
-        const conflictSummary = conflicts
-          .slice(0, 2)
-          .map((conflict) => `${conflict.title}${conflict.label ? ` (${conflict.label})` : ""}`)
-          .join(" and ");
+      const conflictSummary = conflicts
+        .slice(0, 2)
+        .map((conflict) => `${conflict.title}${conflict.label ? ` (${conflict.label})` : ""}`)
+        .join(" and ");
 
-        const proposedTime = plannedTimestamps
-          ? [plannedTimestamps.day, plannedTimestamps.starttime].filter(Boolean).join(" at ")
-          : "that time";
-
-        replyFromClaude =
-          schedulePlan.userReply ||
-          `That time overlaps with ${conflictSummary}. Do you want me to go ahead with ${proposedTime} or pick a different slot?`;
-      }
+      replyFromClaude = `That slot overlaps with ${conflictSummary}. Want to pick a different time?`;
     } else {
-      createdSchedule = await createScheduleFromPlan({ plan: schedulePlan, userId });
+      createdSchedule = await createScheduleFromPlan({ plan, userId });
 
       if (createdSchedule) {
         finalIntent = "create-schedule";
@@ -795,13 +840,48 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
         }
 
         if (!replyFromClaude) {
-          const startLabel = [createdSchedule.day, createdSchedule.starttime].filter(Boolean).join(" at ");
-          const title =
-            createdSchedule.custom_title || createdSchedule.habit?.title || createdSchedule.title || "your session";
-          replyFromClaude =
-            schedulePlan.userReply ||
-            `I scheduled ${title}${startLabel ? ` on ${startLabel}` : ""}. Want me to adjust or add notes?`;
+          replyFromClaude = [
+            "Created.",
+            summarizeSchedule(plan, {
+              day: createdSchedule.day,
+              starttime: createdSchedule.starttime,
+              endtime: createdSchedule.endtime,
+            }),
+          ].join("\n");
         }
+      }
+    }
+  }
+
+  if (!createdSchedule && schedulePlan?.action === "create-schedule") {
+    const { timestamps: plannedTimestamps, conflicts } = findScheduleConflicts(schedulePlan, userContext);
+
+    if (!plannedTimestamps) {
+      finalIntent = "clarify-schedule";
+      replyFromClaude =
+        schedulePlan.userReply ||
+        "I need the exact date and start time to schedule this. Which date and start time should I use?";
+    } else if (conflicts.length) {
+      finalIntent = "clarify-schedule";
+
+      const conflictSummary = conflicts
+        .slice(0, 2)
+        .map((conflict) => `${conflict.title}${conflict.label ? ` (${conflict.label})` : ""}`)
+        .join(" and ");
+
+      const proposedTime = [plannedTimestamps.day, plannedTimestamps.starttime].filter(Boolean).join(" at ");
+
+      replyFromClaude =
+        schedulePlan.userReply ||
+        `That time overlaps with ${conflictSummary}. Do you want a different slot instead of ${proposedTime}?`;
+    } else {
+      finalIntent = "propose-schedule";
+      proposedSchedulePlan = { plan: schedulePlan, timestamps: plannedTimestamps };
+
+      if (!replyFromClaude) {
+        replyFromClaude = [summarizeSchedule(schedulePlan, plannedTimestamps), "Confirm: create this event? (Yes/No)"].join(
+          "\n"
+        );
       }
     }
   }
@@ -845,6 +925,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     habitSuggestion,
     loggedProgress,
     createdSchedule,
+    proposedSchedulePlan,
     context: { dbOverview, userContext, history },
   };
 };
