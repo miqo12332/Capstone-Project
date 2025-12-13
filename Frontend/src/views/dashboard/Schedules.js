@@ -93,7 +93,7 @@ const MySchedule = () => {
   }, [loadHabits])
 
   // ✅ Load user's schedules
-  const loadSchedules = async () => {
+  const loadSchedules = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/schedules/user/${user.id}`)
       if (!res.ok) throw new Error("Failed to fetch schedules")
@@ -105,11 +105,11 @@ const MySchedule = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.id])
 
   useEffect(() => {
     if (user?.id) loadSchedules()
-  }, [user?.id])
+  }, [user?.id, loadSchedules])
 
   // ✅ Load calendar events connected to the account (e.g. Google Calendar)
   const loadCalendarEvents = useCallback(async () => {
@@ -300,6 +300,10 @@ const MySchedule = () => {
   }
 
   useDataRefresh([REFRESH_SCOPES.HABITS], loadHabits)
+  useDataRefresh([REFRESH_SCOPES.SCHEDULES], () => {
+    loadSchedules()
+    loadCalendarEvents()
+  })
 
   return (
     <CRow className="mt-4 g-4 schedules-shell">
