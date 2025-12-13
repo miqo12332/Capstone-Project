@@ -22,6 +22,7 @@ import CalendarEvent from "./CalendarEvent.js";
 import ChatMessage from "./ChatMessage.js";
 import GroupChallengeMessage from "./GroupChallengeMessage.js";
 import RegistrationVerification from "./RegistrationVerification.js";
+import PasswordReset from "./PasswordReset.js";
 
 // === Habit scheduling ===
 User.hasMany(Habit, { foreignKey: "user_id", as: "habits" });
@@ -164,4 +165,5 @@ export {
   ChatMessage,
   GroupChallengeMessage,
   RegistrationVerification,
+  PasswordReset,
 };

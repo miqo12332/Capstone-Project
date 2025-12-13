@@ -2,7 +2,7 @@ import express from "express";
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import { Op } from "sequelize";
-import { RegistrationVerification, UserSetting } from "../models/index.js";
+import { PasswordReset, RegistrationVerification, UserSetting } from "../models/index.js";
 import { EmailConfigError, sendEmail } from "../utils/emailService.js";
 
 const defaultSettings = {
@@ -97,6 +97,9 @@ const ensureUserSettings = async (userId) => {
 const router = express.Router();
 
 const VERIFICATION_EXPIRATION_MINUTES = 15;
+const PASSWORD_REQUIREMENTS_MESSAGE = "Password must be at least 8 characters and include letters and numbers.";
+
+const isPasswordStrong = (password) => /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(password);
 
 const generateVerificationCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -126,6 +129,10 @@ router.post("/register", async (req, res) => {
   try {
     const { name, email, password, onboarding = {} } = req.body;
     if (!name || !email || !password) return res.status(400).json({ error: "All fields required" });
+
+    if (!isPasswordStrong(password)) {
+      return res.status(400).json({ error: PASSWORD_REQUIREMENTS_MESSAGE });
+    }
 
     const existing = await User.findOne({ where: { email } });
     if (existing) return res.status(400).json({ error: "Email already exists" });
@@ -170,6 +177,10 @@ router.post("/register/request-code", async (req, res) => {
   try {
     const { name, email, password, onboarding = {} } = req.body;
     if (!name || !email || !password) return res.status(400).json({ error: "All fields required" });
+
+    if (!isPasswordStrong(password)) {
+      return res.status(400).json({ error: PASSWORD_REQUIREMENTS_MESSAGE });
+    }
 
     const existing = await User.findOne({ where: { email } });
     if (existing) return res.status(400).json({ error: "Email already exists" });
@@ -257,6 +268,79 @@ router.post("/register/verify", async (req, res) => {
   } catch (err) {
     console.error("Verification error:", err);
     res.status(500).json({ error: "Verification failed" });
+  }
+});
+
+router.post("/password/reset/request", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email is required" });
+
+    const user = await User.findOne({ where: { email } });
+    if (!user) return res.status(404).json({ error: "No account found for that email" });
+
+    const code = generateVerificationCode();
+    const codeHash = await bcrypt.hash(code, 10);
+    const expiresAt = new Date(Date.now() + VERIFICATION_EXPIRATION_MINUTES * 60 * 1000);
+
+    await PasswordReset.upsert({ email, code_hash: codeHash, expires_at: expiresAt });
+
+    await sendEmail({
+      to: email,
+      subject: "Reset your StepHabit password",
+      text: `Use this 6-digit code to reset your password: ${code}\n\nThe code expires in ${VERIFICATION_EXPIRATION_MINUTES} minutes. If you didn't request this, you can ignore the email.`,
+    });
+
+    res.json({ message: "Reset code sent" });
+  } catch (err) {
+    console.error("Password reset request error:", err);
+    if (err instanceof EmailConfigError) {
+      return res.status(503).json({
+        error: "Email service is not configured. Please set SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS.",
+        code: err.code,
+      });
+    }
+
+    res.status(500).json({ error: "Unable to send reset code. Please try again." });
+  }
+});
+
+router.post("/password/reset/verify", async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ error: "Email, code, and new password are required" });
+    }
+
+    if (!isPasswordStrong(newPassword)) {
+      return res.status(400).json({ error: PASSWORD_REQUIREMENTS_MESSAGE });
+    }
+
+    const request = await PasswordReset.findOne({ where: { email } });
+    if (!request) return res.status(400).json({ error: "No reset request found for this email" });
+
+    if (new Date(request.expires_at) < new Date()) {
+      await request.destroy();
+      return res.status(400).json({ error: "Reset code has expired" });
+    }
+
+    const isValid = await bcrypt.compare(code, request.code_hash);
+    if (!isValid) return res.status(400).json({ error: "Invalid reset code" });
+
+    const user = await User.findOne({ where: { email } });
+    if (!user) {
+      await request.destroy();
+      return res.status(404).json({ error: "No account found for that email" });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await user.update({ password: hashed });
+    await request.destroy();
+
+    res.json({ message: "Password updated successfully" });
+  } catch (err) {
+    console.error("Password reset verify error:", err);
+    res.status(500).json({ error: "Unable to reset password right now" });
   }
 });
 
