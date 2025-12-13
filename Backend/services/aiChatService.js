@@ -15,6 +15,7 @@ import {
   Schedule,
   User,
   UserSetting,
+  BusySchedule,
 } from "../models/index.js";
 import { findPendingHabitSuggestion, getChatHistory } from "./memoryService.js";
 
@@ -77,6 +78,16 @@ const mapHabit = (habit) => ({
   })),
 });
 
+const mapBusySchedule = (entry) => ({
+  id: entry.id,
+  title: entry.title,
+  day: entry.day,
+  starttime: entry.starttime,
+  endtime: entry.endtime,
+  repeat: entry.repeat,
+  notes: entry.notes,
+});
+
 const loadUserContext = async (userId) => {
   const user = await User.findByPk(userId, {
     include: [
@@ -85,6 +96,7 @@ const loadUserContext = async (userId) => {
       { model: Achievement, as: "achievements" },
       { model: UserSetting, as: "settings" },
       { model: CalendarEvent, as: "calendarEvents" },
+      { model: BusySchedule, as: "busySchedules" },
       {
         model: User,
         as: "friends",
@@ -136,6 +148,7 @@ const loadUserContext = async (userId) => {
       name: challenge.name,
       description: challenge.description,
     })),
+    busySchedules: (plain.busySchedules || []).map(mapBusySchedule),
   };
 };
 
@@ -302,6 +315,81 @@ const requestClaudeProgressDecision = async ({ message, userContext, history }) 
   return parseProgressDecision(reply);
 };
 
+const parseScheduleDecision = (raw) => {
+  if (!raw) return null;
+
+  try {
+    const cleaned = raw.trim().replace(/```(json)?/g, "");
+    const jsonStart = cleaned.indexOf("{");
+    const jsonEnd = cleaned.lastIndexOf("}");
+    const target = jsonStart >= 0 && jsonEnd >= 0 ? cleaned.slice(jsonStart, jsonEnd + 1) : cleaned;
+    const parsed = JSON.parse(target);
+
+    if (parsed.action !== "create-schedule") return null;
+
+    const type = parsed.type === "habit" ? "habit" : parsed.type === "busy" ? "busy" : null;
+    const day = parsed.day?.trim();
+    const starttime = parsed.starttime?.trim();
+    const endtime = parsed.endtime?.trim() || null;
+    const notes = parsed.notes?.trim() || null;
+    const repeat = parsed.repeat?.trim() || "once";
+    const userReply = parsed.userReply?.trim() || null;
+    const customdays = parsed.customdays?.trim() || null;
+
+    if (!type || !day || !starttime) return null;
+    if (type === "habit" && !parsed.habitId) return null;
+    if (type === "busy" && !parsed.title) return null;
+
+    return {
+      type,
+      habitId: parsed.habitId ? Number.parseInt(parsed.habitId, 10) : null,
+      title: parsed.title?.trim() || null,
+      day,
+      starttime,
+      endtime,
+      repeat,
+      customdays,
+      notes,
+      userReply,
+    };
+  } catch (error) {
+    console.error("Failed to parse schedule decision", error?.message || error);
+    return null;
+  }
+};
+
+const requestClaudeScheduleDecision = async ({ message, userContext, history }) => {
+  const habits = userContext?.habits || [];
+  const busySchedules = userContext?.busySchedules || [];
+
+  const habitSummaries = habits.map((h) => ({
+    id: h.id,
+    title: h.title,
+    existingSlots: (h.schedules || []).map((s) => ({ day: s.day, starttime: s.starttime })),
+  }));
+
+  const systemInstruction = [
+    "You are Claude, the StepHabit AI scheduler.",
+    "When the user asks to add something to their schedule or block time, respond with JSON only.",
+    "Shape: { action: 'create-schedule', type: 'habit' | 'busy', habitId: number | null, title: string | null, day: 'YYYY-MM-DD', starttime: 'HH:MM', endtime: 'HH:MM' | null, repeat: string | null, customdays: string | null, notes: string | null, userReply: string }.",
+    "Use 24-hour times. If you cannot confidently schedule, return { action: 'none' }.",
+    "For type 'habit', pick the best matching habitId from the list. For 'busy', supply a clear title.",
+    `Known habits: ${JSON.stringify(habitSummaries)}`,
+    `Current busy events: ${JSON.stringify(busySchedules)}`,
+  ].join("\n");
+
+  const conversation = buildConversationMessages(history);
+  const prompt = new HumanMessage(
+    [
+      "Decide if this message should add a habit session or busy block to the user's calendar.",
+      `User message: ${message}`,
+    ].join("\n")
+  );
+
+  const reply = await callClaude([new SystemMessage(systemInstruction), ...conversation, prompt]);
+  return parseScheduleDecision(reply);
+};
+
 const callClaude = async (messages) => {
   const apiKey = resolveApiKey();
   if (!apiKey) return null;
@@ -438,6 +526,12 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     history,
   });
 
+  const scheduleDecision = await requestClaudeScheduleDecision({
+    message,
+    userContext,
+    history,
+  });
+
   const systemInstruction = [
     "You are a warm, conversational AI assistant for the StepHabit platform.",
     "Respond with short, human-feeling paragraphs (avoid bullet lists unless requested).",
@@ -450,6 +544,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
   let habitSuggestion = habitAnalysis.habitSuggestion;
   let replyFromClaude = progressDecision?.userReply || null;
   let loggedProgress = null;
+  let createdSchedule = null;
   let finalIntent = habitAnalysis.intent;
 
   if (progressDecision) {
@@ -476,6 +571,75 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     }
   }
 
+  if (scheduleDecision?.type === "habit" || scheduleDecision?.type === "busy") {
+    try {
+      if (scheduleDecision.type === "habit" && scheduleDecision.habitId) {
+        const habit = await Habit.findOne({ where: { id: scheduleDecision.habitId, user_id: userId } });
+
+        if (habit) {
+          const created = await Schedule.create({
+            habit_id: scheduleDecision.habitId,
+            user_id: userId,
+            day: scheduleDecision.day,
+            starttime: scheduleDecision.starttime,
+            endtime: scheduleDecision.endtime || null,
+            enddate: scheduleDecision.day,
+            repeat: scheduleDecision.repeat || "once",
+            customdays: scheduleDecision.repeat === "custom" ? scheduleDecision.customdays || null : null,
+            notes: scheduleDecision.notes || "Created via HabitCoach",
+          });
+
+          createdSchedule = {
+            ...(created.toJSON ? created.toJSON() : created),
+            type: "habit",
+            title: habit.title,
+          };
+
+          if (userContext?.habits) {
+            const target = userContext.habits.find((h) => h.id === habit.id);
+            if (target) {
+              target.schedules = [...(target.schedules || []), createdSchedule];
+            }
+          }
+        }
+      }
+
+      if (scheduleDecision.type === "busy") {
+        const busy = await BusySchedule.create({
+          user_id: userId,
+          title: scheduleDecision.title,
+          day: scheduleDecision.day,
+          starttime: scheduleDecision.starttime,
+          endtime: scheduleDecision.endtime || null,
+          enddate: scheduleDecision.day,
+          repeat: scheduleDecision.repeat || "once",
+          customdays: scheduleDecision.repeat === "custom" ? scheduleDecision.customdays || null : null,
+          notes: scheduleDecision.notes || "Blocked by HabitCoach",
+        });
+
+        createdSchedule = {
+          ...(busy.toJSON ? busy.toJSON() : busy),
+          type: "busy",
+        };
+
+        if (userContext?.busySchedules) {
+          userContext.busySchedules = [...(userContext.busySchedules || []), createdSchedule];
+        }
+      }
+
+      if (createdSchedule) {
+        finalIntent = "add-schedule";
+        replyFromClaude =
+          scheduleDecision.userReply ||
+          (scheduleDecision.type === "habit"
+            ? `I added a ${createdSchedule.title || "habit"} session on ${scheduleDecision.day} at ${scheduleDecision.starttime}.`
+            : `I blocked "${scheduleDecision.title}" on ${scheduleDecision.day} at ${scheduleDecision.starttime}.`);
+      }
+    } catch (error) {
+      console.error("Failed to save schedule from Claude decision", error?.message || error);
+    }
+  }
+
   if (progressDecision && !replyFromClaude) {
     const matchedHabit = (userContext?.habits || []).find((h) => h.id === progressDecision.habitId);
     const recapPrompt = new HumanMessage(
@@ -489,19 +653,21 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     replyFromClaude = await callClaude([new SystemMessage(systemInstruction), ...buildConversationMessages(history), recapPrompt]);
   }
 
-  if (habitAnalysis.intent === "suggest") {
-    habitSuggestion =
-      (await requestClaudeHabitSuggestion({ message, userContext })) || buildHabitSuggestion(message);
+  if (!createdSchedule) {
+    if (habitAnalysis.intent === "suggest") {
+      habitSuggestion =
+        (await requestClaudeHabitSuggestion({ message, userContext })) || buildHabitSuggestion(message);
 
-    if (habitSuggestion) {
-      replyFromClaude = await generateClaudeSuggestionReply({
-        habitSuggestion,
-        systemInstruction,
-        history,
-      });
+      if (habitSuggestion) {
+        replyFromClaude = await generateClaudeSuggestionReply({
+          habitSuggestion,
+          systemInstruction,
+          history,
+        });
+      }
+    } else if (habitAnalysis.intent === "chat" && !loggedProgress) {
+      replyFromClaude = await callClaude(buildChatMessages({ systemInstruction, history, message }));
     }
-  } else if (habitAnalysis.intent === "chat" && !loggedProgress) {
-    replyFromClaude = await callClaude(buildChatMessages({ systemInstruction, history, message }));
   }
 
   const reply =
@@ -514,6 +680,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     intent: finalIntent,
     habitSuggestion,
     loggedProgress,
+    createdSchedule,
     context: { dbOverview, userContext, history },
   };
 };

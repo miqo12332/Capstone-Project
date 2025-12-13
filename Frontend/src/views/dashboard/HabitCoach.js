@@ -168,6 +168,14 @@ const HabitCoach = () => {
           habitId: data.createdHabit.id,
         });
       }
+
+      if (data.createdSchedule?.id) {
+        emitDataRefresh(REFRESH_SCOPES.SCHEDULES, {
+          reason: "schedule-added-by-coach",
+          scheduleId: data.createdSchedule.id,
+          scheduleType: data.createdSchedule.type,
+        });
+      }
     } catch (err) {
       console.error("Failed to send coach message", err);
       setError("Something went wrong sending your message. Try again.");
