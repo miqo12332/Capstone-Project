@@ -315,6 +315,55 @@ const requestClaudeProgressDecision = async ({ message, userContext, history }) 
   return parseProgressDecision(reply);
 };
 
+const normalizeTimeString = (value) => {
+  if (!value && value !== 0) return null;
+
+  const raw = `${value}`.trim();
+  if (!raw) return null;
+
+  const ampmMatch = raw.match(/(am|pm)/i);
+  const numericParts = raw.split(/[^0-9]/).filter(Boolean);
+
+  const hourPart = numericParts[0];
+  const minutePart = numericParts[1] || "0";
+
+  if (!hourPart) return null;
+
+  let hour = Number.parseInt(hourPart, 10);
+  let minute = Number.parseInt(minutePart, 10) || 0;
+
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+
+  if (ampmMatch) {
+    const suffix = ampmMatch[1].toLowerCase();
+    if (suffix === "pm" && hour < 12) hour += 12;
+    if (suffix === "am" && hour === 12) hour = 0;
+  }
+
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+
+  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+};
+
+const normalizeIsoDate = (value) => {
+  if (!value) return null;
+  const [datePart] = `${value}`.trim().split(/[T\s]/);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart || "")) return null;
+  return datePart;
+};
+
+const normalizeScheduleDecision = (decision) => {
+  if (!decision) return null;
+
+  const day = normalizeIsoDate(decision.day);
+  const starttime = normalizeTimeString(decision.starttime);
+  const endtime = normalizeTimeString(decision.endtime);
+
+  if (!day || !starttime) return null;
+
+  return { ...decision, day, starttime, endtime };
+};
+
 const parseScheduleDecision = (raw) => {
   if (!raw) return null;
 
@@ -340,7 +389,7 @@ const parseScheduleDecision = (raw) => {
     if (type === "habit" && !parsed.habitId) return null;
     if (type === "busy" && !parsed.title) return null;
 
-    return {
+    const normalized = normalizeScheduleDecision({
       type,
       habitId: parsed.habitId ? Number.parseInt(parsed.habitId, 10) : null,
       title: parsed.title?.trim() || null,
@@ -351,11 +400,70 @@ const parseScheduleDecision = (raw) => {
       customdays,
       notes,
       userReply,
-    };
+    });
+
+    return normalized;
   } catch (error) {
     console.error("Failed to parse schedule decision", error?.message || error);
     return null;
   }
+};
+
+const MIN_DEFAULT_DURATION = 60;
+
+const timeToMinutes = (time) => {
+  const normalized = normalizeTimeString(time);
+  if (!normalized) return null;
+
+  const [hours, minutes] = normalized.split(":").map((part) => Number.parseInt(part, 10));
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+
+  return hours * 60 + minutes;
+};
+
+const minutesToTime = (minutes) => {
+  if (minutes == null || Number.isNaN(minutes)) return null;
+  const hrs = Math.max(0, Math.floor(minutes / 60));
+  const mins = Math.max(0, Math.floor(minutes % 60));
+  return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`;
+};
+
+const findScheduleConflict = async ({ userId, day, starttime, endtime }) => {
+  if (!userId || !day || !starttime) return null;
+
+  const [habitsForDay, busyForDay] = await Promise.all([
+    Schedule.findAll({
+      where: { user_id: userId, day },
+      include: [{ model: Habit, as: "habit", attributes: ["title"] }],
+    }),
+    BusySchedule.findAll({ where: { user_id: userId, day } }),
+  ]);
+
+  const toRange = (entry) => {
+    const start = timeToMinutes(entry.starttime);
+    const end = timeToMinutes(entry.endtime);
+    if (start == null) return null;
+    return {
+      start,
+      end: end != null ? end : start + MIN_DEFAULT_DURATION,
+      title: entry.title || entry.custom_title || entry?.habit?.title || entry.notes || "another block",
+    };
+  };
+
+  const targetStart = timeToMinutes(starttime);
+  const targetEnd = timeToMinutes(endtime);
+
+  if (targetStart == null) return null;
+  const desiredRange = {
+    start: targetStart,
+    end: targetEnd != null ? targetEnd : targetStart + MIN_DEFAULT_DURATION,
+  };
+
+  const existing = [...habitsForDay, ...busyForDay]
+    .map((entry) => ({ ...toRange(entry), raw: entry }))
+    .filter(Boolean);
+
+  return existing.find((range) => desiredRange.start < range.end && desiredRange.end > range.start) || null;
 };
 
 const requestClaudeScheduleDecision = async ({ message, userContext, history }) => {
@@ -532,6 +640,8 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     history,
   });
 
+  const normalizedScheduleDecision = normalizeScheduleDecision(scheduleDecision);
+
   const systemInstruction = [
     "You are a warm, conversational AI assistant for the StepHabit platform.",
     "Respond with short, human-feeling paragraphs (avoid bullet lists unless requested).",
@@ -571,22 +681,37 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     }
   }
 
-  if (scheduleDecision?.type === "habit" || scheduleDecision?.type === "busy") {
+  if (normalizedScheduleDecision?.type === "habit" || normalizedScheduleDecision?.type === "busy") {
     try {
-      if (scheduleDecision.type === "habit" && scheduleDecision.habitId) {
-        const habit = await Habit.findOne({ where: { id: scheduleDecision.habitId, user_id: userId } });
+      const conflict = await findScheduleConflict({
+        userId,
+        day: normalizedScheduleDecision.day,
+        starttime: normalizedScheduleDecision.starttime,
+        endtime: normalizedScheduleDecision.endtime,
+      });
+
+      if (conflict) {
+        replyFromClaude =
+          scheduleDecision?.userReply ||
+          `I couldn't add that block because it overlaps with ${conflict.title} at ${minutesToTime(conflict.start)}.`;
+        finalIntent = "chat";
+      }
+
+      if (!conflict && normalizedScheduleDecision.type === "habit" && normalizedScheduleDecision.habitId) {
+        const habit = await Habit.findOne({ where: { id: normalizedScheduleDecision.habitId, user_id: userId } });
 
         if (habit) {
           const created = await Schedule.create({
-            habit_id: scheduleDecision.habitId,
+            habit_id: normalizedScheduleDecision.habitId,
             user_id: userId,
-            day: scheduleDecision.day,
-            starttime: scheduleDecision.starttime,
-            endtime: scheduleDecision.endtime || null,
-            enddate: scheduleDecision.day,
-            repeat: scheduleDecision.repeat || "once",
-            customdays: scheduleDecision.repeat === "custom" ? scheduleDecision.customdays || null : null,
-            notes: scheduleDecision.notes || "Created via HabitCoach",
+            day: normalizedScheduleDecision.day,
+            starttime: normalizedScheduleDecision.starttime,
+            endtime: normalizedScheduleDecision.endtime || null,
+            enddate: normalizedScheduleDecision.day,
+            repeat: normalizedScheduleDecision.repeat || "once",
+            customdays:
+              normalizedScheduleDecision.repeat === "custom" ? normalizedScheduleDecision.customdays || null : null,
+            notes: normalizedScheduleDecision.notes || "Created via HabitCoach",
           });
 
           createdSchedule = {
@@ -604,17 +729,18 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
         }
       }
 
-      if (scheduleDecision.type === "busy") {
+      if (!conflict && normalizedScheduleDecision.type === "busy") {
         const busy = await BusySchedule.create({
           user_id: userId,
-          title: scheduleDecision.title,
-          day: scheduleDecision.day,
-          starttime: scheduleDecision.starttime,
-          endtime: scheduleDecision.endtime || null,
-          enddate: scheduleDecision.day,
-          repeat: scheduleDecision.repeat || "once",
-          customdays: scheduleDecision.repeat === "custom" ? scheduleDecision.customdays || null : null,
-          notes: scheduleDecision.notes || "Blocked by HabitCoach",
+          title: normalizedScheduleDecision.title,
+          day: normalizedScheduleDecision.day,
+          starttime: normalizedScheduleDecision.starttime,
+          endtime: normalizedScheduleDecision.endtime || null,
+          enddate: normalizedScheduleDecision.day,
+          repeat: normalizedScheduleDecision.repeat || "once",
+          customdays:
+            normalizedScheduleDecision.repeat === "custom" ? normalizedScheduleDecision.customdays || null : null,
+          notes: normalizedScheduleDecision.notes || "Blocked by HabitCoach",
         });
 
         createdSchedule = {
@@ -630,13 +756,13 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
         }
       }
 
-      if (createdSchedule) {
+      if (!conflict && createdSchedule) {
         finalIntent = "add-schedule";
         replyFromClaude =
-          scheduleDecision.userReply ||
-          (scheduleDecision.type === "habit"
-            ? `I added a ${createdSchedule.title || "habit"} session on ${scheduleDecision.day} at ${scheduleDecision.starttime}.`
-            : `I blocked "${scheduleDecision.title}" on ${scheduleDecision.day} at ${scheduleDecision.starttime}.`);
+          normalizedScheduleDecision.userReply ||
+          (normalizedScheduleDecision.type === "habit"
+            ? `I added a ${createdSchedule.title || "habit"} session on ${normalizedScheduleDecision.day} at ${normalizedScheduleDecision.starttime}.`
+            : `I blocked "${normalizedScheduleDecision.title}" on ${normalizedScheduleDecision.day} at ${normalizedScheduleDecision.starttime}.`);
       }
     } catch (error) {
       console.error("Failed to save schedule from Claude decision", error?.message || error);
