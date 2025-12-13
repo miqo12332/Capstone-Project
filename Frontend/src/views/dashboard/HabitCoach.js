@@ -29,7 +29,6 @@ import {
   fetchAiChatHistory,
   sendAiChatMessage,
 } from "../../services/aiChat";
-import { emitDataRefresh, REFRESH_SCOPES } from "../../utils/refreshBus";
 
 const roleConfig = {
   user: { color: "primary", label: "You", icon: cilUser },
@@ -161,13 +160,6 @@ const HabitCoach = () => {
       const data = await sendAiChatMessage(user.id, trimmedMessage);
       setHistory(data.history || []);
       setContext(data.context || null);
-
-      if (data.createdHabit?.id) {
-        emitDataRefresh(REFRESH_SCOPES.HABITS, {
-          reason: "habit-added-by-coach",
-          habitId: data.createdHabit.id,
-        });
-      }
     } catch (err) {
       console.error("Failed to send coach message", err);
       setError("Something went wrong sending your message. Try again.");
