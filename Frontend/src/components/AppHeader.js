@@ -28,9 +28,20 @@ import {
 import { AppBreadcrumb } from './index'
 import { AppHeaderDropdown } from './header/index'
 
+const COLOR_MODE_EVENT = 'coreui-color-mode-updated'
+
 const AppHeader = () => {
   const headerRef = useRef()
   const { colorMode, setColorMode } = useColorModes('coreui-free-react-admin-template-theme')
+
+  const broadcastColorMode = (mode) => {
+    setColorMode(mode)
+    window.dispatchEvent(
+      new CustomEvent(COLOR_MODE_EVENT, {
+        detail: mode,
+      })
+    )
+  }
 
   const dispatch = useDispatch()
   const sidebarShow = useSelector((state) => state.sidebarShow)
@@ -41,6 +52,16 @@ const AppHeader = () => {
         headerRef.current.classList.toggle('shadow-sm', document.documentElement.scrollTop > 0)
     })
   }, [])
+
+  useEffect(() => {
+    const handleColorModeChange = (event) => {
+      if (!event.detail) return
+      setColorMode(event.detail)
+    }
+
+    window.addEventListener(COLOR_MODE_EVENT, handleColorModeChange)
+    return () => window.removeEventListener(COLOR_MODE_EVENT, handleColorModeChange)
+  }, [setColorMode])
 
   return (
     <CHeader position="sticky" className="mb-4 p-0" ref={headerRef}>
@@ -95,7 +116,7 @@ const AppHeader = () => {
                 className="d-flex align-items-center"
                 as="button"
                 type="button"
-                onClick={() => setColorMode('light')}
+                onClick={() => broadcastColorMode('light')}
               >
                 <CIcon className="me-2" icon={cilSun} size="lg" /> Light
               </CDropdownItem>
@@ -104,7 +125,7 @@ const AppHeader = () => {
                 className="d-flex align-items-center"
                 as="button"
                 type="button"
-                onClick={() => setColorMode('dark')}
+                onClick={() => broadcastColorMode('dark')}
               >
                 <CIcon className="me-2" icon={cilMoon} size="lg" /> Dark
               </CDropdownItem>
@@ -113,7 +134,7 @@ const AppHeader = () => {
                 className="d-flex align-items-center"
                 as="button"
                 type="button"
-                onClick={() => setColorMode('auto')}
+                onClick={() => broadcastColorMode('auto')}
               >
                 <CIcon className="me-2" icon={cilContrast} size="lg" /> Auto
               </CDropdownItem>
