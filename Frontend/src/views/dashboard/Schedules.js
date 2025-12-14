@@ -26,6 +26,7 @@ import { cilClock, cilCalendar, cilLoopCircular, cilPlus, cilNotes } from "@core
 import { emitDataRefresh, REFRESH_SCOPES, useDataRefresh } from "../../utils/refreshBus"
 import { API_BASE } from "../../utils/apiConfig"
 import { fetchCalendarOverview, syncCalendar } from "../../services/calendar"
+import { runScheduleAgent } from "../../services/scheduleAgent"
 import "./Schedules.css"
 
 const MySchedule = () => {
@@ -44,6 +45,15 @@ const MySchedule = () => {
   const [calendarFileName, setCalendarFileName] = useState("")
   const [calendarFileText, setCalendarFileText] = useState("")
   const calendarFileInputRef = useRef(null)
+  const [agentForm, setAgentForm] = useState({
+    title: "",
+    date: "",
+    startTime: "",
+    endTime: "",
+    notes: "",
+  })
+  const [agentResult, setAgentResult] = useState(null)
+  const [agentLoading, setAgentLoading] = useState(false)
 
   const formattedCalendarEvents = useMemo(() => {
     const sorted = [...calendarEvents].sort((a, b) => {
@@ -236,6 +246,34 @@ const MySchedule = () => {
     }
   }
 
+  const handleAgentInput = (field) => (event) => {
+    const { value } = event.target
+    setAgentForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleAgentSubmit = async () => {
+    if (!user?.id) return setError("Please log in to add events with HabitAI.")
+
+    try {
+      setAgentLoading(true)
+      setError("")
+      const data = await runScheduleAgent(user.id, agentForm)
+      setAgentResult(data)
+      if (data?.status === "created") {
+        await loadSchedules()
+        setAgentForm((prev) => ({ ...prev, title: "", notes: "" }))
+      }
+    } catch (err) {
+      console.error("❌ schedule agent failed:", err)
+      setAgentResult({
+        status: "error",
+        message: "EVENT_NOT_CREATED\nReason: Unable to run the schedule agent.",
+      })
+    } finally {
+      setAgentLoading(false)
+    }
+  }
+
   const handleCalendarFile = (event) => {
     setCalendarError("")
     const inputElement = event.target
@@ -305,6 +343,120 @@ const MySchedule = () => {
     <CRow className="mt-4 g-4 schedules-shell">
       <CCol xs={12}>{error && <CAlert color="danger">{error}</CAlert>}</CCol>
       <CCol xs={12}>{calendarError && <CAlert color="warning">{calendarError}</CAlert>}</CCol>
+
+      <CCol xs={12}>
+        <CCard className="shadow-sm border-0">
+          <CCardHeader className="bg-dark text-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div className="d-flex align-items-center gap-2">
+              <CIcon icon={cilClock} />
+              <span className="fw-semibold">HabitAI schedule executor</span>
+            </div>
+            <CBadge color="light" textColor="dark">
+              Tool-first · Timezone: Asia/Yerevan
+            </CBadge>
+          </CCardHeader>
+          <CCardBody className="d-flex flex-column gap-3">
+            <div className="text-medium-emphasis small">
+              Provide the title, date, and time window. If anything is missing, the agent asks one
+              clarification, otherwise it immediately books the event so it shows in both your planner and
+              calendar view.
+            </div>
+
+            <CForm className="row g-3">
+              <CCol md={4}>
+                <CFormLabel htmlFor="agent-title">Title</CFormLabel>
+                <CFormInput
+                  id="agent-title"
+                  value={agentForm.title}
+                  onChange={handleAgentInput("title")}
+                  placeholder="Boxing session"
+                  disabled={agentLoading}
+                />
+              </CCol>
+              <CCol md={2}>
+                <CFormLabel htmlFor="agent-date">Date</CFormLabel>
+                <CFormInput
+                  type="date"
+                  id="agent-date"
+                  value={agentForm.date}
+                  onChange={handleAgentInput("date")}
+                  disabled={agentLoading}
+                />
+              </CCol>
+              <CCol md={2}>
+                <CFormLabel htmlFor="agent-start">Start</CFormLabel>
+                <CFormInput
+                  type="time"
+                  id="agent-start"
+                  value={agentForm.startTime}
+                  onChange={handleAgentInput("startTime")}
+                  disabled={agentLoading}
+                />
+              </CCol>
+              <CCol md={2}>
+                <CFormLabel htmlFor="agent-end">End</CFormLabel>
+                <CFormInput
+                  type="time"
+                  id="agent-end"
+                  value={agentForm.endTime}
+                  onChange={handleAgentInput("endTime")}
+                  disabled={agentLoading}
+                />
+              </CCol>
+              <CCol md={2}>
+                <CFormLabel className="d-flex justify-content-between align-items-center">
+                  <span>Timezone</span>
+                  <CBadge color="secondary" className="ms-2">UTC+4</CBadge>
+                </CFormLabel>
+                <CFormInput value="Asia/Yerevan" disabled />
+              </CCol>
+              <CCol xs={12}>
+                <CFormLabel htmlFor="agent-notes">Notes (optional)</CFormLabel>
+                <CFormTextarea
+                  id="agent-notes"
+                  value={agentForm.notes}
+                  onChange={handleAgentInput("notes")}
+                  placeholder="Add a quick note or location"
+                  disabled={agentLoading}
+                  rows={2}
+                />
+              </CCol>
+            </CForm>
+
+            <div className="d-flex align-items-center gap-3 flex-wrap">
+              <CButton color="primary" onClick={handleAgentSubmit} disabled={agentLoading}>
+                {agentLoading ? <CSpinner size="sm" className="me-2" /> : <CIcon icon={cilPlus} className="me-2" />}Save with HabitAI
+              </CButton>
+              <div className="text-medium-emphasis small">
+                Required fields: title, date, start time, end time.
+              </div>
+            </div>
+
+            {agentResult?.message && (
+              <CCard className="border-0 bg-body-secondary">
+                <CCardBody>
+                  <div className="fw-semibold mb-1">Agent response</div>
+                  <pre className="mb-2 small" style={{ whiteSpace: "pre-wrap" }}>
+                    {agentResult.message}
+                  </pre>
+                  {agentResult.overlaps && agentResult.overlaps.length > 0 && (
+                    <div className="small">
+                      <div className="fw-semibold">Overlap check</div>
+                      <ul className="mb-0 ps-3">
+                        {agentResult.overlaps.map((entry) => (
+                          <li key={`${entry.type}-${entry.id}`}>
+                            {entry.day} · {entry.starttime}–{entry.endtime} — {entry.title}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </CCardBody>
+              </CCard>
+            )}
+          </CCardBody>
+        </CCard>
+      </CCol>
 
       <CCol lg={5}>
         <CCard className="shadow-sm border-0 h-100">

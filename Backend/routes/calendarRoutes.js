@@ -3,6 +3,7 @@ import { Op } from "sequelize";
 import CalendarIntegration from "../models/CalendarIntegration.js";
 import CalendarEvent from "../models/CalendarEvent.js";
 import Schedule from "../models/Schedule.js";
+import BusySchedule from "../models/BusySchedule.js";
 import Habit from "../models/Habit.js";
 import { parseIcsFeed } from "../utils/calendarParser.js";
 
@@ -16,7 +17,7 @@ const buildOverview = async (userId, rangeDays = 30) => {
   const horizon = new Date(today);
   horizon.setDate(horizon.getDate() + windowDays);
 
-  const [integrations, events, schedules] = await Promise.all([
+  const [integrations, events, schedules, busySchedules] = await Promise.all([
     CalendarIntegration.findAll({
       where: { user_id: userId },
       order: [["updated_at", "DESC"]],
@@ -44,6 +45,10 @@ const buildOverview = async (userId, rangeDays = 30) => {
         },
       ],
     }),
+    BusySchedule.findAll({
+      where: { user_id: userId },
+      order: [["day", "ASC"], ["starttime", "ASC"]],
+    }),
   ]);
 
   const plainIntegrations = integrations.map((integration) =>
@@ -65,7 +70,28 @@ const buildOverview = async (userId, rangeDays = 30) => {
     schedule.get({ plain: true })
   );
 
-  const groupedByDate = plainEvents.reduce((acc, event) => {
+  const plainBusyEvents = busySchedules.map((busy) => {
+    const start = busy.starttime ? new Date(`${busy.day}T${busy.starttime}`) : null;
+    const end = busy.endtime ? new Date(`${busy.day}T${busy.endtime}`) : null;
+
+    return {
+      id: `busy-${busy.id}`,
+      title: busy.title,
+      start_time: start ? start.toISOString() : null,
+      end_time: end ? end.toISOString() : null,
+      source: "schedule",
+      all_day: false,
+      metadata: { repeat: busy.repeat, customdays: busy.customdays },
+    };
+  });
+
+  const combinedEvents = [...plainEvents, ...plainBusyEvents].sort((a, b) => {
+    const aTs = a.start_time ? new Date(a.start_time).getTime() : 0;
+    const bTs = b.start_time ? new Date(b.start_time).getTime() : 0;
+    return aTs - bTs;
+  });
+
+  const groupedByDate = combinedEvents.reduce((acc, event) => {
     const key = event.start_time ? event.start_time.split("T")[0] : null;
     if (!key) return acc;
     if (!acc[key]) acc[key] = [];
@@ -86,7 +112,7 @@ const buildOverview = async (userId, rangeDays = 30) => {
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 
-  const totalMinutes = plainEvents.reduce((sum, event) => {
+  const totalMinutes = combinedEvents.reduce((sum, event) => {
     const start = event.start_time ? new Date(event.start_time) : null;
     const end = event.end_time ? new Date(event.end_time) : null;
     if (!start || Number.isNaN(start.getTime())) return sum;
@@ -121,18 +147,18 @@ const buildOverview = async (userId, rangeDays = 30) => {
 
   return {
     integrations: plainIntegrations,
-    events: plainEvents,
+    events: combinedEvents,
     schedules: plainSchedules,
     groupedByDate,
     summary: {
-      totalEvents: plainEvents.length,
+      totalEvents: combinedEvents.length,
       integrationCount: plainIntegrations.length,
       providers,
       busyDays,
       hoursScheduled: Math.round((totalMinutes / 60) * 10) / 10,
       lastSync: lastSyncTs ? new Date(lastSyncTs).toISOString() : null,
       nextFreeDay,
-      upcoming: plainEvents.slice(0, 6),
+      upcoming: combinedEvents.filter((event) => event.start_time).slice(0, 6),
     },
   };
 };
