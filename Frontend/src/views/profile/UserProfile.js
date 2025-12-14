@@ -171,16 +171,11 @@ const UserProfile = () => {
             settings.pushReminders ?? settings.pushNotifications ?? settings.push_reminders ?? false,
           ),
         })
-        setConnectedApps((prev) => ({
-          googleCalendar:
-            Boolean(settings.googleCalendar ?? settings.google_calendar ?? false) ||
-            prev.googleCalendar,
-          appleCalendar:
-            Boolean(settings.appleCalendar ?? settings.apple_calendar ?? false) ||
-            prev.appleCalendar,
-          fitnessSync:
-            Boolean(settings.fitnessSync ?? settings.fitness_sync ?? false) || prev.fitnessSync,
-        }))
+        setConnectedApps({
+          googleCalendar: Boolean(settings.googleCalendar ?? settings.google_calendar ?? false),
+          appleCalendar: Boolean(settings.appleCalendar ?? settings.apple_calendar ?? false),
+          fitnessSync: Boolean(settings.fitnessSync ?? settings.fitness_sync ?? false),
+        })
         setAvatarUrl(payload.avatar ? `${ASSET_BASE}${payload.avatar}` : "/uploads/default-avatar.png")
         setError("")
         if (typeof loginRef.current === "function") {
@@ -216,8 +211,6 @@ const UserProfile = () => {
         overview?.integrations || overview?.overview?.integrations || overview?.data?.integrations || []
       const providersMap =
         overview?.summary?.providers || overview?.overview?.summary?.providers || overview?.data?.providers || {}
-      const hasEventData = Array.isArray(overview?.events) && overview.events.length > 0
-
       const hasGoogleIntegration = integrations.some((integration) => {
         const provider = (integration.provider || integration.type || "").toLowerCase()
         const label = (integration.label || "").toLowerCase()
@@ -233,8 +226,7 @@ const UserProfile = () => {
 
       setConnectedApps((prev) => ({
         ...prev,
-        googleCalendar:
-          hasGoogleIntegration || hasGoogleProviderCount || hasEventData || prev.googleCalendar,
+        googleCalendar: hasGoogleIntegration || hasGoogleProviderCount,
       }))
     } catch (err) {
       console.error("Failed to refresh calendar integrations", err)
