@@ -139,6 +139,16 @@ const startServer = async () => {
       }
     }
 
+    if (hasTable("notifications")) {
+      const notificationDef = await queryInterface.describeTable("notifications");
+      if (!notificationDef.email_sent_at) {
+        await queryInterface.addColumn("notifications", "email_sent_at", {
+          type: DataTypes.DATE,
+          allowNull: true,
+        });
+      }
+    }
+
     // ---- FINAL SAFE SYNC ----
     await sequelize.sync({ alter: true });
 

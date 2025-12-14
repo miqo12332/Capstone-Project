@@ -33,6 +33,7 @@ const Notification = sequelize.define(
     },
     metadata: { type: DataTypes.JSON, allowNull: true },
     scheduled_for: { type: DataTypes.DATE, allowNull: true },
+    email_sent_at: { type: DataTypes.DATE, allowNull: true },
     is_read: { type: DataTypes.BOOLEAN, defaultValue: false },
     read_at: { type: DataTypes.DATE, allowNull: true },
     created_at: {

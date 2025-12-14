@@ -169,9 +169,20 @@ CREATE TABLE user_group_challenges (
 CREATE TABLE notifications (
     id SERIAL PRIMARY KEY,
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(140) NOT NULL DEFAULT 'Habit reminder',
     message TEXT NOT NULL,
+    type VARCHAR(40) NOT NULL DEFAULT 'general',
+    category VARCHAR(40) NOT NULL DEFAULT 'general',
+    priority VARCHAR(20) NOT NULL DEFAULT 'medium',
+    reference_id VARCHAR(80),
+    metadata JSON,
+    scheduled_for TIMESTAMP,
+    email_sent_at TIMESTAMP,
     is_read BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    read_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    cta_label VARCHAR(60),
+    cta_url VARCHAR(255)
 );
 
 -- ======================

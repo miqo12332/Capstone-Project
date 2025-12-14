@@ -1,5 +1,5 @@
 import { Op } from "sequelize"
-import { User, UserSetting } from "../models/index.js"
+import { User, UserSetting, Notification } from "../models/index.js"
 import { EmailConfigError, sendEmail } from "../utils/emailService.js"
 
 const lastSentByUser = new Map()
@@ -111,6 +111,41 @@ export const dispatchDailyReminderEmails = async () => {
   }
 }
 
+const scheduledWindowMinutes = 5
+
+export const dispatchScheduledNotificationEmails = async () => {
+  const now = new Date()
+  const windowStart = new Date(now.getTime() - scheduledWindowMinutes * 60 * 1000)
+
+  const notifications = await Notification.findAll({
+    where: {
+      scheduled_for: { [Op.ne]: null, [Op.lte]: now, [Op.gte]: windowStart },
+      email_sent_at: { [Op.is]: null },
+    },
+    include: [{ model: User, as: "user" }],
+  })
+
+  for (const notification of notifications) {
+    const recipient = notification.user?.email
+    if (!recipient) continue
+
+    const subject = notification.title || "StepHabit reminder"
+    const text = notification.message || "You have an upcoming StepHabit reminder."
+
+    try {
+      await sendEmail({ to: recipient, subject, text })
+      await notification.update({ email_sent_at: now })
+      console.log(`📧 Sent scheduled notification email to ${recipient}`)
+    } catch (error) {
+      if (error instanceof EmailConfigError) {
+        console.warn("Email configuration missing; scheduled notification emails are paused.")
+        return
+      }
+      console.error(`Failed to send scheduled notification to ${recipient}:`, error)
+    }
+  }
+}
+
 let schedulerHandle = null
 
 export const startReminderScheduler = () => {
@@ -120,6 +155,9 @@ export const startReminderScheduler = () => {
     console.log("⏱️ Reminder scheduler tick")
     dispatchDailyReminderEmails().catch((error) =>
       console.error("Reminder scheduler error", error),
+    )
+    dispatchScheduledNotificationEmails().catch((error) =>
+      console.error("Scheduled notification email error", error),
     )
   }, 60_000)
 
