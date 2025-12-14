@@ -421,6 +421,7 @@ const parseScheduleJson = (raw) => {
       day,
       starttime,
       endtime: parsed.endtime?.trim() || null,
+      enddate: parsed.enddate?.trim() || null,
       repeat: parsed.repeat?.trim() || "once",
       customdays: parsed.customdays?.trim() || null,
       notes: parsed.notes?.trim() || null,
@@ -487,6 +488,86 @@ const minutesToTime = (totalMinutes) => {
   const hours = Math.floor(safeMinutes / 60) % 24;
   const minutes = safeMinutes % 60;
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+};
+
+const parseCustomDays = (customdays) => {
+  if (!customdays || typeof customdays !== "string") return new Set();
+
+  const map = {
+    sun: 0,
+    sunday: 0,
+    mon: 1,
+    monday: 1,
+    tue: 2,
+    tues: 2,
+    tuesday: 2,
+    wed: 3,
+    weds: 3,
+    wednesday: 3,
+    thu: 4,
+    thur: 4,
+    thurs: 4,
+    thursday: 4,
+    fri: 5,
+    friday: 5,
+    sat: 6,
+    saturday: 6,
+  };
+
+  return customdays
+    .split(/[^a-zA-Z]+/)
+    .map((token) => map[token.toLowerCase()])
+    .filter((val) => val != null)
+    .reduce((set, val) => set.add(val), new Set());
+};
+
+const buildRecurrenceDays = ({ day, repeat = "once", enddate, customdays }) => {
+  if (!day) return [];
+
+  const occurrences = [];
+  const start = new Date(`${day}T00:00:00Z`);
+  if (Number.isNaN(start.getTime())) return occurrences;
+
+  const end = (() => {
+    if (!enddate) return new Date(start);
+    const parsed = new Date(`${enddate}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime())) return new Date(start);
+    return parsed;
+  })();
+
+  const limit = 180; // safety guard for long ranges
+  const addOccurrence = (dateObj) => {
+    if (occurrences.length >= limit) return;
+    occurrences.push(dateObj.toISOString().split("T")[0]);
+  };
+
+  const normalizedRepeat = (repeat || "once").toLowerCase();
+
+  if (normalizedRepeat === "once") {
+    addOccurrence(start);
+    return occurrences;
+  }
+
+  const targetDays = parseCustomDays(customdays);
+  const defaultDay = start.getUTCDay();
+  const weekdaySet = targetDays.size ? targetDays : new Set([defaultDay]);
+
+  for (
+    const cursor = new Date(start);
+    cursor <= end && occurrences.length < limit;
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  ) {
+    if (normalizedRepeat === "daily") {
+      addOccurrence(cursor);
+    } else if (normalizedRepeat === "weekly" || normalizedRepeat === "custom") {
+      if (weekdaySet.has(cursor.getUTCDay())) {
+        addOccurrence(cursor);
+      }
+    }
+  }
+
+  if (!occurrences.length) addOccurrence(start);
+  return occurrences;
 };
 
 const normalizeInterval = ({ start, end, day, title, type }) => {
@@ -597,7 +678,7 @@ const findNextAvailableSlot = (intervals, requestedStart, durationMinutes) => {
   return null;
 };
 
-const detectScheduleConflict = async ({ userId, scheduleDecision }) => {
+const detectSingleDayScheduleConflict = async ({ userId, scheduleDecision }) => {
   const startMinutes = parseTimeToMinutes(scheduleDecision?.starttime);
   if (!scheduleDecision?.day || startMinutes == null) return null;
 
@@ -625,6 +706,30 @@ const detectScheduleConflict = async ({ userId, scheduleDecision }) => {
   };
 };
 
+const detectScheduleConflict = async ({ userId, scheduleDecision }) => {
+  const occurrenceDays = buildRecurrenceDays(scheduleDecision);
+  if (!occurrenceDays.length) return null;
+
+  let firstNonConflict = null;
+
+  for (const day of occurrenceDays) {
+    const info = await detectSingleDayScheduleConflict({
+      userId,
+      scheduleDecision: { ...scheduleDecision, day },
+    });
+
+    if (info?.conflict) {
+      return { ...info, conflictDay: day, occurrences: occurrenceDays };
+    }
+
+    if (!firstNonConflict) {
+      firstNonConflict = { ...info, conflictDay: null, occurrences: occurrenceDays };
+    }
+  }
+
+  return firstNonConflict;
+};
+
 const requestClaudeScheduleDecision = async ({ message, userContext, history }) => {
   const { timezone, currentDate, currentTime } = getReferenceDateInfo(userContext);
 
@@ -632,8 +737,8 @@ const requestClaudeScheduleDecision = async ({ message, userContext, history }) 
     "You are Claude, an encouraging habit coach that can also add calendar events.",
     "Decide whether the user wants to schedule a calendar event or create a habit.",
     "If it's a habit or routine request, respond ONLY with { action: 'habit' }.",
-    "If it's a calendar event and the user provided a clear title AND an explicit start time, respond ONLY with JSON: { action: 'create-event', title, day (YYYY-MM-DD), starttime (HH:mm, 24h), endtime (HH:mm|null), repeat ('once'|'daily'|'weekly'|'custom'), notes (string|null), userReply (short confirmation sentence) }.",
-    "Convert relative dates to YYYY-MM-DD. Never make up times; if any timing or title detail is missing or ambiguous, respond with { action: 'clarify-event', question: 'follow-up to ask for missing details' }.",
+    "If it's a calendar event and the user provided a clear title AND an explicit start time, respond ONLY with JSON: { action: 'create-event', title, day (YYYY-MM-DD), starttime (HH:mm, 24h), endtime (HH:mm|null), enddate (YYYY-MM-DD|null, required when repeat is not 'once'), repeat ('once'|'daily'|'weekly'|'custom'), customdays (comma-separated weekdays when repeat='custom' or to pin specific weekdays), notes (string|null), userReply (short confirmation sentence) }.",
+    "Convert relative dates to YYYY-MM-DD. Support recurring ranges like 'every Monday in October' by filling repeat, customdays, and enddate. Never make up times; if any timing or title detail is missing or ambiguous, respond with { action: 'clarify-event', question: 'follow-up to ask for missing details' }.",
     "Keep the reply strictly JSON with no markdown. Use recent conversation context when helpful.",
     `Interpret all relative dates and times using this reference: today is ${currentDate} and the current time is ${currentTime || 'unknown'} in the ${timezone} timezone.`,
     `User context: ${JSON.stringify(userContext || {})}`,
@@ -643,6 +748,7 @@ const requestClaudeScheduleDecision = async ({ message, userContext, history }) 
     [
       "Based on the last few messages, decide if this is an event to schedule or a habit idea.",
       "If you can't find a concrete start time and title for an event, ask a clarifying question instead of creating one.",
+      "When the user asks for repeating events or a date range, include the recurrence details instead of assuming a single day.",
       `Reference date: ${currentDate} (${timezone})${currentTime ? ` at ${currentTime}` : ""}.`,
       `User message: ${message}`,
     ].join("\n")
@@ -697,6 +803,13 @@ export const generateHabitCreatedReply = async ({ habit, context }) => {
 const generateScheduleCreatedReply = async ({ schedule, context }) => {
   const { dbOverview, userContext, history } = context || {};
 
+  const normalizedSchedule = Array.isArray(schedule)
+    ? {
+        ...(schedule[0] || {}),
+        occurrences: schedule.length,
+      }
+    : schedule;
+
   const systemInstruction = [
     "You are a warm, conversational AI assistant for the StepHabit platform.",
     "A calendar event was just saved. Confirm the details briefly and ask if the user wants tweaks.",
@@ -707,7 +820,7 @@ const generateScheduleCreatedReply = async ({ schedule, context }) => {
 
   const conversation = buildConversationMessages(history);
   const prompt = new HumanMessage(
-    `Confirm the event creation in a friendly sentence and offer help adjusting it: ${JSON.stringify(schedule)}`
+    `Confirm the event creation in a friendly sentence and offer help adjusting it: ${JSON.stringify(normalizedSchedule)}`
   );
 
   return (
@@ -718,7 +831,7 @@ const generateScheduleCreatedReply = async ({ schedule, context }) => {
 
 const generateScheduleConflictReply = async ({ scheduleDecision, conflictInfo, context }) => {
   const { dbOverview, userContext, history } = context || {};
-  const { conflict, alternativeStart, duration } = conflictInfo || {};
+  const { conflict, alternativeStart, duration, conflictDay, occurrences } = conflictInfo || {};
 
   const systemInstruction = [
     "You are a warm, conversational AI assistant for the StepHabit platform.",
@@ -738,14 +851,22 @@ const generateScheduleConflictReply = async ({ scheduleDecision, conflictInfo, c
 
   const promptLines = [
     "Tell the user their requested time clashes with an existing item and suggest a better slot.",
-    `Requested: ${scheduleDecision?.title || "Event"} on ${scheduleDecision?.day || "unknown day"} from ${
-      proposedStart || "unknown"
-    }${proposedEnd ? ` to ${proposedEnd}` : ""}.`,
+    `Requested: ${scheduleDecision?.title || "Event"} on ${
+      conflictDay || scheduleDecision?.day || "unknown day"
+    } from ${proposedStart || "unknown"}${proposedEnd ? ` to ${proposedEnd}` : ""}.`,
   ];
 
   if (conflict) {
     promptLines.push(
       `Conflict: ${conflict.title || "Busy"} from ${conflictStart || "unknown"} to ${conflictEnd || "unknown"} (${conflict.type}).`
+    );
+  }
+
+  if (occurrences?.length > 1) {
+    promptLines.push(
+      `Let them know the event was planned to repeat ${occurrences.length} times and this clash happens on ${
+        conflictDay || "one of those days"
+      }.`
     );
   }
 
@@ -869,19 +990,26 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
       });
     } else {
       try {
-        const created = await BusySchedule.create({
+        const occurrenceDays =
+          scheduleConflict?.occurrences?.length
+            ? scheduleConflict.occurrences
+            : buildRecurrenceDays(scheduleDecision);
+
+        const payloads = (occurrenceDays.length ? occurrenceDays : [scheduleDecision.day]).map((day) => ({
           user_id: userId,
           title: scheduleDecision.title,
-          day: scheduleDecision.day,
+          day,
           starttime: scheduleDecision.starttime,
           endtime: scheduleDecision.endtime || null,
-          enddate: null,
+          enddate: scheduleDecision.enddate || scheduleDecision.day,
           repeat: scheduleDecision.repeat || "once",
           customdays: scheduleDecision.repeat === "custom" ? scheduleDecision.customdays || null : null,
           notes: scheduleDecision.notes || null,
-        });
+        }));
 
-        createdSchedule = created.get({ plain: true });
+        const created = await BusySchedule.bulkCreate(payloads, { returning: true });
+
+        createdSchedule = created.map((entry) => entry.get({ plain: true }));
         finalIntent = "create-schedule";
         replyFromClaude =
           scheduleDecision.userReply ||
