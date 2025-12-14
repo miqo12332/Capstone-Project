@@ -9,7 +9,7 @@ import { parseIcsFeed } from "../utils/calendarParser.js";
 
 const router = express.Router();
 
-const buildOverview = async (userId, rangeDays = 30) => {
+export const buildOverview = async (userId, rangeDays = 30) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const parsedRange = Number.parseInt(rangeDays, 10);

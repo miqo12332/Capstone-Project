@@ -266,7 +266,11 @@ const MySchedule = () => {
           await loadSchedules()
         }
 
-        await loadCalendarEvents()
+        if (Array.isArray(data?.calendar?.events)) {
+          setCalendarEvents(data.calendar.events)
+        } else {
+          await loadCalendarEvents()
+        }
         emitDataRefresh(REFRESH_SCOPES.SCHEDULES, { reason: "schedule-agent-added" })
         setAgentForm((prev) => ({ ...prev, title: "", notes: "" }))
       }

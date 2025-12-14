@@ -3,6 +3,7 @@ import express from "express";
 import BusySchedule from "../models/BusySchedule.js";
 import Habit from "../models/Habit.js";
 import Schedule from "../models/Schedule.js";
+import { buildOverview } from "./calendarRoutes.js";
 
 const router = express.Router();
 
@@ -15,6 +16,15 @@ const clarificationPrompts = {
   date: "Which date should I book it for (YYYY-MM-DD)?",
   startTime: "What time does it start (HH:mm)?",
   endTime: "When does it end (HH:mm)?",
+};
+
+const sortSchedules = (entries) => {
+  return [...entries].sort((a, b) => {
+    const dayA = new Date(a.day).getTime();
+    const dayB = new Date(b.day).getTime();
+    if (dayA !== dayB) return dayA - dayB;
+    return (a.starttime || "").localeCompare(b.starttime || "");
+  });
 };
 
 const toMinutes = (value) => {
@@ -58,7 +68,7 @@ const buildScheduleList = async (userId) => {
     custom_title: busy.title,
   }));
 
-  return [...normalizedHabitSchedules, ...normalizedBusySchedules];
+  return sortSchedules([...normalizedHabitSchedules, ...normalizedBusySchedules]);
 };
 
 const detectOverlaps = (entries, date, startTime, endTime) => {
@@ -148,6 +158,13 @@ router.post("/", async (req, res) => {
       `Timezone: ${TIMEZONE}`,
     ].join("\n");
 
+    const updatedSchedules = sortSchedules([
+      ...schedules,
+      { ...created.toJSON(), type: "custom", custom_title: created.title },
+    ]);
+
+    const calendarOverview = await buildOverview(userId, 60);
+
     return res.status(201).json({
       status: "created",
       message,
@@ -160,7 +177,12 @@ router.post("/", async (req, res) => {
         timezone: TIMEZONE,
       },
       overlaps,
-      schedules: [...schedules, { ...created.toJSON(), type: "custom", custom_title: created.title }],
+      schedules: updatedSchedules,
+      calendar: {
+        events: calendarOverview?.events || [],
+        groupedByDate: calendarOverview?.groupedByDate || {},
+        summary: calendarOverview?.summary || {},
+      },
     });
   } catch (error) {
     console.error("❌ schedule agent failed", error);
