@@ -171,11 +171,16 @@ const UserProfile = () => {
             settings.pushReminders ?? settings.pushNotifications ?? settings.push_reminders ?? false,
           ),
         })
-        setConnectedApps({
-          googleCalendar: Boolean(settings.googleCalendar ?? settings.google_calendar ?? false),
-          appleCalendar: Boolean(settings.appleCalendar ?? settings.apple_calendar ?? false),
-          fitnessSync: Boolean(settings.fitnessSync ?? settings.fitness_sync ?? false),
-        })
+        setConnectedApps((prev) => ({
+          googleCalendar:
+            Boolean(settings.googleCalendar ?? settings.google_calendar ?? false) ||
+            prev.googleCalendar,
+          appleCalendar:
+            Boolean(settings.appleCalendar ?? settings.apple_calendar ?? false) ||
+            prev.appleCalendar,
+          fitnessSync:
+            Boolean(settings.fitnessSync ?? settings.fitness_sync ?? false) || prev.fitnessSync,
+        }))
         setAvatarUrl(payload.avatar ? `${ASSET_BASE}${payload.avatar}` : "/uploads/default-avatar.png")
         setError("")
         if (typeof loginRef.current === "function") {
