@@ -394,6 +394,11 @@ const parseScheduleJson = (raw) => {
       return { action: "habit" };
     }
 
+    if (parsed.action === "clarify-event") {
+      const question = parsed.question?.trim();
+      return question ? { action: "clarify-event", question } : null;
+    }
+
     if (parsed.action !== "create-event") return null;
 
     const title = parsed.title?.trim();
@@ -424,8 +429,9 @@ const requestClaudeScheduleDecision = async ({ message, userContext }) => {
     "You are Claude, an encouraging habit coach that can also add calendar events.",
     "Decide if the user's message is asking to add a one-time or repeating event (like meetings, appointments, classes).",
     "If it sounds like a habit or routine to build, respond with { action: 'habit' }.",
-    "If it's an event to schedule, respond ONLY with JSON: { action: 'create-event', title, day (YYYY-MM-DD), starttime (HH:mm), endtime (HH:mm|null), repeat ('once'|'daily'|'weekly'|'custom'), notes (string|null), userReply (short confirmation sentence) }.",
-    "Pick the soonest reasonable future date if none is provided and avoid markdown.",
+    "If it's an event to schedule and the user provided a clear title AND a specific start time, respond ONLY with JSON: { action: 'create-event', title, day (YYYY-MM-DD), starttime (HH:mm), endtime (HH:mm|null), repeat ('once'|'daily'|'weekly'|'custom'), notes (string|null), userReply (short confirmation sentence) }.",
+    "If the time or title is missing/uncertain, do NOT invent defaults. Instead, respond with { action: 'clarify-event', question: 'follow-up to ask for missing details' }.",
+    "You may infer the date (e.g., 'today' or 'tomorrow'), but never fabricate a time—always ask when in doubt.",
     `User context: ${JSON.stringify(userContext || {})}`,
   ].join("\n");
 
@@ -541,6 +547,18 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
   let loggedProgress = null;
   let createdSchedule = null;
   let finalIntent = habitAnalysis.intent;
+  let scheduleClarification = null;
+
+  if (scheduleDecision?.action === "habit" && finalIntent === "chat") {
+    finalIntent = "suggest";
+  }
+
+  if (scheduleDecision?.action === "clarify-event") {
+    scheduleClarification = scheduleDecision.question;
+    if (finalIntent === "chat") {
+      finalIntent = "clarify-schedule";
+    }
+  }
 
   if (scheduleDecision?.action === "habit" && finalIntent === "chat") {
     finalIntent = "suggest";
@@ -568,6 +586,10 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     } catch (error) {
       console.error("Failed to save progress from Claude decision", error?.message || error);
     }
+  }
+
+  if (scheduleClarification && !replyFromClaude && !loggedProgress) {
+    replyFromClaude = scheduleClarification;
   }
 
   if (progressDecision && !replyFromClaude) {
