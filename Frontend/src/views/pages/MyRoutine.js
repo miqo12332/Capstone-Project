@@ -84,16 +84,19 @@ const MyRoutine = ({ onSyncClick }) => {
 
   const calendarEvents = useMemo(
     () =>
-      (calendarOverview?.events || []).map((event) => ({
-        id: `calendar-${event.id}`,
-        type: "calendar",
-        title: event.title,
-        start: event.start_time ? new Date(event.start_time) : null,
-        end: event.end_time ? new Date(event.end_time) : null,
-        allDay: Boolean(event.all_day),
-        location: event.location,
-        provider: event.source,
-      })),
+      (calendarOverview?.events || [])
+        .filter((event) => event.type !== "busy")
+        .map((event) => ({
+          id: `calendar-${event.id}`,
+          type: "calendar",
+          title: event.title,
+          start: event.start_time ? new Date(event.start_time) : null,
+          end: event.end_time ? new Date(event.end_time) : null,
+          allDay: Boolean(event.all_day),
+          location: event.location,
+          provider: event.source,
+          notes: event.notes,
+        })),
     [calendarOverview]
   );
 
