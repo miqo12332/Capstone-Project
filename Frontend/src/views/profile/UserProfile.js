@@ -533,52 +533,41 @@ const UserProfile = () => {
           <CListGroupItem className="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
               <div className="fw-semibold">Google Calendar</div>
-              <small className="text-body-secondary">Block time for routines alongside events.</small>
+              <small className="text-body-secondary">
+                Status is checked automatically based on your account connection.
+              </small>
             </div>
             <div className="d-flex align-items-center gap-2">
               <CBadge color={connectedApps.googleCalendar ? "success" : "secondary"}>
                 {connectedApps.googleCalendar ? "Connected" : "Not connected"}
               </CBadge>
-              <CFormSwitch
-                checked={connectedApps.googleCalendar}
-                onChange={(event) =>
-                  setConnectedApps((prev) => ({ ...prev, googleCalendar: event.target.checked }))
-                }
-              />
+              <CBadge color="info" className="text-uppercase">Auto</CBadge>
             </div>
           </CListGroupItem>
           <CListGroupItem className="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
               <div className="fw-semibold">Apple Calendar</div>
-              <small className="text-body-secondary">See habits next to your schedule.</small>
+              <small className="text-body-secondary">Future improvement to see habits next to your schedule.</small>
             </div>
             <div className="d-flex align-items-center gap-2">
               <CBadge color={connectedApps.appleCalendar ? "success" : "secondary"}>
                 {connectedApps.appleCalendar ? "Connected" : "Not connected"}
               </CBadge>
-              <CFormSwitch
-                checked={connectedApps.appleCalendar}
-                onChange={(event) =>
-                  setConnectedApps((prev) => ({ ...prev, appleCalendar: event.target.checked }))
-                }
-              />
+              <CBadge color="warning" className="text-uppercase">Coming soon</CBadge>
             </div>
           </CListGroupItem>
           <CListGroupItem className="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
               <div className="fw-semibold">Fitness Sync</div>
-              <small className="text-body-secondary">Import steps and workouts to fuel streaks.</small>
+              <small className="text-body-secondary">
+                Future improvement to import steps and workouts to fuel streaks.
+              </small>
             </div>
             <div className="d-flex align-items-center gap-2">
               <CBadge color={connectedApps.fitnessSync ? "success" : "secondary"}>
                 {connectedApps.fitnessSync ? "Connected" : "Not connected"}
               </CBadge>
-              <CFormSwitch
-                checked={connectedApps.fitnessSync}
-                onChange={(event) =>
-                  setConnectedApps((prev) => ({ ...prev, fitnessSync: event.target.checked }))
-                }
-              />
+              <CBadge color="warning" className="text-uppercase">Coming soon</CBadge>
             </div>
           </CListGroupItem>
         </CListGroup>
