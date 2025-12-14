@@ -25,17 +25,26 @@ const parseTime = (timeString) => {
 const getLocalTimeInfo = (timezone) => {
   const now = new Date()
   const safeZone = timezone || "UTC"
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: safeZone,
-    hour12: false,
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-  const parts = formatter.formatToParts(now)
-  const hour = Number(parts.find((part) => part.type === "hour")?.value || "0")
-  const minute = Number(parts.find((part) => part.type === "minute")?.value || "0")
-  const dateKey = new Intl.DateTimeFormat("en-CA", { timeZone: safeZone }).format(now)
-  return { hour, minute, dateKey }
+
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: safeZone,
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+    const parts = formatter.formatToParts(now)
+    const hour = Number(parts.find((part) => part.type === "hour")?.value || "0")
+    const minute = Number(parts.find((part) => part.type === "minute")?.value || "0")
+    const dateKey = new Intl.DateTimeFormat("en-CA", { timeZone: safeZone }).format(now)
+    return { hour, minute, dateKey }
+  } catch {
+    // Invalid or unsupported time zone; fall back to UTC so reminders still send
+    const utcHour = now.getUTCHours()
+    const utcMinute = now.getUTCMinutes()
+    const utcDateKey = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(now)
+    return { hour: utcHour, minute: utcMinute, dateKey: utcDateKey }
+  }
 }
 
 const shouldSendReminderNow = (settings) => {

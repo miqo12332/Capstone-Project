@@ -89,12 +89,6 @@ const startServer = async () => {
 
     const hasTable = (name) => tableNames.includes(name);
 
-    // 🔥 CRITICAL FIX: drop legacy user_settings table
-    if (hasTable("user_settings")) {
-      await queryInterface.dropTable("user_settings");
-      console.log("🧹 Dropped legacy user_settings table");
-    }
-
     // ---- Generic orphan cleanup helper ----
     const cleanupOrphans = async (table, fkColumn, parentTable, parentColumn) => {
       if (!hasTable(table) || !hasTable(parentTable)) return;
