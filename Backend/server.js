@@ -25,6 +25,7 @@ import assistantRoutes from "./routes/assistantRoutes.js";
 import calendarRoutes from "./routes/calendarRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import aiRoutes from "./routes/ai.js";
+import { startEmailScheduler } from "./services/emailScheduler.js";
 
 // === Node path handling for ES modules ===
 import path from "path";
@@ -88,12 +89,6 @@ const startServer = async () => {
 
     const hasTable = (name) => tableNames.includes(name);
 
-    // 🔥 CRITICAL FIX: drop legacy user_settings table
-    if (hasTable("user_settings")) {
-      await queryInterface.dropTable("user_settings");
-      console.log("🧹 Dropped legacy user_settings table");
-    }
-
     // ---- Generic orphan cleanup helper ----
     const cleanupOrphans = async (table, fkColumn, parentTable, parentColumn) => {
       if (!hasTable(table) || !hasTable(parentTable)) return;
@@ -129,6 +124,8 @@ const startServer = async () => {
 
     // ---- FINAL SAFE SYNC ----
     await sequelize.sync({ alter: true });
+
+    startEmailScheduler();
 
     app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
