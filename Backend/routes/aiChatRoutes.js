@@ -62,6 +62,10 @@ router.post("/message", async (req, res) => {
       ? { dbOverview: context.dbOverview.map((t) => t.name) }
       : null;
 
+    if (context?.routerCommand) {
+      metadata = { ...(metadata || {}), routerCommand: context.routerCommand };
+    }
+
     if (intent === "confirm-add") {
       const suggestion = habitSuggestion || findPendingHabitSuggestion(history);
       if (!suggestion) {

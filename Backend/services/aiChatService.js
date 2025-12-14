@@ -4,6 +4,7 @@ import { QueryTypes } from "sequelize";
 
 import sequelize from "../sequelize.js";
 import { buildHabitSuggestion, detectConfirmation, detectHabitIdea } from "../utils/habitNlp.js";
+import HABIT_COACH_ROUTER_PROMPT from "../prompts/habitCoachRouterPrompt.js";
 import {
   Achievement,
   CalendarEvent,
@@ -231,6 +232,36 @@ const buildChatMessages = ({ systemInstruction, history, message }) => {
   return [new SystemMessage(systemInstruction), ...conversation];
 };
 
+const buildDomainStateSnapshot = (userContext = {}) => {
+  const habits = (userContext.habits || []).map((habit) => ({
+    id: habit.id,
+    name: habit.title,
+    frequency: habit.isDailyGoal || habit.is_daily_goal ? "daily" : null,
+    scheduleInfo: (habit.schedules || [])
+      .map((s) => `${s.day} ${s.starttime || ""}${s.endtime ? `-${s.endtime}` : ""}`.trim())
+      .filter(Boolean)
+      .join(", ")
+      .trim(),
+    isActive: true,
+  }));
+
+  const events = (userContext.calendarEvents || []).map((event) => ({
+    id: event.id,
+    title: event.title,
+    startISO: event.start,
+    endISO: event.end,
+  }));
+
+  const tasks = (userContext.tasks || []).map((task) => ({
+    id: task.id,
+    title: task.title,
+    dueISO: task.dueDate || null,
+    status: task.status || null,
+  }));
+
+  return { habits, events, tasks, scheduleBusyWindows: [] };
+};
+
 const buildConversationMessages = (history) =>
   (history || [])
     .filter((entry) => ["user", "assistant"].includes(entry.role))
@@ -339,6 +370,77 @@ const callClaude = async (messages) => {
   return null;
 };
 
+const parseRouterCommand = (raw) => {
+  if (!raw) return null;
+
+  try {
+    const cleaned = raw.trim().replace(/```(json)?/g, "");
+    const jsonStart = cleaned.indexOf("{");
+    const jsonEnd = cleaned.lastIndexOf("}");
+    const target = jsonStart >= 0 && jsonEnd >= 0 ? cleaned.slice(jsonStart, jsonEnd + 1) : cleaned;
+    const parsed = JSON.parse(target);
+
+    if (!parsed.intent || !parsed.domain) return null;
+    return parsed;
+  } catch (error) {
+    console.error("Failed to parse router command", error?.message || error);
+    return null;
+  }
+};
+
+const runHabitCoachRouter = async ({ message, userContext, dbOverview }) => {
+  if (!message) return null;
+
+  const domainState = buildDomainStateSnapshot(userContext);
+  const nowISO = new Date().toISOString();
+
+  const payload = {
+    currentMenu: "HABITS",
+    userMessage: message,
+    timezone: "Asia/Yerevan",
+    nowISO,
+    domainState,
+    recentContext: {
+      lastCreatedHabitId: userContext?.habits?.[userContext.habits.length - 1]?.id || null,
+      lastCreatedEventId: userContext?.calendarEvents?.[userContext.calendarEvents.length - 1]?.id || null,
+      lastCreatedTaskId: userContext?.tasks?.[userContext.tasks.length - 1]?.id || null,
+    },
+    dbOverview,
+  };
+
+  const messages = [
+    new SystemMessage(HABIT_COACH_ROUTER_PROMPT),
+    new HumanMessage(
+      [
+        "Route this HabitCoach request using the required JSON format.",
+        "If information is missing, set needs_clarification=true and provide the minimal question.",
+        JSON.stringify(payload, null, 2),
+      ].join("\n\n")
+    ),
+  ];
+
+  const reply = await callClaude(messages);
+  return parseRouterCommand(reply);
+};
+
+const buildHabitListReply = (habits = []) => {
+  if (!habits.length) return "I don't see any saved habits yet. Want me to add one?";
+
+  const topHabits = habits.slice(0, 5);
+  const lines = topHabits.map((habit) => {
+    const schedule = (habit.schedules || [])
+      .map((s) => `${s.day}${s.starttime ? ` at ${s.starttime}` : ""}`)
+      .join(", ");
+    return schedule ? `${habit.title} (${schedule})` : habit.title;
+  });
+
+  if (habits.length > topHabits.length) {
+    lines.push(`…and ${habits.length - topHabits.length} more.`);
+  }
+
+  return `Here's what I'm tracking: ${lines.join("; ")}`;
+};
+
 const parseHabitJson = (raw) => {
   if (!raw) return null;
 
@@ -430,6 +532,8 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
       : getChatHistory(userId, MESSAGE_HISTORY_LIMIT),
   ]);
 
+  const routerCommand = await runHabitCoachRouter({ message, userContext, dbOverview });
+
   const habitAnalysis = analyzeHabitIntent(message, history);
 
   const progressDecision = await requestClaudeProgressDecision({
@@ -450,7 +554,27 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
   let habitSuggestion = habitAnalysis.habitSuggestion;
   let replyFromClaude = progressDecision?.userReply || null;
   let loggedProgress = null;
-  let finalIntent = habitAnalysis.intent;
+  let finalIntent = routerCommand?.intent || habitAnalysis.intent;
+
+  if (routerCommand?.needs_clarification && routerCommand?.question) {
+    return {
+      reply: routerCommand.question,
+      intent: "clarification",
+      habitSuggestion: null,
+      loggedProgress: null,
+      context: { dbOverview, userContext, history, routerCommand },
+    };
+  }
+
+  if (routerCommand?.domain === "HABITS" && routerCommand.intent === "LIST_HABITS") {
+    return {
+      reply: buildHabitListReply(userContext?.habits || []),
+      intent: "list-habits",
+      habitSuggestion: null,
+      loggedProgress: null,
+      context: { dbOverview, userContext, history, routerCommand },
+    };
+  }
 
   if (progressDecision) {
     try {
@@ -514,6 +638,6 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     intent: finalIntent,
     habitSuggestion,
     loggedProgress,
-    context: { dbOverview, userContext, history },
+    context: { dbOverview, userContext, history, routerCommand },
   };
 };
