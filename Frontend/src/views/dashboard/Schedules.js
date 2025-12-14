@@ -20,13 +20,50 @@ import {
   CFormText,
   CFormTextarea,
   CBadge,
+  CFormCheck,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
-import { cilClock, cilCalendar, cilLoopCircular, cilPlus, cilNotes } from "@coreui/icons"
+import { cilClock, cilCalendar, cilPlus, cilNotes } from "@coreui/icons"
 import { emitDataRefresh, REFRESH_SCOPES, useDataRefresh } from "../../utils/refreshBus"
 import { API_BASE } from "../../utils/apiConfig"
 import { fetchCalendarOverview, syncCalendar } from "../../services/calendar"
 import "./Schedules.css"
+
+const DAYS_OF_WEEK = [
+  { value: "sun", label: "Sun" },
+  { value: "mon", label: "Mon" },
+  { value: "tue", label: "Tue" },
+  { value: "wed", label: "Wed" },
+  { value: "thu", label: "Thu" },
+  { value: "fri", label: "Fri" },
+  { value: "sat", label: "Sat" },
+]
+
+const formatCustomDays = (days) => {
+  if (!days) return ""
+  if (typeof days === "string") return days
+  if (!Array.isArray(days)) return ""
+
+  return days
+    .map((day) => DAYS_OF_WEEK.find((d) => d.value === day)?.label || day)
+    .join(", ")
+}
+
+const getRepeatDisplay = (repeatValue, customdays) => {
+  const repeatLabels = {
+    daily: "Daily",
+    weekly: "Weekly",
+    every3days: "Every 3 Days",
+    custom: "Custom",
+  }
+
+  if (repeatValue === "custom") {
+    const label = formatCustomDays(customdays)
+    return label ? `Custom · ${label}` : "Custom"
+  }
+
+  return repeatLabels[repeatValue] || "One-time"
+}
 
 const MySchedule = () => {
   const user = JSON.parse(localStorage.getItem("user"))
@@ -70,7 +107,7 @@ const MySchedule = () => {
     endtime: "",
     enddate: "",
     repeat: "daily",
-    customdays: "",
+    customdays: [],
     notes: "",
   })
 
@@ -141,6 +178,18 @@ const MySchedule = () => {
       if (!newSchedule.day || !newSchedule.starttime)
         return setError("Please fill required fields (day and start time)")
 
+      const endDateValue = newSchedule.enddate || newSchedule.day
+      const startDateObj = newSchedule.day ? new Date(`${newSchedule.day}T00:00:00`) : null
+      const endDateObj = endDateValue ? new Date(`${endDateValue}T00:00:00`) : null
+
+      if (startDateObj && endDateObj && endDateObj < startDateObj) {
+        return setError("End date cannot be before the start date")
+      }
+
+      if (newSchedule.repeat === "custom" && (!newSchedule.customdays || newSchedule.customdays.length === 0)) {
+        return setError("Please pick at least one day for a custom pattern")
+      }
+
       if (
         newSchedule.type === "custom" &&
         (!newSchedule.custom_title || !newSchedule.custom_title.trim())
@@ -164,7 +213,10 @@ const MySchedule = () => {
         endtime: newSchedule.endtime || null,
         enddate: newSchedule.enddate || null,
         repeat: newSchedule.repeat,
-        customdays: newSchedule.repeat === "custom" ? newSchedule.customdays || null : null,
+        customdays:
+          newSchedule.repeat === "custom" && Array.isArray(newSchedule.customdays)
+            ? newSchedule.customdays
+            : null,
         notes: newSchedule.notes || null,
       }
 
@@ -187,7 +239,7 @@ const MySchedule = () => {
         endtime: "",
         enddate: "",
         repeat: "daily",
-        customdays: "",
+        customdays: [],
         notes: "",
       })
     } catch (err) {
@@ -272,11 +324,6 @@ const MySchedule = () => {
     { value: "every3days", label: "Every 3 Days" },
     { value: "custom", label: "Custom" },
   ]
-
-  const repeatLabels = repeatOptions.reduce(
-    (acc, option) => ({ ...acc, [option.value]: option.label }),
-    {}
-  )
 
   const selectedHabit =
     newSchedule.type === "habit" && newSchedule.habit_id
@@ -466,30 +513,44 @@ const MySchedule = () => {
                 <CFormLabel className="text-uppercase text-muted fw-semibold small">
                   Repeat pattern
                 </CFormLabel>
-                <CInputGroup>
-                  <CInputGroupText>
-                    <CIcon icon={cilLoopCircular} />
-                  </CInputGroupText>
-                  <CFormSelect
-                    value={newSchedule.repeat}
-                    onChange={(e) => setNewSchedule({ ...newSchedule, repeat: e.target.value })}
-                  >
-                    {repeatOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </CFormSelect>
-                </CInputGroup>
+                <CButtonGroup className="w-100">
+                  {repeatOptions.map((option) => (
+                    <CButton
+                      key={option.value}
+                      color={newSchedule.repeat === option.value ? "primary" : "outline-primary"}
+                      onClick={() =>
+                        setNewSchedule({
+                          ...newSchedule,
+                          repeat: option.value,
+                        })
+                      }
+                    >
+                      {option.label}
+                    </CButton>
+                  ))}
+                </CButtonGroup>
                 {newSchedule.repeat === "custom" && (
-                  <CFormInput
-                    className="mt-2"
-                    placeholder="e.g. Mon, Wed, Fri"
-                    value={newSchedule.customdays}
-                    onChange={(e) =>
-                      setNewSchedule({ ...newSchedule, customdays: e.target.value })
-                    }
-                  />
+                  <div className="mt-2">
+                    <div className="d-flex flex-wrap gap-2">
+                      {DAYS_OF_WEEK.map((day) => (
+                        <CFormCheck
+                          key={day.value}
+                          id={`custom-day-${day.value}`}
+                          type="checkbox"
+                          label={day.label}
+                          checked={newSchedule.customdays.includes(day.value)}
+                          onChange={(e) => {
+                            const checked = e.target.checked
+                            const nextDays = checked
+                              ? [...new Set([...newSchedule.customdays, day.value])]
+                              : newSchedule.customdays.filter((d) => d !== day.value)
+                            setNewSchedule({ ...newSchedule, customdays: nextDays })
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <CFormText>Select which weekdays this schedule should repeat on.</CFormText>
+                  </div>
                 )}
               </div>
 
@@ -520,7 +581,7 @@ const MySchedule = () => {
                 <div className="d-flex justify-content-between align-items-center mb-2">
                   <span className="fw-semibold">Preview</span>
                   <CBadge color="info" shape="rounded-pill">
-                    {repeatLabels[newSchedule.repeat] || "One-time"}
+                    {getRepeatDisplay(newSchedule.repeat, newSchedule.customdays)}
                   </CBadge>
                 </div>
                 <div className="text-muted small">
@@ -626,7 +687,7 @@ const MySchedule = () => {
                       </div>
                       <div className="d-flex align-items-center gap-2">
                         <CBadge color="secondary" shape="rounded-pill">
-                          {repeatLabels[s.repeat] || s.repeat}
+                          {getRepeatDisplay(s.repeat, s.customdays)}
                         </CBadge>
                         <CButton
                           color="danger"
