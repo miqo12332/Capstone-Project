@@ -4,6 +4,7 @@ import CalendarIntegration from "../models/CalendarIntegration.js";
 import CalendarEvent from "../models/CalendarEvent.js";
 import Schedule from "../models/Schedule.js";
 import Habit from "../models/Habit.js";
+import BusySchedule from "../models/BusySchedule.js";
 import { parseIcsFeed } from "../utils/calendarParser.js";
 
 const router = express.Router();
@@ -16,7 +17,7 @@ const buildOverview = async (userId, rangeDays = 30) => {
   const horizon = new Date(today);
   horizon.setDate(horizon.getDate() + windowDays);
 
-  const [integrations, events, schedules] = await Promise.all([
+  const [integrations, events, schedules, busySchedules] = await Promise.all([
     CalendarIntegration.findAll({
       where: { user_id: userId },
       order: [["updated_at", "DESC"]],
@@ -44,6 +45,15 @@ const buildOverview = async (userId, rangeDays = 30) => {
         },
       ],
     }),
+    BusySchedule.findAll({
+      where: {
+        user_id: userId,
+        day: {
+          [Op.between]: [today, horizon],
+        },
+      },
+      order: [["day", "ASC"], ["starttime", "ASC"]],
+    }),
   ]);
 
   const plainIntegrations = integrations.map((integration) =>
@@ -65,13 +75,36 @@ const buildOverview = async (userId, rangeDays = 30) => {
     schedule.get({ plain: true })
   );
 
-  const groupedByDate = plainEvents.reduce((acc, event) => {
+  const plainBusySchedules = busySchedules.map((busy) => busy.get({ plain: true }));
+
+  const busyItems = plainBusySchedules.map((item) => {
+    const startIso = item.day ? `${item.day}T${item.starttime || "00:00"}` : null;
+    const endIso = item.day && item.endtime ? `${item.day}T${item.endtime}` : null;
+    return {
+      ...item,
+      id: item.id,
+      title: item.title,
+      start_time: startIso ? new Date(startIso).toISOString() : null,
+      end_time: endIso ? new Date(endIso).toISOString() : null,
+      all_day: false,
+      source: "My Schedule",
+      type: "busy",
+    };
+  });
+
+  const groupedByDate = [...plainEvents, ...busyItems].reduce((acc, event) => {
     const key = event.start_time ? event.start_time.split("T")[0] : null;
     if (!key) return acc;
     if (!acc[key]) acc[key] = [];
     acc[key].push(event);
     return acc;
   }, {});
+
+  const combinedEvents = [...plainEvents, ...busyItems].sort((a, b) => {
+    const startA = a.start_time ? new Date(a.start_time).getTime() : 0;
+    const startB = b.start_time ? new Date(b.start_time).getTime() : 0;
+    return startA - startB;
+  });
 
   const busyDays = Object.entries(groupedByDate)
     .map(([date, items]) => ({
@@ -86,7 +119,7 @@ const buildOverview = async (userId, rangeDays = 30) => {
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 
-  const totalMinutes = plainEvents.reduce((sum, event) => {
+  const totalMinutes = combinedEvents.reduce((sum, event) => {
     const start = event.start_time ? new Date(event.start_time) : null;
     const end = event.end_time ? new Date(event.end_time) : null;
     if (!start || Number.isNaN(start.getTime())) return sum;
@@ -121,18 +154,19 @@ const buildOverview = async (userId, rangeDays = 30) => {
 
   return {
     integrations: plainIntegrations,
-    events: plainEvents,
+    events: combinedEvents,
     schedules: plainSchedules,
+    busySchedules: busyItems,
     groupedByDate,
     summary: {
-      totalEvents: plainEvents.length,
+      totalEvents: combinedEvents.length,
       integrationCount: plainIntegrations.length,
       providers,
       busyDays,
       hoursScheduled: Math.round((totalMinutes / 60) * 10) / 10,
       lastSync: lastSyncTs ? new Date(lastSyncTs).toISOString() : null,
       nextFreeDay,
-      upcoming: plainEvents.slice(0, 6),
+      upcoming: combinedEvents.slice(0, 6),
     },
   };
 };

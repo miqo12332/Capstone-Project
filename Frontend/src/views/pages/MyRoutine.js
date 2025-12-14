@@ -86,13 +86,14 @@ const MyRoutine = ({ onSyncClick }) => {
     () =>
       (calendarOverview?.events || []).map((event) => ({
         id: `calendar-${event.id}`,
-        type: "calendar",
+        type: event.type === "busy" ? "timeblock" : "calendar",
         title: event.title,
         start: event.start_time ? new Date(event.start_time) : null,
         end: event.end_time ? new Date(event.end_time) : null,
         allDay: Boolean(event.all_day),
         location: event.location,
-        provider: event.source,
+        provider: event.type === "busy" ? "My Schedule" : event.source,
+        notes: event.notes,
       })),
     [calendarOverview]
   );

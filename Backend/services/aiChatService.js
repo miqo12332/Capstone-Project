@@ -1,6 +1,6 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { QueryTypes } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
 
 import sequelize from "../sequelize.js";
 import { buildHabitSuggestion, detectConfirmation, detectHabitIdea } from "../utils/habitNlp.js";
@@ -12,6 +12,7 @@ import {
   Habit,
   Notification,
   Progress,
+  BusySchedule,
   Schedule,
   User,
   UserSetting,
@@ -85,6 +86,7 @@ const loadUserContext = async (userId) => {
       { model: Achievement, as: "achievements" },
       { model: UserSetting, as: "settings" },
       { model: CalendarEvent, as: "calendarEvents" },
+      { model: BusySchedule, as: "busySchedules" },
       {
         model: User,
         as: "friends",
@@ -122,6 +124,13 @@ const loadUserContext = async (userId) => {
       title: event.title,
       start: event.start,
       end: event.end,
+    })),
+    busySchedules: (plain.busySchedules || []).map((entry) => ({
+      id: entry.id,
+      title: entry.title,
+      day: entry.day,
+      starttime: entry.starttime,
+      endtime: entry.endtime,
     })),
     friends: (plain.friends || []).map((friend) => ({
       id: friend.id,
@@ -379,6 +388,270 @@ const requestClaudeHabitSuggestion = async ({ message, userContext }) => {
   return parseHabitJson(reply);
 };
 
+const parseScheduleJson = (raw) => {
+  if (!raw) return null;
+
+  try {
+    const cleaned = raw.trim().replace(/```(json)?/g, "");
+    const jsonStart = cleaned.indexOf("{");
+    const jsonEnd = cleaned.lastIndexOf("}");
+    const target = jsonStart >= 0 && jsonEnd >= 0 ? cleaned.slice(jsonStart, jsonEnd + 1) : cleaned;
+    const parsed = JSON.parse(target);
+
+    if (parsed.action === "habit") {
+      return { action: "habit" };
+    }
+
+    if (parsed.action === "clarify-event") {
+      const question = parsed.question?.trim();
+      return question ? { action: "clarify-event", question } : null;
+    }
+
+    if (parsed.action !== "create-event") return null;
+
+    const title = parsed.title?.trim();
+    const day = parsed.day?.trim();
+    const starttime = parsed.starttime?.trim();
+
+    if (!title || !day || !starttime) return null;
+
+    return {
+      action: "create-event",
+      title,
+      day,
+      starttime,
+      endtime: parsed.endtime?.trim() || null,
+      repeat: parsed.repeat?.trim() || "once",
+      customdays: parsed.customdays?.trim() || null,
+      notes: parsed.notes?.trim() || null,
+      userReply: parsed.userReply?.trim() || null,
+    };
+  } catch (error) {
+    console.error("Failed to parse schedule JSON", error?.message || error);
+    return null;
+  }
+};
+
+const getReferenceDateInfo = (userContext) => {
+  const timezone = userContext?.settings?.timezone || "UTC";
+
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .formatToParts(new Date())
+      .reduce((acc, part) => {
+        if (part.type !== "literal") acc[part.type] = part.value;
+        return acc;
+      }, {});
+
+    const currentDate = `${parts.year}-${parts.month}-${parts.day}`;
+    const currentTime = `${parts.hour}:${parts.minute}`;
+
+    return {
+      timezone,
+      currentDate,
+      currentTime,
+    };
+  } catch (error) {
+    console.error("Failed to derive reference date info", error?.message || error);
+    return {
+      timezone,
+      currentDate: new Date().toISOString().slice(0, 10),
+      currentTime: null,
+    };
+  }
+};
+
+const DEFAULT_EVENT_DURATION_MINUTES = 60;
+
+const parseTimeToMinutes = (timeString) => {
+  if (!timeString || typeof timeString !== "string") return null;
+  const [hoursStr, minutesStr] = timeString.split(":");
+  const hours = Number.parseInt(hoursStr, 10);
+  const minutes = Number.parseInt(minutesStr, 10);
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+  return hours * 60 + minutes;
+};
+
+const minutesToTime = (totalMinutes) => {
+  if (typeof totalMinutes !== "number" || Number.isNaN(totalMinutes)) return null;
+  const safeMinutes = Math.max(0, Math.round(totalMinutes));
+  const hours = Math.floor(safeMinutes / 60) % 24;
+  const minutes = safeMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+};
+
+const normalizeInterval = ({ start, end, day, title, type }) => {
+  if (start == null) return null;
+  const safeEnd = end && end > start ? end : start + DEFAULT_EVENT_DURATION_MINUTES;
+  return {
+    start,
+    end: safeEnd,
+    day,
+    title: title || "Busy", 
+    type: type || "schedule",
+  };
+};
+
+const collectExistingDayBlocks = async ({ userId, day }) => {
+  if (!userId || !day) return [];
+
+  const dayStart = new Date(`${day}T00:00:00Z`);
+  const nextDay = new Date(dayStart);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+
+  const [busySchedules, habitSchedules, calendarEvents] = await Promise.all([
+    BusySchedule.findAll({ where: { user_id: userId, day } }),
+    Schedule.findAll({
+      where: { user_id: userId, day },
+      include: [{ model: Habit, as: "habit", attributes: ["title"] }],
+    }),
+    CalendarEvent.findAll({
+      where: {
+        user_id: userId,
+        start_time: {
+          [Op.between]: [dayStart, nextDay],
+        },
+      },
+    }),
+  ]);
+
+  const intervals = [];
+
+  busySchedules.forEach((entry) => {
+    const startMinutes = parseTimeToMinutes(entry.starttime);
+    const endMinutes = parseTimeToMinutes(entry.endtime);
+    const normalized = normalizeInterval({
+      start: startMinutes,
+      end: endMinutes,
+      day: entry.day,
+      title: entry.title,
+      type: "busy",
+    });
+    if (normalized) intervals.push(normalized);
+  });
+
+  habitSchedules.forEach((entry) => {
+    const startMinutes = parseTimeToMinutes(entry.starttime);
+    const endMinutes = parseTimeToMinutes(entry.endtime);
+    const normalized = normalizeInterval({
+      start: startMinutes,
+      end: endMinutes,
+      day: entry.day,
+      title: entry.habit?.title || "Habit",
+      type: "habit",
+    });
+    if (normalized) intervals.push(normalized);
+  });
+
+  calendarEvents.forEach((event) => {
+    const startDate = event.start_time ? new Date(event.start_time) : null;
+    if (!startDate || Number.isNaN(startDate.getTime())) return;
+    const eventDay = startDate.toISOString().split("T")[0];
+    if (eventDay !== day) return;
+    const startMinutes = startDate.getUTCHours() * 60 + startDate.getUTCMinutes();
+    const endDate = event.end_time ? new Date(event.end_time) : null;
+    const endMinutes = endDate && !Number.isNaN(endDate.getTime())
+      ? endDate.getUTCHours() * 60 + endDate.getUTCMinutes()
+      : null;
+
+    const normalized = normalizeInterval({
+      start: startMinutes,
+      end: endMinutes,
+      day: eventDay,
+      title: event.title,
+      type: "calendar",
+    });
+
+    if (normalized) intervals.push(normalized);
+  });
+
+  return intervals.sort((a, b) => a.start - b.start);
+};
+
+const findNextAvailableSlot = (intervals, requestedStart, durationMinutes) => {
+  const windowStart = Math.max(6 * 60, requestedStart);
+  const windowEnd = 22 * 60;
+  let cursor = windowStart;
+
+  for (const block of intervals) {
+    if (cursor + durationMinutes <= block.start) {
+      return cursor;
+    }
+    cursor = Math.max(cursor, block.end);
+    if (cursor > windowEnd) break;
+  }
+
+  if (cursor + durationMinutes <= windowEnd) {
+    return cursor;
+  }
+
+  return null;
+};
+
+const detectScheduleConflict = async ({ userId, scheduleDecision }) => {
+  const startMinutes = parseTimeToMinutes(scheduleDecision?.starttime);
+  if (!scheduleDecision?.day || startMinutes == null) return null;
+
+  const proposedDuration = (() => {
+    const endMinutes = parseTimeToMinutes(scheduleDecision.endtime);
+    if (endMinutes && endMinutes > startMinutes) return endMinutes - startMinutes;
+    return DEFAULT_EVENT_DURATION_MINUTES;
+  })();
+
+  const proposedEnd = startMinutes + proposedDuration;
+  const existingBlocks = await collectExistingDayBlocks({ userId, day: scheduleDecision.day });
+  const conflict = existingBlocks.find((block) => startMinutes < block.end && block.start < proposedEnd);
+
+  if (!conflict) {
+    return { conflict: null, duration: proposedDuration, alternativeStart: null, existingBlocks };
+  }
+
+  const alternativeStart = findNextAvailableSlot(existingBlocks, proposedEnd, proposedDuration);
+
+  return {
+    conflict,
+    duration: proposedDuration,
+    alternativeStart,
+    existingBlocks,
+  };
+};
+
+const requestClaudeScheduleDecision = async ({ message, userContext, history }) => {
+  const { timezone, currentDate, currentTime } = getReferenceDateInfo(userContext);
+
+  const systemInstruction = [
+    "You are Claude, an encouraging habit coach that can also add calendar events.",
+    "Decide whether the user wants to schedule a calendar event or create a habit.",
+    "If it's a habit or routine request, respond ONLY with { action: 'habit' }.",
+    "If it's a calendar event and the user provided a clear title AND an explicit start time, respond ONLY with JSON: { action: 'create-event', title, day (YYYY-MM-DD), starttime (HH:mm, 24h), endtime (HH:mm|null), repeat ('once'|'daily'|'weekly'|'custom'), notes (string|null), userReply (short confirmation sentence) }.",
+    "Convert relative dates to YYYY-MM-DD. Never make up times; if any timing or title detail is missing or ambiguous, respond with { action: 'clarify-event', question: 'follow-up to ask for missing details' }.",
+    "Keep the reply strictly JSON with no markdown. Use recent conversation context when helpful.",
+    `Interpret all relative dates and times using this reference: today is ${currentDate} and the current time is ${currentTime || 'unknown'} in the ${timezone} timezone.`,
+    `User context: ${JSON.stringify(userContext || {})}`,
+  ].join("\n");
+
+  const prompt = new HumanMessage(
+    [
+      "Based on the last few messages, decide if this is an event to schedule or a habit idea.",
+      "If you can't find a concrete start time and title for an event, ask a clarifying question instead of creating one.",
+      `Reference date: ${currentDate} (${timezone})${currentTime ? ` at ${currentTime}` : ""}.`,
+      `User message: ${message}`,
+    ].join("\n")
+  );
+
+  const reply = await callClaude([new SystemMessage(systemInstruction), ...buildConversationMessages(history), prompt]);
+  return parseScheduleJson(reply);
+};
+
 const generateClaudeSuggestionReply = async ({
   habitSuggestion,
   systemInstruction,
@@ -421,6 +694,77 @@ export const generateHabitCreatedReply = async ({ habit, context }) => {
   );
 };
 
+const generateScheduleCreatedReply = async ({ schedule, context }) => {
+  const { dbOverview, userContext, history } = context || {};
+
+  const systemInstruction = [
+    "You are a warm, conversational AI assistant for the StepHabit platform.",
+    "A calendar event was just saved. Confirm the details briefly and ask if the user wants tweaks.",
+    "Keep replies short and natural.",
+    "Database overview:\n" + formatTableSummary(dbOverview || []),
+    "User context:\n" + JSON.stringify(userContext || {}, null, 2),
+  ].join("\n\n");
+
+  const conversation = buildConversationMessages(history);
+  const prompt = new HumanMessage(
+    `Confirm the event creation in a friendly sentence and offer help adjusting it: ${JSON.stringify(schedule)}`
+  );
+
+  return (
+    (await callClaude([new SystemMessage(systemInstruction), ...conversation, prompt])) ||
+    "Your event was saved. Want to adjust anything?"
+  );
+};
+
+const generateScheduleConflictReply = async ({ scheduleDecision, conflictInfo, context }) => {
+  const { dbOverview, userContext, history } = context || {};
+  const { conflict, alternativeStart, duration } = conflictInfo || {};
+
+  const systemInstruction = [
+    "You are a warm, conversational AI assistant for the StepHabit platform.",
+    "A requested calendar event conflicts with an existing commitment. Explain the conflict briefly and propose a new time.",
+    "Stay concise, friendly, and avoid markdown. Ask the user to confirm the suggested time or offer another.",
+    "Database overview:\n" + formatTableSummary(dbOverview || []),
+    "User context:\n" + JSON.stringify(userContext || {}, null, 2),
+  ].join("\n\n");
+
+  const conflictStart = conflict ? minutesToTime(conflict.start) : null;
+  const conflictEnd = conflict ? minutesToTime(conflict.end) : null;
+  const proposedStart = minutesToTime(parseTimeToMinutes(scheduleDecision?.starttime));
+  const proposedEnd = minutesToTime(
+    parseTimeToMinutes(scheduleDecision?.starttime || "") + (duration || DEFAULT_EVENT_DURATION_MINUTES)
+  );
+  const suggestedSlot = alternativeStart != null ? minutesToTime(alternativeStart) : null;
+
+  const promptLines = [
+    "Tell the user their requested time clashes with an existing item and suggest a better slot.",
+    `Requested: ${scheduleDecision?.title || "Event"} on ${scheduleDecision?.day || "unknown day"} from ${
+      proposedStart || "unknown"
+    }${proposedEnd ? ` to ${proposedEnd}` : ""}.`,
+  ];
+
+  if (conflict) {
+    promptLines.push(
+      `Conflict: ${conflict.title || "Busy"} from ${conflictStart || "unknown"} to ${conflictEnd || "unknown"} (${conflict.type}).`
+    );
+  }
+
+  if (suggestedSlot) {
+    const suggestedEnd = minutesToTime((alternativeStart || 0) + (duration || DEFAULT_EVENT_DURATION_MINUTES));
+    promptLines.push(`Suggest rescheduling to ${suggestedSlot}${suggestedEnd ? `-${suggestedEnd}` : ""} and ask for confirmation.`);
+  } else {
+    promptLines.push("Suggest moving the event to the next available opening later that day and ask them to pick a time.");
+  }
+
+  const conversation = buildConversationMessages(history);
+  const prompt = new HumanMessage(promptLines.join("\n"));
+
+  return (
+    (await callClaude([new SystemMessage(systemInstruction), ...conversation, prompt])) ||
+    "That time is already booked. Want to try a different slot?"
+  );
+};
+
 export const generateAiChatReply = async ({ userId, message, history: providedHistory = null }) => {
   const [dbOverview, userContext, history] = await Promise.all([
     describeTables(),
@@ -438,6 +782,12 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     history,
   });
 
+  const scheduleDecision = await requestClaudeScheduleDecision({
+    message,
+    userContext,
+    history,
+  });
+
   const systemInstruction = [
     "You are a warm, conversational AI assistant for the StepHabit platform.",
     "Respond with short, human-feeling paragraphs (avoid bullet lists unless requested).",
@@ -450,7 +800,21 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
   let habitSuggestion = habitAnalysis.habitSuggestion;
   let replyFromClaude = progressDecision?.userReply || null;
   let loggedProgress = null;
+  let createdSchedule = null;
   let finalIntent = habitAnalysis.intent;
+  let scheduleClarification = null;
+  let scheduleConflict = null;
+
+  if (scheduleDecision?.action === "habit" && finalIntent === "chat") {
+    finalIntent = "suggest";
+  }
+
+  if (scheduleDecision?.action === "clarify-event") {
+    scheduleClarification = scheduleDecision.question;
+    if (finalIntent === "chat") {
+      finalIntent = "clarify-schedule";
+    }
+  }
 
   if (progressDecision) {
     try {
@@ -476,6 +840,10 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     }
   }
 
+  if (scheduleClarification && !replyFromClaude && !loggedProgress) {
+    replyFromClaude = scheduleClarification;
+  }
+
   if (progressDecision && !replyFromClaude) {
     const matchedHabit = (userContext?.habits || []).find((h) => h.id === progressDecision.habitId);
     const recapPrompt = new HumanMessage(
@@ -489,7 +857,42 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     replyFromClaude = await callClaude([new SystemMessage(systemInstruction), ...buildConversationMessages(history), recapPrompt]);
   }
 
-  if (habitAnalysis.intent === "suggest") {
+  if (!loggedProgress && scheduleDecision?.action === "create-event") {
+    scheduleConflict = await detectScheduleConflict({ userId, scheduleDecision });
+
+    if (scheduleConflict?.conflict) {
+      finalIntent = "schedule-conflict";
+      replyFromClaude = await generateScheduleConflictReply({
+        scheduleDecision,
+        conflictInfo: scheduleConflict,
+        context: { dbOverview, userContext, history },
+      });
+    } else {
+      try {
+        const created = await BusySchedule.create({
+          user_id: userId,
+          title: scheduleDecision.title,
+          day: scheduleDecision.day,
+          starttime: scheduleDecision.starttime,
+          endtime: scheduleDecision.endtime || null,
+          enddate: null,
+          repeat: scheduleDecision.repeat || "once",
+          customdays: scheduleDecision.repeat === "custom" ? scheduleDecision.customdays || null : null,
+          notes: scheduleDecision.notes || null,
+        });
+
+        createdSchedule = created.get({ plain: true });
+        finalIntent = "create-schedule";
+        replyFromClaude =
+          scheduleDecision.userReply ||
+          (await generateScheduleCreatedReply({ schedule: createdSchedule, context: { dbOverview, userContext, history } }));
+      } catch (error) {
+        console.error("Failed to save schedule from Claude decision", error?.message || error);
+      }
+    }
+  }
+
+  if (finalIntent === "suggest") {
     habitSuggestion =
       (await requestClaudeHabitSuggestion({ message, userContext })) || buildHabitSuggestion(message);
 
@@ -500,7 +903,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
         history,
       });
     }
-  } else if (habitAnalysis.intent === "chat" && !loggedProgress) {
+  } else if (finalIntent === "chat" && !loggedProgress && !createdSchedule) {
     replyFromClaude = await callClaude(buildChatMessages({ systemInstruction, history, message }));
   }
 
@@ -514,6 +917,8 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     intent: finalIntent,
     habitSuggestion,
     loggedProgress,
+    createdSchedule,
+    scheduleConflict,
     context: { dbOverview, userContext, history },
   };
 };
