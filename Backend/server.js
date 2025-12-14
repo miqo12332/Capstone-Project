@@ -122,6 +122,23 @@ const startServer = async () => {
       }
     }
 
+    if (hasTable("user_settings")) {
+      const settingsDef = await queryInterface.describeTable("user_settings");
+      if (!settingsDef.daily_reminder_time) {
+        await queryInterface.addColumn("user_settings", "daily_reminder_time", {
+          type: DataTypes.STRING(10),
+          allowNull: true,
+        });
+      }
+      if (!settingsDef.timezone) {
+        await queryInterface.addColumn("user_settings", "timezone", {
+          type: DataTypes.STRING(80),
+          allowNull: false,
+          defaultValue: "UTC",
+        });
+      }
+    }
+
     // ---- FINAL SAFE SYNC ----
     await sequelize.sync({ alter: true });
 

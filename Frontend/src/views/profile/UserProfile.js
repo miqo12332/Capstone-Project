@@ -336,8 +336,6 @@ const UserProfile = () => {
         supportStyle: preferences.supportStyle,
         emailAlerts: notificationPrefs.emailAlerts,
         emailNotifications: notificationPrefs.emailAlerts,
-        pushReminders: false,
-        pushNotifications: false,
         googleCalendar: connectedApps.googleCalendar,
         appleCalendar: connectedApps.appleCalendar,
         fitnessSync: connectedApps.fitnessSync,

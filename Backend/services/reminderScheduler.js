@@ -117,6 +117,7 @@ export const startReminderScheduler = () => {
   if (schedulerHandle) return schedulerHandle
 
   schedulerHandle = setInterval(() => {
+    console.log("⏱️ Reminder scheduler tick")
     dispatchDailyReminderEmails().catch((error) =>
       console.error("Reminder scheduler error", error),
     )
