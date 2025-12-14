@@ -13,6 +13,7 @@ import {
   Notification,
   Progress,
   Schedule,
+  BusySchedule,
   User,
   UserSetting,
 } from "../models/index.js";
@@ -36,10 +37,10 @@ const describeTables = async () => {
   const queryInterface = sequelize.getQueryInterface();
   const rawTables = await queryInterface.showAllTables();
   const tableNames = rawTables.map(normalizeTableName);
-
   const definitions = [];
 
-  for (const name of tableNames) {
+  const addTableDefinition = async (name) => {
+    if (!name || definitions.some((entry) => entry.name === name)) return;
     try {
       const columns = await queryInterface.describeTable(name);
       const rows = await sequelize.query(`SELECT COUNT(*) as count FROM ${name};`, {
@@ -58,7 +59,16 @@ const describeTables = async () => {
     } catch (error) {
       console.error("Failed to describe table", name, error);
     }
+  };
+
+  for (const name of tableNames) {
+    await addTableDefinition(name);
   }
+
+  // Ensure scheduling tables are always surfaced to the AI, even if the
+  // database driver omits them from showAllTables in some environments.
+  await addTableDefinition("schedules");
+  await addTableDefinition("busy_schedules");
 
   return definitions;
 };
@@ -85,6 +95,7 @@ const loadUserContext = async (userId) => {
       { model: Achievement, as: "achievements" },
       { model: UserSetting, as: "settings" },
       { model: CalendarEvent, as: "calendarEvents" },
+      { model: BusySchedule, as: "busySchedules" },
       {
         model: User,
         as: "friends",
@@ -122,6 +133,15 @@ const loadUserContext = async (userId) => {
       title: event.title,
       start: event.start,
       end: event.end,
+    })),
+    busySchedules: (plain.busySchedules || []).map((event) => ({
+      id: event.id,
+      title: event.title,
+      day: event.day,
+      starttime: event.starttime,
+      endtime: event.endtime,
+      repeat: event.repeat,
+      customdays: event.customdays,
     })),
     friends: (plain.friends || []).map((friend) => ({
       id: friend.id,
