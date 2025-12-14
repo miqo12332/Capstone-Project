@@ -84,7 +84,6 @@ const UserProfile = () => {
   }))
   const [notificationPrefs, setNotificationPrefs] = useState({
     emailAlerts: true,
-    pushReminders: true,
   })
   const [connectedApps, setConnectedApps] = useState({
     googleCalendar: false,
@@ -166,9 +165,6 @@ const UserProfile = () => {
         setNotificationPrefs({
           emailAlerts: Boolean(
             settings.emailAlerts ?? settings.emailNotifications ?? settings.email_alerts ?? true,
-          ),
-          pushReminders: Boolean(
-            settings.pushReminders ?? settings.pushNotifications ?? settings.push_reminders ?? false,
           ),
         })
         setConnectedApps({
@@ -339,9 +335,9 @@ const UserProfile = () => {
         aiTone: preferences.aiTone,
         supportStyle: preferences.supportStyle,
         emailAlerts: notificationPrefs.emailAlerts,
-        pushReminders: notificationPrefs.pushReminders,
         emailNotifications: notificationPrefs.emailAlerts,
-        pushNotifications: notificationPrefs.pushReminders,
+        pushReminders: false,
+        pushNotifications: false,
         googleCalendar: connectedApps.googleCalendar,
         appleCalendar: connectedApps.appleCalendar,
         fitnessSync: connectedApps.fitnessSync,
@@ -550,13 +546,6 @@ const UserProfile = () => {
             setNotificationPrefs((prev) => ({ ...prev, emailAlerts: event.target.checked }))
           }
           className="mb-3"
-        />
-        <CFormSwitch
-          label="Push reminders for upcoming habits"
-          checked={notificationPrefs.pushReminders}
-          onChange={(event) =>
-            setNotificationPrefs((prev) => ({ ...prev, pushReminders: event.target.checked }))
-          }
         />
       </CCardBody>
     </CCard>

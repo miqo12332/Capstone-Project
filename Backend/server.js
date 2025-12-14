@@ -25,6 +25,7 @@ import assistantRoutes from "./routes/assistantRoutes.js";
 import calendarRoutes from "./routes/calendarRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import aiRoutes from "./routes/ai.js";
+import { startReminderScheduler } from "./services/reminderScheduler.js";
 
 // === Node path handling for ES modules ===
 import path from "path";
@@ -129,6 +130,8 @@ const startServer = async () => {
 
     // ---- FINAL SAFE SYNC ----
     await sequelize.sync({ alter: true });
+
+    startReminderScheduler();
 
     app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
