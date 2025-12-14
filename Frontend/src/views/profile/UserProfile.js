@@ -202,36 +202,55 @@ const UserProfile = () => {
     setColorMode(mapThemeToColorMode(preferences.theme))
   }, [preferences.theme, setColorMode])
 
-  const refreshCalendarConnection = useCallback(async () => {
-    if (!user?.id) return
-    try {
-      const overview = await fetchCalendarOverview(user.id, { days: 7 })
+  const refreshCalendarConnection = useCallback(
+    async (eventDetail = {}) => {
+      if (!user?.id) return
 
-      const integrations =
-        overview?.integrations || overview?.overview?.integrations || overview?.data?.integrations || []
-      const providersMap =
-        overview?.summary?.providers || overview?.overview?.summary?.providers || overview?.data?.providers || {}
-      const hasGoogleIntegration = integrations.some((integration) => {
-        const provider = (integration.provider || integration.type || "").toLowerCase()
-        const label = (integration.label || "").toLowerCase()
-        return provider === "google" || provider.includes("google") || label.includes("google")
-      })
+      const provider = eventDetail?.meta?.provider?.toLowerCase()
+      const providerIsGoogle = provider?.includes("google")
+      const metaConnected = eventDetail?.meta?.connected
 
-      const hasGoogleProviderCount = Boolean(
-        Object.entries(providersMap || {}).some(([key, count]) => {
-          const normalizedKey = key.toLowerCase()
-          return normalizedKey.includes("google") && Number(count || 0) > 0
-        }),
-      )
+      if (providerIsGoogle && typeof metaConnected === "boolean") {
+        setConnectedApps((prev) => ({
+          ...prev,
+          googleCalendar: metaConnected,
+        }))
+      }
 
-      setConnectedApps((prev) => ({
-        ...prev,
-        googleCalendar: hasGoogleIntegration || hasGoogleProviderCount,
-      }))
-    } catch (err) {
-      console.error("Failed to refresh calendar integrations", err)
-    }
-  }, [user?.id])
+      try {
+        const overview = await fetchCalendarOverview(user.id, { days: 7 })
+
+        const integrations =
+          overview?.integrations || overview?.overview?.integrations || overview?.data?.integrations || []
+        const providersMap =
+          overview?.summary?.providers || overview?.overview?.summary?.providers || overview?.data?.providers || {}
+        const hasGoogleIntegration = integrations.some((integration) => {
+          const integrationProvider = (integration.provider || integration.type || "").toLowerCase()
+          const label = (integration.label || "").toLowerCase()
+          return (
+            integrationProvider === "google" ||
+            integrationProvider.includes("google") ||
+            label.includes("google")
+          )
+        })
+
+        const hasGoogleProviderCount = Boolean(
+          Object.entries(providersMap || {}).some(([key, count]) => {
+            const normalizedKey = key.toLowerCase()
+            return normalizedKey.includes("google") && Number(count || 0) > 0
+          }),
+        )
+
+        setConnectedApps((prev) => ({
+          ...prev,
+          googleCalendar: hasGoogleIntegration || hasGoogleProviderCount,
+        }))
+      } catch (err) {
+        console.error("Failed to refresh calendar integrations", err)
+      }
+    },
+    [user?.id],
+  )
 
   useEffect(() => {
     refreshCalendarConnection()
