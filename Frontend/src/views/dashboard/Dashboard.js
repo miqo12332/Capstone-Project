@@ -16,6 +16,7 @@ import {
   CModalBody,
   CModalFooter,
   CModalHeader,
+  CModalTitle,
   CProgress,
   CProgressBar,
   CRow,
