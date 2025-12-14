@@ -25,6 +25,7 @@ import assistantRoutes from "./routes/assistantRoutes.js";
 import calendarRoutes from "./routes/calendarRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import aiRoutes from "./routes/ai.js";
+import agentScheduleRoutes from "./routes/agentScheduleRoutes.js";
 
 // === Node path handling for ES modules ===
 import path from "path";
@@ -67,6 +68,7 @@ app.use("/api/assistant", assistantRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/ai", aiRoutes);
+app.use("/api/agent-schedules", agentScheduleRoutes);
 
 // === Global Error Handler ===
 app.use((err, req, res, next) => {
