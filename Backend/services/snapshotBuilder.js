@@ -1,10 +1,15 @@
 // snapshotBuilder.js
 
-import { Op } from "sequelize";
-import { User, Habit, Progress as Completion, Schedule } from "../models/index.js";
+import { User, Habit, Progress as Completion, Schedule, BusySchedule } from "../models/index.js";
 
 const calculateRate = (done, total) =>
   total > 0 ? Math.round((done / total) * 100) : 0;
+
+const toDateTime = (day, time) => {
+  if (!day || !time) return null;
+  const safeDay = typeof day === "string" ? day : day.toISOString().split("T")[0];
+  return new Date(`${safeDay}T${time}`);
+};
 
 export async function buildSnapshot(userId) {
   if (!userId) throw new Error("userId is required.");
@@ -17,13 +22,13 @@ export async function buildSnapshot(userId) {
   const habits = await Habit.findAll({ where: { user_id: userId }, attributes: ["id", "title"] });
   const completions = await Completion.findAll({ where: { user_id: userId }, attributes: ["habit_id", "status"] });
 
-  const now = new Date();
-  const upcoming = await Schedule.findAll({
-    where: { starttime: { [Op.gte]: now }, user_id: userId },
-    include: [{ model: Habit, as: "habit", attributes: ["title"] }],
-    order: [["starttime", "ASC"]],
-    limit: 5,
-  });
+  const [habitSchedules, busyEvents] = await Promise.all([
+    Schedule.findAll({
+      where: { user_id: userId },
+      include: [{ model: Habit, as: "habit", attributes: ["title"] }],
+    }),
+    BusySchedule.findAll({ where: { user_id: userId } }),
+  ]);
 
   const habitSummaries = habits.map(h => {
     const entries = completions.filter(c => c.habit_id === h.id);
@@ -53,12 +58,30 @@ export async function buildSnapshot(userId) {
       habitSummaries,
     },
     schedules: {
-      upcoming: upcoming.map(s => ({
-        habitTitle: s.habit?.title || "",
-        day: s.day || s.starttime.toISOString().split("T")[0],
-        starttime: s.starttime,
-        endtime: s.endtime,
-      })),
+      upcoming: [
+        ...habitSchedules.map(s => ({
+          type: "habit",
+          habitTitle: s.habit?.title || "",
+          title: s.habit?.title || "",
+          day: s.day,
+          starttime: s.starttime,
+          endtime: s.endtime,
+          startsAt: toDateTime(s.day, s.starttime),
+        })),
+        ...busyEvents.map(event => ({
+          type: "busy",
+          title: event.title,
+          habitTitle: event.title,
+          day: event.day,
+          starttime: event.starttime,
+          endtime: event.endtime,
+          startsAt: toDateTime(event.day, event.starttime),
+        })),
+      ]
+        .filter(item => item.startsAt && item.startsAt >= new Date())
+        .sort((a, b) => a.startsAt - b.startsAt)
+        .slice(0, 5)
+        .map(({ startsAt, ...rest }) => rest),
     },
   };
 }
