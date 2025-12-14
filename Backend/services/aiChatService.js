@@ -424,7 +424,46 @@ const parseScheduleJson = (raw) => {
   }
 };
 
+const getReferenceDateInfo = (userContext) => {
+  const timezone = userContext?.settings?.timezone || "UTC";
+
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .formatToParts(new Date())
+      .reduce((acc, part) => {
+        if (part.type !== "literal") acc[part.type] = part.value;
+        return acc;
+      }, {});
+
+    const currentDate = `${parts.year}-${parts.month}-${parts.day}`;
+    const currentTime = `${parts.hour}:${parts.minute}`;
+
+    return {
+      timezone,
+      currentDate,
+      currentTime,
+    };
+  } catch (error) {
+    console.error("Failed to derive reference date info", error?.message || error);
+    return {
+      timezone,
+      currentDate: new Date().toISOString().slice(0, 10),
+      currentTime: null,
+    };
+  }
+};
+
 const requestClaudeScheduleDecision = async ({ message, userContext, history }) => {
+  const { timezone, currentDate, currentTime } = getReferenceDateInfo(userContext);
+
   const systemInstruction = [
     "You are Claude, an encouraging habit coach that can also add calendar events.",
     "Decide whether the user wants to schedule a calendar event or create a habit.",
@@ -432,6 +471,7 @@ const requestClaudeScheduleDecision = async ({ message, userContext, history }) 
     "If it's a calendar event and the user provided a clear title AND an explicit start time, respond ONLY with JSON: { action: 'create-event', title, day (YYYY-MM-DD), starttime (HH:mm, 24h), endtime (HH:mm|null), repeat ('once'|'daily'|'weekly'|'custom'), notes (string|null), userReply (short confirmation sentence) }.",
     "Convert relative dates to YYYY-MM-DD. Never make up times; if any timing or title detail is missing or ambiguous, respond with { action: 'clarify-event', question: 'follow-up to ask for missing details' }.",
     "Keep the reply strictly JSON with no markdown. Use recent conversation context when helpful.",
+    `Interpret all relative dates and times using this reference: today is ${currentDate} and the current time is ${currentTime || 'unknown'} in the ${timezone} timezone.`,
     `User context: ${JSON.stringify(userContext || {})}`,
   ].join("\n");
 
@@ -439,6 +479,7 @@ const requestClaudeScheduleDecision = async ({ message, userContext, history }) 
     [
       "Based on the last few messages, decide if this is an event to schedule or a habit idea.",
       "If you can't find a concrete start time and title for an event, ask a clarifying question instead of creating one.",
+      `Reference date: ${currentDate} (${timezone})${currentTime ? ` at ${currentTime}` : ""}.`,
       `User message: ${message}`,
     ].join("\n")
   );
