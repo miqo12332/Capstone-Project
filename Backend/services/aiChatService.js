@@ -65,19 +65,55 @@ const describeTables = async () => {
   return definitions;
 };
 
-const mapHabit = (habit) => ({
-  id: habit.id,
-  title: habit.title,
-  category: habit.category,
-  goal: habit.goal,
-  progressLogs: (habit.progressLogs || []).length,
-  schedules: (habit.schedules || []).map((s) => ({
-    id: s.id,
-    day: s.day,
-    starttime: s.starttime,
-    endtime: s.endtime,
-  })),
-});
+const mapHabit = (habit) => {
+  const progressLogs = habit.progressLogs || [];
+  const recentNotes = progressLogs
+    .filter((log) => log.reflection_reason)
+    .map((log) => ({
+      id: log.id,
+      date: log.progress_date || log.created_at,
+      status: log.status,
+      note: log.reflection_reason,
+    }))
+    .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+    .slice(0, 5);
+
+  return {
+    id: habit.id,
+    title: habit.title,
+    category: habit.category,
+    goal: habit.goal,
+    progressLogs: progressLogs.length,
+    recentNotes,
+    schedules: (habit.schedules || []).map((s) => ({
+      id: s.id,
+      day: s.day,
+      starttime: s.starttime,
+      endtime: s.endtime,
+    })),
+  };
+};
+
+const buildRecentNotesDigest = (habits = []) => {
+  const sections = [];
+
+  for (const habit of habits) {
+    const notes = habit.recentNotes || [];
+    if (!notes.length) continue;
+
+    const entries = notes
+      .map((note) => {
+        const statusLabel = note.status ? `(${note.status})` : "";
+        const dateLabel = note.date ? ` ${note.date}` : "";
+        return `${statusLabel}${dateLabel}: ${note.note}`;
+      })
+      .join("; ");
+
+    sections.push(`${habit.title || "Habit"}: ${entries}`);
+  }
+
+  return sections.length ? sections.join("\n") : "No recent habit notes recorded.";
+};
 
 const mapTask = (task) => ({
   id: task.id,
@@ -301,6 +337,11 @@ const requestClaudeProgressDecision = async ({ message, userContext, history }) 
     title: h.title,
     goal: h.goal || null,
     targetReps: h.targetReps || null,
+    recentNotes: (h.recentNotes || []).map((note) => ({
+      date: note.date,
+      status: note.status,
+      note: note.note,
+    })),
   }));
 
   const systemInstruction = [
@@ -312,6 +353,7 @@ const requestClaudeProgressDecision = async ({ message, userContext, history }) 
     "ing | null, userReply: string }. The userReply should be a friendly one-sentence acknowledgment that you generated.",
     "Use the note field to briefly capture what happened (e.g., partial completion) in natural language. Do not include mark",
     "down.",
+    "Each habit includes recentNotes so you can append new reflections or reference past ones when logging progress.",
     `Known habits: ${JSON.stringify(habitSummaries)}`,
   ].join("\n");
 
@@ -1070,8 +1112,10 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     "Respond with short, human-feeling paragraphs (avoid bullet lists unless requested).",
     "You can see the database overview and the current user's context—use them naturally in conversation.",
     "Stay encouraging and keep the chat flowing with one clear next step in each reply.",
+    "When users ask why a habit is missed or succeeds, study the recentNotes on that habit to describe patterns or reasons.",
     "Database overview:\n" + formatTableSummary(dbOverview),
     "User context:\n" + JSON.stringify(userContext || {}, null, 2),
+    "Recent habit notes:\n" + buildRecentNotesDigest(userContext?.habits || []),
   ].join("\n\n");
 
   let habitSuggestion = habitAnalysis.habitSuggestion;

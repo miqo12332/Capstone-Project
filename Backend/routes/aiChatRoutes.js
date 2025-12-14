@@ -89,6 +89,7 @@ router.post("/message", async (req, res) => {
               category: createdHabit.category,
               goal: createdHabit.goal,
               progressLogs: 0,
+              recentNotes: [],
               schedules: [],
             },
           ];
