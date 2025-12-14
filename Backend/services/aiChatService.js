@@ -68,13 +68,13 @@ const describeTables = async () => {
 const mapHabit = (habit) => {
   const progressLogs = habit.progressLogs || [];
   const recentNotes = progressLogs
-    .filter((log) => log.reflection_reason)
     .map((log) => ({
       id: log.id,
       date: log.progress_date || log.created_at,
       status: log.status,
-      note: log.reflection_reason,
+      note: log.reflected_reason ?? log.reflection_reason,
     }))
+    .filter((log) => log.note)
     .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
     .slice(0, 5);
 
@@ -1153,7 +1153,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
         user_id: userId,
         habit_id: progressDecision.habitId,
         status: progressDecision.status,
-        reflection_reason: progressDecision.note,
+        reflected_reason: progressDecision.note,
         progress_date: new Date(),
       });
 
@@ -1161,7 +1161,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
         id: entry.id,
         habitId: entry.habit_id,
         status: entry.status,
-        note: entry.reflection_reason,
+        note: entry.reflected_reason,
         progressDate: entry.progress_date,
       };
 

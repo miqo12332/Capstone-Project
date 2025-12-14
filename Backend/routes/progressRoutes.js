@@ -29,7 +29,7 @@ router.post("/:habitId/log", async (req, res) => {
       user_id: userId,
       habit_id: habitId,
       status,                // 'done' or 'missed'
-      reflection_reason: status === "missed" ? reason.trim() : null,
+      reflected_reason: status === "missed" ? reason.trim() : null,
       progress_date: new Date(), // stored as DATE; time ignored by PG
     });
 
@@ -96,7 +96,7 @@ router.put("/:habitId/logs", async (req, res) => {
           status,
           progress_date: isoDate,
           created_at: now,
-          reflection_reason: trimmedNote,
+          reflected_reason: trimmedNote,
         }))
       );
     } else if (existing.length > desiredCount) {
@@ -106,8 +106,8 @@ router.put("/:habitId/logs", async (req, res) => {
 
     if (desiredCount > 0 && existing.length > 0) {
       const latest = existing[0];
-      if (latest.reflection_reason !== trimmedNote) {
-        latest.reflection_reason = trimmedNote;
+      if (latest.reflected_reason !== trimmedNote) {
+        latest.reflected_reason = trimmedNote;
         await latest.save();
       }
     }
@@ -195,7 +195,7 @@ router.get("/history/:userId", async (req, res) => {
       habitTitle: row.habit?.title || `Habit ${row.habit_id}`,
       category: row.habit?.category || null,
       status: row.status,
-      reason: row.reflection_reason,
+      reason: row.reflected_reason,
       progressDate: row.progress_date,
       createdAt: row.created_at,
     }));
