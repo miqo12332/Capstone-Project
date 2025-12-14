@@ -5,6 +5,7 @@ DROP TABLE IF EXISTS user_group_challenges CASCADE;
 DROP TABLE IF EXISTS friends CASCADE;
 DROP TABLE IF EXISTS user_achievements CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
+DROP TABLE IF EXISTS user_settings CASCADE;
 DROP TABLE IF EXISTS progress CASCADE;
 DROP TABLE IF EXISTS busy_schedules CASCADE;
 DROP TABLE IF EXISTS tasks CASCADE;
@@ -171,6 +172,30 @@ CREATE TABLE notifications (
     message TEXT NOT NULL,
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ======================
+-- USER SETTINGS
+-- ======================
+CREATE TABLE user_settings (
+    id SERIAL PRIMARY KEY,
+    user_id INT UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    timezone VARCHAR(80) NOT NULL DEFAULT 'UTC',
+    daily_reminder_time VARCHAR(10),
+    weekly_summary_day VARCHAR(16) NOT NULL DEFAULT 'Sunday',
+    email_notifications BOOLEAN NOT NULL DEFAULT TRUE,
+    push_notifications BOOLEAN NOT NULL DEFAULT FALSE,
+    share_activity BOOLEAN NOT NULL DEFAULT TRUE,
+    theme VARCHAR(20) NOT NULL DEFAULT 'light',
+    ai_tone VARCHAR(30) NOT NULL DEFAULT 'balanced',
+    support_style VARCHAR(30) NOT NULL DEFAULT 'celebrate',
+    email_alerts BOOLEAN NOT NULL DEFAULT TRUE,
+    push_reminders BOOLEAN NOT NULL DEFAULT FALSE,
+    google_calendar BOOLEAN NOT NULL DEFAULT FALSE,
+    apple_calendar BOOLEAN NOT NULL DEFAULT FALSE,
+    fitness_sync BOOLEAN NOT NULL DEFAULT FALSE,
+    last_reminder_sent_date VARCHAR(16),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 DELETE FROM assistant_memories WHERE user_id NOT IN (SELECT id FROM users);
