@@ -9,7 +9,16 @@ const parseTime = (timeString) => {
   const [hourStr, minuteStr] = timeString.split(":")
   const hour = Number.parseInt(hourStr, 10)
   const minute = Number.parseInt(minuteStr, 10)
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null
+
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+    // Handle values like "08:00:00" by retrying with the first two segments
+    const [h, m] = timeString.split(":").slice(0, 2)
+    const retryHour = Number.parseInt(h, 10)
+    const retryMinute = Number.parseInt(m, 10)
+    if (!Number.isFinite(retryHour) || !Number.isFinite(retryMinute)) return null
+    return { hour: retryHour, minute: retryMinute }
+  }
+
   return { hour, minute }
 }
 
@@ -34,8 +43,17 @@ const shouldSendReminderNow = (settings) => {
   if (!reminderTime) return null
 
   const { hour, minute, dateKey } = getLocalTimeInfo(settings.timezone)
-  if (reminderTime.hour !== hour || reminderTime.minute !== minute) return null
-  if (lastSentByUser.get(settings.user_id) === dateKey) return null
+  const nowMinutes = hour * 60 + minute
+  const scheduledMinutes = reminderTime.hour * 60 + reminderTime.minute
+  if (Number.isNaN(nowMinutes) || Number.isNaN(scheduledMinutes)) return null
+
+  // Catch up reminders if the service was temporarily offline
+  if (nowMinutes < scheduledMinutes) return null
+
+  const persistedLastSend = settings.last_reminder_sent_date
+  const memoryLastSend = lastSentByUser.get(settings.user_id)
+  const alreadySentForDay = persistedLastSend === dateKey || memoryLastSend === dateKey
+  if (alreadySentForDay) return null
 
   return dateKey
 }
@@ -72,6 +90,7 @@ export const dispatchDailyReminderEmails = async () => {
     try {
       await sendEmail({ to: recipient, subject, text })
       lastSentByUser.set(setting.user_id, reminderDateKey)
+      await setting.update({ last_reminder_sent_date: reminderDateKey })
       console.log(`📧 Sent reminder email to ${recipient}`)
     } catch (error) {
       if (error instanceof EmailConfigError) {

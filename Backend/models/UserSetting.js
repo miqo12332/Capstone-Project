@@ -83,6 +83,11 @@ const UserSetting = sequelize.define(
       allowNull: false,
       defaultValue: false,
     },
+    last_reminder_sent_date: {
+      type: DataTypes.STRING(16),
+      allowNull: true,
+      defaultValue: null,
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,
