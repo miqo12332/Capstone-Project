@@ -216,13 +216,13 @@ const UserProfile = () => {
       const hasGoogleIntegration = integrations.some((integration) => {
         const provider = (integration.provider || integration.type || "").toLowerCase()
         const label = (integration.label || "").toLowerCase()
-        return provider === "google" || label.includes("google")
+        return provider === "google" || provider.includes("google") || label.includes("google")
       })
 
       const hasGoogleProviderCount = Boolean(
         Object.entries(providersMap || {}).some(([key, count]) => {
           const normalizedKey = key.toLowerCase()
-          return normalizedKey === "google" && Number(count || 0) > 0
+          return normalizedKey.includes("google") && Number(count || 0) > 0
         }),
       )
 
