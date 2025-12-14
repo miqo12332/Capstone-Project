@@ -210,13 +210,6 @@ const UserProfile = () => {
       const providerIsGoogle = provider?.includes("google")
       const metaConnected = eventDetail?.meta?.connected
 
-      if (providerIsGoogle && typeof metaConnected === "boolean") {
-        setConnectedApps((prev) => ({
-          ...prev,
-          googleCalendar: metaConnected,
-        }))
-      }
-
       try {
         const overview = await fetchCalendarOverview(user.id, { days: 7 })
 
@@ -241,12 +234,24 @@ const UserProfile = () => {
           }),
         )
 
+        const resolvedGoogleConnection =
+          typeof metaConnected === "boolean"
+            ? metaConnected
+            : hasGoogleIntegration || hasGoogleProviderCount
+
         setConnectedApps((prev) => ({
           ...prev,
-          googleCalendar: hasGoogleIntegration || hasGoogleProviderCount,
+          googleCalendar: resolvedGoogleConnection,
         }))
       } catch (err) {
         console.error("Failed to refresh calendar integrations", err)
+
+        if (providerIsGoogle && typeof metaConnected === "boolean") {
+          setConnectedApps((prev) => ({
+            ...prev,
+            googleCalendar: metaConnected,
+          }))
+        }
       }
     },
     [user?.id],
