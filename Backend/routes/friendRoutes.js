@@ -94,10 +94,6 @@ router.get("/:userId/search", async (req, res, next) => {
     const { userId } = req.params;
     const query = (req.query.q || "").trim();
 
-    if (!query) {
-      return res.json([]);
-    }
-
     const user = await User.findByPk(userId, { attributes: ["id"] });
     if (!user) {
       return res.status(404).json({ error: "User not found" });
@@ -116,14 +112,20 @@ router.get("/:userId/search", async (req, res, next) => {
       excludedIds.add(Number(friendship.friend_id));
     });
 
+    const nameOrEmailFilter = query
+      ? {
+          [Op.or]: [
+            { name: { [Op.iLike]: `${query}%` } },
+            { email: { [Op.iLike]: `${query}%` } },
+          ],
+        }
+      : {};
+
     const potentialFriends = await User.findAll({
       attributes: ["id", "name", "email", "avatar"],
       where: {
         id: { [Op.notIn]: Array.from(excludedIds) },
-        [Op.or]: [
-          { name: { [Op.substring]: query } },
-          { email: { [Op.substring]: query } },
-        ],
+        ...nameOrEmailFilter,
       },
       order: [["name", "ASC"]],
       limit: 10,

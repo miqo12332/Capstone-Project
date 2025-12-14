@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react"
+import React, { useCallback, useContext, useEffect, useState } from "react"
 import {
   CAlert,
   CAvatar,
@@ -73,26 +73,39 @@ const Friends = () => {
     loadFriendsAndRequests()
   }, [user?.id])
 
+  const performSearch = useCallback(
+    async (query, { allowEmpty = false } = {}) => {
+      const trimmedQuery = (query || "").trim()
+      setSuccess("")
+      setError("")
+
+      if (!allowEmpty && !trimmedQuery) {
+        setSearchResults([])
+        return
+      }
+
+      try {
+        setSearching(true)
+        const results = await searchPotentialFriends(user.id, trimmedQuery)
+        setSearchResults(Array.isArray(results) ? results : [])
+      } catch (err) {
+        console.error("Friend search failed", err)
+        setError("Search failed. Please try again.")
+      } finally {
+        setSearching(false)
+      }
+    },
+    [user?.id]
+  )
+
   const handleSearch = async (event) => {
     event.preventDefault()
-    setSuccess("")
-    setError("")
+    performSearch(searchTerm)
+  }
 
-    if (!searchTerm.trim()) {
-      setSearchResults([])
-      return
-    }
-
-    try {
-      setSearching(true)
-      const results = await searchPotentialFriends(user.id, searchTerm.trim())
-      setSearchResults(Array.isArray(results) ? results : [])
-    } catch (err) {
-      console.error("Friend search failed", err)
-      setError("Search failed. Please try again.")
-    } finally {
-      setSearching(false)
-    }
+  const handleGrowCircleClick = () => {
+    setSearchTerm("")
+    performSearch("", { allowEmpty: true })
   }
 
   const handleAddFriend = async (friendId) => {
@@ -182,6 +195,18 @@ const Friends = () => {
     setExpandedFriendId((previous) => (previous === friendId ? null : friendId))
   }
 
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      return
+    }
+
+    const delayId = setTimeout(() => {
+      performSearch(searchTerm)
+    }, 300)
+
+    return () => clearTimeout(delayId)
+  }, [performSearch, searchTerm])
+
   return (
     <CRow className="justify-content-center mt-4">
       <CCol xs={12} lg={10} xl={9}>
@@ -195,9 +220,14 @@ const Friends = () => {
                 <p className="text-uppercase small text-body-secondary mb-1">Find friends</p>
                 <h4 className="mb-0">Discover new accountability partners</h4>
               </div>
-              <CBadge color="primary" className="px-3 py-2 rounded-pill">
+              <CButton
+                color="primary"
+                className="px-3 py-2 rounded-pill"
+                variant="ghost"
+                onClick={handleGrowCircleClick}
+              >
                 <CIcon icon={cilUserPlus} className="me-2" /> Grow your circle
-              </CBadge>
+              </CButton>
             </div>
           </CCardHeader>
           <CCardBody className="pt-3">
@@ -209,7 +239,15 @@ const Friends = () => {
                 <CFormInput
                   placeholder="Search by name or email"
                   value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    setSearchTerm(value)
+
+                    if (!value.trim()) {
+                      setSearchResults([])
+                      setSuccess("")
+                    }
+                  }}
                 />
                 <CButton type="submit" color="primary" disabled={searching} className="px-4">
                   {searching ? <CSpinner size="sm" /> : "Search"}
