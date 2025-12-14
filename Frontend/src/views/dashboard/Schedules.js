@@ -260,7 +260,13 @@ const MySchedule = () => {
       const data = await runScheduleAgent(user.id, agentForm)
       setAgentResult(data)
       if (data?.status === "created") {
-        await loadSchedules()
+        if (Array.isArray(data?.schedules)) {
+          setSchedules(data.schedules)
+        } else {
+          await loadSchedules()
+        }
+
+        await loadCalendarEvents()
         setAgentForm((prev) => ({ ...prev, title: "", notes: "" }))
       }
     } catch (err) {
