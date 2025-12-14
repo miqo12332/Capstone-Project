@@ -560,6 +560,10 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     }
   }
 
+  if (scheduleDecision?.action === "habit" && finalIntent === "chat") {
+    finalIntent = "suggest";
+  }
+
   if (progressDecision) {
     try {
       const entry = await Progress.create({
