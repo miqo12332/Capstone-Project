@@ -14,6 +14,7 @@ import {
   Progress,
   BusySchedule,
   Schedule,
+  Task,
   User,
   UserSetting,
 } from "../models/index.js";
@@ -78,6 +79,19 @@ const mapHabit = (habit) => ({
   })),
 });
 
+const mapTask = (task) => ({
+  id: task.id,
+  name: task.name,
+  status: task.status,
+  due_date: task.due_date,
+  duration_minutes: task.duration_minutes,
+  min_duration_minutes: task.min_duration_minutes,
+  max_duration_minutes: task.max_duration_minutes,
+  split_up: task.split_up,
+  schedule_after: task.schedule_after,
+  color: task.color,
+});
+
 const loadUserContext = async (userId) => {
   const user = await User.findByPk(userId, {
     include: [
@@ -87,6 +101,7 @@ const loadUserContext = async (userId) => {
       { model: UserSetting, as: "settings" },
       { model: CalendarEvent, as: "calendarEvents" },
       { model: BusySchedule, as: "busySchedules" },
+      { model: Task, as: "tasks" },
       {
         model: User,
         as: "friends",
@@ -119,6 +134,7 @@ const loadUserContext = async (userId) => {
     })),
     achievements: (plain.achievements || []).map((a) => ({ id: a.id, name: a.name })),
     settings: plain.settings || null,
+    tasks: (plain.tasks || []).map(mapTask),
     calendarEvents: (plain.calendarEvents || []).map((event) => ({
       id: event.id,
       title: event.title,
@@ -402,9 +418,39 @@ const parseScheduleJson = (raw) => {
       return { action: "habit" };
     }
 
-    if (parsed.action === "clarify-event") {
+    if (parsed.action === "clarify-event" || parsed.action === "clarify-task" || parsed.action === "clarify") {
       const question = parsed.question?.trim();
-      return question ? { action: "clarify-event", question } : null;
+      const target = parsed.target?.trim() || (parsed.action === "clarify-task" ? "task" : parsed.action === "clarify-event" ? "event" : null);
+      return question ? { action: "clarify", question, target: target || null } : null;
+    }
+
+    if (parsed.action === "create-task") {
+      const name = parsed.name?.trim() || parsed.title?.trim();
+      if (!name) return null;
+
+      const parseIntOrNull = (value) => {
+        if (value == null) return null;
+        const parsedValue = Number.parseInt(value, 10);
+        return Number.isFinite(parsedValue) ? parsedValue : null;
+      };
+
+      const status = (parsed.status?.trim() || "pending").toLowerCase();
+      const allowedStatuses = new Set(["pending", "done", "missed"]);
+
+      return {
+        action: "create-task",
+        name,
+        dueDate: parsed.dueDate?.trim() || null,
+        scheduleAfter: parsed.scheduleAfter?.trim() || null,
+        durationMinutes: parseIntOrNull(parsed.durationMinutes) ?? 60,
+        minDuration: parseIntOrNull(parsed.minDuration),
+        maxDuration: parseIntOrNull(parsed.maxDuration),
+        splitUp: parsed.splitUp === undefined ? false : Boolean(parsed.splitUp),
+        hoursLabel: parsed.hoursLabel?.trim() || null,
+        color: parsed.color?.trim() || null,
+        status: allowedStatuses.has(status) ? status : "pending",
+        userReply: parsed.userReply?.trim() || null,
+      };
     }
 
     if (parsed.action !== "create-event") return null;
@@ -734,20 +780,21 @@ const requestClaudeScheduleDecision = async ({ message, userContext, history }) 
   const { timezone, currentDate, currentTime } = getReferenceDateInfo(userContext);
 
   const systemInstruction = [
-    "You are Claude, an encouraging habit coach that can also add calendar events.",
-    "Decide whether the user wants to schedule a calendar event or create a habit.",
+    "You are Claude, an encouraging habit coach that can also add calendar events and one-off tasks.",
+    "Decide whether the user wants a habit/routine, a scheduled calendar event, or a task/to-do.",
     "If it's a habit or routine request, respond ONLY with { action: 'habit' }.",
-    "If it's a calendar event and the user provided a clear title AND an explicit start time, respond ONLY with JSON: { action: 'create-event', title, day (YYYY-MM-DD), starttime (HH:mm, 24h), endtime (HH:mm|null), enddate (YYYY-MM-DD|null, required when repeat is not 'once'), repeat ('once'|'daily'|'weekly'|'custom'), customdays (comma-separated weekdays when repeat='custom' or to pin specific weekdays), notes (string|null), userReply (short confirmation sentence) }.",
-    "Convert relative dates to YYYY-MM-DD. Support recurring ranges like 'every Monday in October' by filling repeat, customdays, and enddate. Never make up times; if any timing or title detail is missing or ambiguous, respond with { action: 'clarify-event', question: 'follow-up to ask for missing details' }.",
-    "Keep the reply strictly JSON with no markdown. Use recent conversation context when helpful.",
+    "If it's a task (a to-do without a precise meeting time), respond ONLY with JSON: { action: 'create-task', name, dueDate (YYYY-MM-DD|null), scheduleAfter (YYYY-MM-DD|null), durationMinutes (integer minutes), minDuration (integer|null), maxDuration (integer|null), splitUp (boolean), hoursLabel (string|null), color (string|null), status ('pending'|'done'|'missed'), userReply (short confirmation sentence tailored to the request) }.",
+    "If it's a calendar event and the user provided a clear title AND an explicit start time, respond ONLY with JSON: { action: 'create-event', title, day (YYYY-MM-DD), starttime (HH:mm, 24h), endtime (HH:mm|null), enddate (YYYY-MM-DD|null, required when repeat is not 'once'), repeat ('once'|'daily'|'weekly'|'custom'), customdays (comma-separated weekdays when repeat='custom' or to pin specific weekdays), notes (string|null), userReply (short confirmation sentence tailored to the request) }.",
+    "Convert relative dates to YYYY-MM-DD. Support recurring ranges like 'every Monday in October' by filling repeat, customdays, and enddate. Never make up times; if any timing or title detail is missing or ambiguous, respond with { action: 'clarify', target: 'event'|'task'|null, question: 'follow-up to ask for missing details' }.",
+    "Keep the reply strictly JSON with no markdown. Use recent conversation context and user goals to make each userReply feel specific—avoid canned or generic wording.",
     `Interpret all relative dates and times using this reference: today is ${currentDate} and the current time is ${currentTime || 'unknown'} in the ${timezone} timezone.`,
     `User context: ${JSON.stringify(userContext || {})}`,
   ].join("\n");
 
   const prompt = new HumanMessage(
     [
-      "Based on the last few messages, decide if this is an event to schedule or a habit idea.",
-      "If you can't find a concrete start time and title for an event, ask a clarifying question instead of creating one.",
+      "Based on the last few messages, decide if this is an event to schedule, a task to capture, or a habit idea.",
+      "If you can't find a concrete start time and title for an event, ask a clarifying question instead of creating one. Do the same for tasks that need a due date or duration.",
       "When the user asks for repeating events or a date range, include the recurrence details instead of assuming a single day.",
       `Reference date: ${currentDate} (${timezone})${currentTime ? ` at ${currentTime}` : ""}.`,
       `User message: ${message}`,
@@ -829,6 +876,28 @@ const generateScheduleCreatedReply = async ({ schedule, context }) => {
   );
 };
 
+const generateTaskCreatedReply = async ({ task, context }) => {
+  const { dbOverview, userContext, history } = context || {};
+
+  const systemInstruction = [
+    "You are a warm, conversational AI assistant for the StepHabit platform.",
+    "A task/to-do was just saved. Confirm the details briefly and invite the user to refine timing or priority.",
+    "Keep replies short, specific to their request, and avoid canned phrasing.",
+    "Database overview:\n" + formatTableSummary(dbOverview || []),
+    "User context:\n" + JSON.stringify(userContext || {}, null, 2),
+  ].join("\n\n");
+
+  const conversation = buildConversationMessages(history);
+  const prompt = new HumanMessage(
+    `Confirm the task creation in a friendly sentence and offer help adjusting it: ${JSON.stringify(task)}`
+  );
+
+  return (
+    (await callClaude([new SystemMessage(systemInstruction), ...conversation, prompt])) ||
+    "Your task is saved. Want to tweak the timing or details?"
+  );
+};
+
 const generateScheduleConflictReply = async ({ scheduleDecision, conflictInfo, context }) => {
   const { dbOverview, userContext, history } = context || {};
   const { conflict, alternativeStart, duration, conflictDay, occurrences } = conflictInfo || {};
@@ -903,7 +972,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     history,
   });
 
-  const scheduleDecision = await requestClaudeScheduleDecision({
+  const planDecision = await requestClaudeScheduleDecision({
     message,
     userContext,
     history,
@@ -922,18 +991,27 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
   let replyFromClaude = progressDecision?.userReply || null;
   let loggedProgress = null;
   let createdSchedule = null;
+  let createdTask = null;
   let finalIntent = habitAnalysis.intent;
   let scheduleClarification = null;
   let scheduleConflict = null;
+  let taskClarification = null;
 
-  if (scheduleDecision?.action === "habit" && finalIntent === "chat") {
+  if (planDecision?.action === "habit" && finalIntent === "chat") {
     finalIntent = "suggest";
   }
 
-  if (scheduleDecision?.action === "clarify-event") {
-    scheduleClarification = scheduleDecision.question;
-    if (finalIntent === "chat") {
-      finalIntent = "clarify-schedule";
+  if (planDecision?.action === "clarify") {
+    if (planDecision.target === "task") {
+      taskClarification = planDecision.question;
+      if (finalIntent === "chat") {
+        finalIntent = "clarify-task";
+      }
+    } else {
+      scheduleClarification = planDecision.question;
+      if (finalIntent === "chat") {
+        finalIntent = "clarify-schedule";
+      }
     }
   }
 
@@ -965,6 +1043,10 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     replyFromClaude = scheduleClarification;
   }
 
+  if (taskClarification && !replyFromClaude && !loggedProgress) {
+    replyFromClaude = taskClarification;
+  }
+
   if (progressDecision && !replyFromClaude) {
     const matchedHabit = (userContext?.habits || []).find((h) => h.id === progressDecision.habitId);
     const recapPrompt = new HumanMessage(
@@ -978,13 +1060,45 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     replyFromClaude = await callClaude([new SystemMessage(systemInstruction), ...buildConversationMessages(history), recapPrompt]);
   }
 
-  if (!loggedProgress && scheduleDecision?.action === "create-event") {
-    scheduleConflict = await detectScheduleConflict({ userId, scheduleDecision });
+  if (!loggedProgress && planDecision?.action === "create-task") {
+    try {
+      const parseDate = (value) => {
+        if (!value) return null;
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+      };
+
+      const created = await Task.create({
+        user_id: userId,
+        name: planDecision.name,
+        duration_minutes: planDecision.durationMinutes ?? 60,
+        min_duration_minutes: planDecision.minDuration,
+        max_duration_minutes: planDecision.maxDuration,
+        split_up: Boolean(planDecision.splitUp),
+        hours_label: planDecision.hoursLabel,
+        schedule_after: parseDate(planDecision.scheduleAfter),
+        due_date: parseDate(planDecision.dueDate),
+        color: planDecision.color,
+        status: planDecision.status || "pending",
+      });
+
+      createdTask = created.get({ plain: true });
+      finalIntent = "create-task";
+      replyFromClaude =
+        planDecision.userReply ||
+        (await generateTaskCreatedReply({ task: createdTask, context: { dbOverview, userContext, history } }));
+    } catch (error) {
+      console.error("Failed to save task from Claude decision", error?.message || error);
+    }
+  }
+
+  if (!loggedProgress && planDecision?.action === "create-event") {
+    scheduleConflict = await detectScheduleConflict({ userId, scheduleDecision: planDecision });
 
     if (scheduleConflict?.conflict) {
       finalIntent = "schedule-conflict";
       replyFromClaude = await generateScheduleConflictReply({
-        scheduleDecision,
+        scheduleDecision: planDecision,
         conflictInfo: scheduleConflict,
         context: { dbOverview, userContext, history },
       });
@@ -993,18 +1107,18 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
         const occurrenceDays =
           scheduleConflict?.occurrences?.length
             ? scheduleConflict.occurrences
-            : buildRecurrenceDays(scheduleDecision);
+            : buildRecurrenceDays(planDecision);
 
-        const payloads = (occurrenceDays.length ? occurrenceDays : [scheduleDecision.day]).map((day) => ({
+        const payloads = (occurrenceDays.length ? occurrenceDays : [planDecision.day]).map((day) => ({
           user_id: userId,
-          title: scheduleDecision.title,
+          title: planDecision.title,
           day,
-          starttime: scheduleDecision.starttime,
-          endtime: scheduleDecision.endtime || null,
-          enddate: scheduleDecision.enddate || scheduleDecision.day,
-          repeat: scheduleDecision.repeat || "once",
-          customdays: scheduleDecision.repeat === "custom" ? scheduleDecision.customdays || null : null,
-          notes: scheduleDecision.notes || null,
+          starttime: planDecision.starttime,
+          endtime: planDecision.endtime || null,
+          enddate: planDecision.enddate || planDecision.day,
+          repeat: planDecision.repeat || "once",
+          customdays: planDecision.repeat === "custom" ? planDecision.customdays || null : null,
+          notes: planDecision.notes || null,
         }));
 
         const created = await BusySchedule.bulkCreate(payloads, { returning: true });
@@ -1012,7 +1126,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
         createdSchedule = created.map((entry) => entry.get({ plain: true }));
         finalIntent = "create-schedule";
         replyFromClaude =
-          scheduleDecision.userReply ||
+          planDecision.userReply ||
           (await generateScheduleCreatedReply({ schedule: createdSchedule, context: { dbOverview, userContext, history } }));
       } catch (error) {
         console.error("Failed to save schedule from Claude decision", error?.message || error);
@@ -1031,7 +1145,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
         history,
       });
     }
-  } else if (finalIntent === "chat" && !loggedProgress && !createdSchedule) {
+  } else if (finalIntent === "chat" && !loggedProgress && !createdSchedule && !createdTask) {
     replyFromClaude = await callClaude(buildChatMessages({ systemInstruction, history, message }));
   }
 
@@ -1046,6 +1160,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     habitSuggestion,
     loggedProgress,
     createdSchedule,
+    createdTask,
     scheduleConflict,
     context: { dbOverview, userContext, history },
   };
