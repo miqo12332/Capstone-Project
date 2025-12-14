@@ -21,6 +21,11 @@ import {
   CFormTextarea,
   CBadge,
   CFormCheck,
+  CModal,
+  CModalBody,
+  CModalFooter,
+  CModalHeader,
+  CModalTitle,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
 import { cilClock, cilCalendar, cilPlus, cilNotes } from "@coreui/icons"
@@ -81,6 +86,10 @@ const MySchedule = () => {
   const [calendarFileName, setCalendarFileName] = useState("")
   const [calendarFileText, setCalendarFileText] = useState("")
   const calendarFileInputRef = useRef(null)
+  const [filterDate, setFilterDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [editSchedule, setEditSchedule] = useState(null)
+  const [editValues, setEditValues] = useState({ day: "", starttime: "", endtime: "" })
+  const [savingEdit, setSavingEdit] = useState(false)
 
   const formattedCalendarEvents = useMemo(() => {
     const sorted = [...calendarEvents].sort((a, b) => {
@@ -91,9 +100,8 @@ const MySchedule = () => {
     return sorted.map((event) => ({
       id: event.id,
       title: event.title || "Calendar event",
-      when: event.start_time
-        ? new Date(event.start_time).toLocaleString()
-        : "Date unknown",
+      when: event.start_time ? new Date(event.start_time).toLocaleString() : "Date unknown",
+      startDate: event.start_time || null,
       provider: event.source || event.integration?.provider || "calendar",
       location: event.location || event.metadata?.location || "",
     }))
@@ -110,6 +118,31 @@ const MySchedule = () => {
     customdays: [],
     notes: "",
   })
+
+  const matchesFilterDate = useCallback(
+    (dateValue) => {
+      if (!filterDate) return true
+      if (!dateValue) return false
+      if (typeof dateValue === "string" && dateValue.length >= 10) {
+        return dateValue.slice(0, 10) === filterDate
+      }
+
+      const candidate = new Date(dateValue)
+      if (Number.isNaN(candidate)) return false
+      return candidate.toISOString().slice(0, 10) === filterDate
+    },
+    [filterDate],
+  )
+
+  const filteredSchedules = useMemo(
+    () => schedules.filter((schedule) => matchesFilterDate(schedule.day)),
+    [schedules, matchesFilterDate],
+  )
+
+  const filteredCalendarEvents = useMemo(
+    () => formattedCalendarEvents.filter((event) => matchesFilterDate(event.startDate)),
+    [formattedCalendarEvents, matchesFilterDate],
+  )
 
   // ✅ Load user's habits
   const loadHabits = useCallback(async () => {
@@ -130,8 +163,10 @@ const MySchedule = () => {
   }, [loadHabits])
 
   // ✅ Load user's schedules
-  const loadSchedules = async () => {
+  const loadSchedules = useCallback(async () => {
+    if (!user?.id) return
     try {
+      setLoading(true)
       const res = await fetch(`${API_BASE}/schedules/user/${user.id}`)
       if (!res.ok) throw new Error("Failed to fetch schedules")
       const data = await res.json()
@@ -142,11 +177,11 @@ const MySchedule = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.id])
 
   useEffect(() => {
     if (user?.id) loadSchedules()
-  }, [user?.id])
+  }, [user?.id, loadSchedules])
 
   // ✅ Load calendar events connected to the account (e.g. Google Calendar)
   const loadCalendarEvents = useCallback(async () => {
@@ -170,6 +205,11 @@ const MySchedule = () => {
   useEffect(() => {
     loadCalendarEvents()
   }, [loadCalendarEvents])
+
+  const refreshSchedulesAndCalendar = useCallback(() => {
+    loadSchedules()
+    loadCalendarEvents()
+  }, [loadCalendarEvents, loadSchedules])
 
   // ✅ Add new schedule
   const handleAdd = async () => {
@@ -346,10 +386,74 @@ const MySchedule = () => {
     }
   }
 
+  const openEditModal = (schedule) => {
+    setEditSchedule(schedule)
+    setEditValues({
+      day: schedule.day || "",
+      starttime: schedule.starttime || "",
+      endtime: schedule.endtime || "",
+    })
+  }
+
+  const closeEditModal = () => {
+    setEditSchedule(null)
+    setEditValues({ day: "", starttime: "", endtime: "" })
+    setSavingEdit(false)
+  }
+
+  const handleUpdate = async () => {
+    if (!editSchedule) return
+
+    try {
+      setSavingEdit(true)
+      setError("")
+
+      const payload = {
+        day: editValues.day || null,
+        starttime: editValues.starttime || null,
+        endtime: editValues.endtime || null,
+      }
+
+      const res = await fetch(
+        `${API_BASE}/schedules/${editSchedule.id}${editSchedule.type ? `?type=${editSchedule.type}` : ""}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      )
+
+      if (!res.ok) throw new Error("Failed to update schedule")
+
+      const updatedSchedule = await res.json()
+
+      setSchedules((prev) =>
+        prev.map((schedule) =>
+          String(schedule.id) === String(editSchedule.id)
+            ? { ...schedule, ...updatedSchedule }
+            : schedule,
+        ),
+      )
+      await loadSchedules()
+      emitDataRefresh(REFRESH_SCOPES.SCHEDULES, {
+        reason: "schedule-updated",
+        scheduleId: editSchedule.id,
+      })
+      closeEditModal()
+    } catch (err) {
+      console.error("❌ Failed to update schedule:", err)
+      setError("Failed to update schedule")
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
   useDataRefresh([REFRESH_SCOPES.HABITS], loadHabits)
+  useDataRefresh([REFRESH_SCOPES.SCHEDULES], refreshSchedulesAndCalendar)
 
   return (
-    <CRow className="mt-4 g-4 schedules-shell">
+    <>
+      <CRow className="mt-4 g-4 schedules-shell">
       <CCol xs={12}>{error && <CAlert color="danger">{error}</CAlert>}</CCol>
       <CCol xs={12}>{calendarError && <CAlert color="warning">{calendarError}</CAlert>}</CCol>
 
@@ -576,28 +680,6 @@ const MySchedule = () => {
               </CButton>
             </CForm>
 
-            <CCard className="border-0 schedule-preview-card mt-4">
-              <CCardBody>
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <span className="fw-semibold">Preview</span>
-                  <CBadge color="info" shape="rounded-pill">
-                    {getRepeatDisplay(newSchedule.repeat, newSchedule.customdays)}
-                  </CBadge>
-                </div>
-                <div className="text-muted small">
-                  <div className="mb-1">
-                    <strong>
-                      {selectedHabit?.title || newSchedule.custom_title || "Untitled schedule"}
-                    </strong>
-                  </div>
-                  <div>{newSchedule.day || "Pick a day"}</div>
-                  <div>
-                    {newSchedule.starttime || "Start time"} – {newSchedule.endtime || "End time"}
-                  </div>
-                  {newSchedule.notes && <div className="mt-1">{newSchedule.notes}</div>}
-                </div>
-              </CCardBody>
-            </CCard>
           </CCardBody>
         </CCard>
       </CCol>
@@ -606,6 +688,37 @@ const MySchedule = () => {
         <CCard className="shadow-sm border-0 h-100 saved-busy-card">
           <CCardHeader className="fw-semibold saved-busy-header">Saved busy times</CCardHeader>
           <CCardBody className="p-0">
+            <div className="p-3 border-bottom d-flex flex-wrap justify-content-between align-items-end gap-3">
+              <div>
+                <div className="fw-semibold">Filter by day</div>
+                <div className="small text-body-secondary">
+                  {filterDate
+                    ? `Showing entries for ${new Date(filterDate).toLocaleDateString()}`
+                    : "Showing entries across all days"}
+                </div>
+              </div>
+              <div className="d-flex flex-wrap align-items-end gap-2">
+                <div style={{ minWidth: "180px" }}>
+                  <CFormLabel className="text-uppercase text-muted fw-semibold small mb-1">
+                    Day
+                  </CFormLabel>
+                  <CFormInput
+                    type="date"
+                    value={filterDate}
+                    onChange={(e) => setFilterDate(e.target.value)}
+                  />
+                </div>
+                <CButton
+                  color="secondary"
+                  variant="ghost"
+                  size="sm"
+                  disabled={!filterDate}
+                  onClick={() => setFilterDate("")}
+                >
+                  Clear
+                </CButton>
+              </div>
+            </div>
             <div className="p-3 border-bottom calendar-import-panel">
               <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
                 <div>
@@ -671,9 +784,14 @@ const MySchedule = () => {
               <div className="text-center text-muted py-5">
                 Add time blocks so the assistant understands when you're occupied or focused.
               </div>
+            ) : filteredSchedules.length === 0 ? (
+              <div className="text-center text-muted py-5">
+                No entries found for this day.
+                <div className="small">Try another date or clear the filter to see everything.</div>
+              </div>
             ) : (
               <CListGroup flush>
-                {schedules.map((s) => (
+                {filteredSchedules.map((s) => (
                   <CListGroupItem key={`${s.type || "habit"}-${s.id}`} className="py-3">
                     <div className="d-flex justify-content-between align-items-start flex-wrap gap-2">
                       <div>
@@ -689,6 +807,14 @@ const MySchedule = () => {
                         <CBadge color="secondary" shape="rounded-pill">
                           {getRepeatDisplay(s.repeat, s.customdays)}
                         </CBadge>
+                        <CButton
+                          color="primary"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditModal(s)}
+                        >
+                          Edit
+                        </CButton>
                         <CButton
                           color="danger"
                           variant="ghost"
@@ -718,9 +844,13 @@ const MySchedule = () => {
                 <div className="text-body-secondary small">
                   Connect Google Calendar to automatically add busy events to this view.
                 </div>
+              ) : filteredCalendarEvents.length === 0 ? (
+                <div className="text-body-secondary small">
+                  No imported events match this day. Try adjusting or clearing the filter.
+                </div>
               ) : (
                 <CListGroup flush>
-                  {formattedCalendarEvents.map((event) => (
+                  {filteredCalendarEvents.map((event) => (
                     <CListGroupItem key={`${event.id}-${event.when}`} className="py-3">
                       <div className="fw-semibold">{event.title}</div>
                       <div className="text-muted small">{event.when}</div>
@@ -739,6 +869,57 @@ const MySchedule = () => {
         </CCard>
       </CCol>
     </CRow>
+
+      <CModal visible={Boolean(editSchedule)} onClose={closeEditModal} alignment="center">
+        <CModalHeader closeButton>
+          <CModalTitle>Edit schedule</CModalTitle>
+        </CModalHeader>
+        <CModalBody className="d-flex flex-column gap-3">
+          <div>
+            <CFormLabel className="text-uppercase text-muted fw-semibold small">Day</CFormLabel>
+            <CFormInput
+              type="date"
+              value={editValues.day}
+              onChange={(e) => setEditValues({ ...editValues, day: e.target.value })}
+            />
+          </div>
+          <div className="row g-3">
+            <div className="col-12 col-md-6">
+              <CFormLabel className="text-uppercase text-muted fw-semibold small">Start time</CFormLabel>
+              <CFormInput
+                type="time"
+                value={editValues.starttime}
+                onChange={(e) => setEditValues({ ...editValues, starttime: e.target.value })}
+              />
+            </div>
+            <div className="col-12 col-md-6">
+              <CFormLabel className="text-uppercase text-muted fw-semibold small">End time</CFormLabel>
+              <CFormInput
+                type="time"
+                value={editValues.endtime || ""}
+                onChange={(e) => setEditValues({ ...editValues, endtime: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="small text-body-secondary">
+            Update the day or time range for this busy block. Changes are saved to your account.
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" variant="ghost" onClick={closeEditModal} disabled={savingEdit}>
+            Cancel
+          </CButton>
+          <CButton
+            color="primary"
+            onClick={handleUpdate}
+            disabled={!editValues.day || !editValues.starttime || savingEdit}
+          >
+            {savingEdit ? <CSpinner size="sm" className="me-2" /> : null}
+            Save changes
+          </CButton>
+        </CModalFooter>
+      </CModal>
+    </>
   )
 }
 

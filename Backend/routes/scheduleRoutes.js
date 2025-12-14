@@ -267,4 +267,76 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// UPDATE schedule
+router.put("/:id", async (req, res) => {
+  try {
+    const { type } = req.query;
+    const { day, starttime, endtime } = req.body;
+
+    if (!day || !starttime) {
+      return res.status(400).json({ error: "day and starttime are required" });
+    }
+
+    const payload = {
+      day,
+      starttime,
+      endtime: endtime || null,
+    };
+
+    if (type === "custom") {
+      const [updated] = await BusySchedule.update(payload, { where: { id: req.params.id } });
+      if (!updated) return res.status(404).json({ error: "Schedule not found" });
+
+      const busy = await BusySchedule.findByPk(req.params.id);
+      return res.json({
+        ...busy.toJSON(),
+        type: "custom",
+        habit: null,
+        habit_id: null,
+        custom_title: busy.title,
+      });
+    }
+
+    const [updatedSchedule] = await Schedule.update(payload, {
+      where: { id: req.params.id },
+    });
+
+    if (updatedSchedule) {
+      const fresh = await Schedule.findByPk(req.params.id, {
+        include: [
+          {
+            model: Habit,
+            as: "habit",
+            attributes: ["id", "title"],
+            required: false,
+          },
+        ],
+      });
+
+      return res.json({
+        ...fresh.toJSON(),
+        type: "habit",
+        custom_title: null,
+      });
+    }
+
+    const [updatedBusy] = await BusySchedule.update(payload, { where: { id: req.params.id } });
+    if (updatedBusy) {
+      const busy = await BusySchedule.findByPk(req.params.id);
+      return res.json({
+        ...busy.toJSON(),
+        type: "custom",
+        habit: null,
+        habit_id: null,
+        custom_title: busy.title,
+      });
+    }
+
+    return res.status(404).json({ error: "Schedule not found" });
+  } catch (err) {
+    console.error("❌ Error updating schedule:", err);
+    res.status(500).json({ error: "Failed to update schedule" });
+  }
+});
+
 export default router;
