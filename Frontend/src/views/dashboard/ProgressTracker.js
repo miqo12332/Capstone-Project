@@ -2,10 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CAlert,
   CBadge,
+  CButton,
+  CButtonGroup,
   CCard,
   CCardBody,
   CCardHeader,
   CCol,
+  CFormSelect,
   CListGroup,
   CListGroupItem,
   CProgress,
@@ -40,6 +43,38 @@ const formatDate = (date) => {
   });
 };
 
+const TIMEFRAMES = {
+  weekly: { label: "Weekly", days: 7, description: "Last 7 days" },
+  monthly: { label: "Monthly", days: 30, description: "Last 30 days" },
+  yearly: { label: "Yearly", days: 365, description: "Last 12 months" },
+};
+
+const buildTimeframeSeries = (productivity = [], timeframeKey = "weekly") => {
+  const config = TIMEFRAMES[timeframeKey] || TIMEFRAMES.weekly;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const map = new Map(
+    productivity.map((entry) => [entry.date, { ...entry }])
+  );
+
+  const series = [];
+  for (let i = config.days - 1; i >= 0; i -= 1) {
+    const current = new Date(today);
+    current.setDate(today.getDate() - i);
+    const iso = current.toISOString().slice(0, 10);
+    const existing = map.get(iso) || {};
+
+    const completed = existing.completed ?? 0;
+    const missed = existing.missed ?? 0;
+    const net = existing.net ?? completed - missed;
+
+    series.push({ date: iso, completed, missed, net });
+  }
+
+  return series;
+};
+
 const ProgressTracker = () => {
   const [habits, setHabits] = useState([]);
   const [err, setErr] = useState("");
@@ -47,6 +82,8 @@ const ProgressTracker = () => {
   const [analyticsErr, setAnalyticsErr] = useState("");
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [todayCounts, setTodayCounts] = useState({});
+  const [selectedHabitId, setSelectedHabitId] = useState(null);
+  const [timeframe, setTimeframe] = useState("weekly");
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const userId = user?.id;
@@ -69,6 +106,12 @@ const ProgressTracker = () => {
   useEffect(() => {
     loadHabits();
   }, [loadHabits]);
+
+  useEffect(() => {
+    if (!selectedHabitId && habits.length) {
+      setSelectedHabitId(habits[0].id);
+    }
+  }, [habits, selectedHabitId]);
 
   const loadAnalytics = useCallback(
     async (options = { showSpinner: true }) => {
@@ -147,9 +190,35 @@ const ProgressTracker = () => {
     }, {});
   }, [analytics]);
 
+  const selectedHabitStats = useMemo(
+    () => (selectedHabitId ? habitStatsMap[selectedHabitId] : null),
+    [habitStatsMap, selectedHabitId]
+  );
+
+  const selectedHabitName = useMemo(() => {
+    const fromHabitList = habits.find((h) => h.id === selectedHabitId);
+    return (
+      selectedHabitStats?.habitName ||
+      fromHabitList?.title ||
+      fromHabitList?.name ||
+      "Choose a habit"
+    );
+  }, [habits, selectedHabitId, selectedHabitStats]);
+
+  const timeframeSeries = useMemo(() => {
+    if (!selectedHabitId) return [];
+    return buildTimeframeSeries(selectedHabitStats?.productivity, timeframe);
+  }, [selectedHabitId, selectedHabitStats, timeframe]);
+
+  const timeframeTotals = useMemo(() => {
+    const done = timeframeSeries.reduce((sum, day) => sum + day.completed, 0);
+    const missed = timeframeSeries.reduce((sum, day) => sum + day.missed, 0);
+    const total = done + missed;
+    const completionRate = total ? Math.round((done / total) * 100) : 0;
+    return { done, missed, total, completionRate };
+  }, [timeframeSeries]);
+
   const summary = analytics?.summary;
-  const dailyTrend = summary?.dailyTrend ?? [];
-  const momentumTrend = useMemo(() => dailyTrend, [dailyTrend]);
   const leaderboard = summary?.habitLeaderboard ?? [];
 
   const statusBadgeColor = (rate) => {
@@ -174,6 +243,55 @@ const ProgressTracker = () => {
                 </div>
               ) : (
                 <>
+                  <CRow className="g-3 align-items-end mb-3">
+                    <CCol xs={12} md={7} lg={8} xl={9}>
+                      <div className="text-body-secondary small mb-1">
+                        Focused habit
+                      </div>
+                      <CFormSelect
+                        value={selectedHabitId || ""}
+                        onChange={(e) =>
+                          setSelectedHabitId(Number(e.target.value) || null)
+                        }
+                        aria-label="Choose a habit to view statistics"
+                      >
+                        <option value="">Select a habit</option>
+                        {habits.map((habit) => (
+                          <option key={habit.id} value={habit.id}>
+                            {habit.title || habit.name}
+                          </option>
+                        ))}
+                      </CFormSelect>
+                    </CCol>
+                    <CCol
+                      xs={12}
+                      md={5}
+                      lg={4}
+                      xl={3}
+                      className="d-flex justify-content-md-end"
+                    >
+                      <div className="d-flex flex-wrap gap-2 w-100 justify-content-end">
+                        <div className="text-body-secondary small align-self-center">
+                          Range
+                        </div>
+                        <CButtonGroup role="group" aria-label="Timeframe selector">
+                          {Object.entries(TIMEFRAMES).map(([key, meta]) => (
+                            <CButton
+                              key={key}
+                              color="primary"
+                              variant={timeframe === key ? undefined : "outline"}
+                              onClick={() => setTimeframe(key)}
+                              active={timeframe === key}
+                              size="sm"
+                            >
+                              {meta.label}
+                            </CButton>
+                          ))}
+                        </CButtonGroup>
+                      </div>
+                    </CCol>
+                  </CRow>
+
                   <CRow className="g-3 mb-4">
                     <CCol xs={12} md={6} xl={3}>
                       <CCard className="h-100 bg-body-tertiary">
@@ -252,18 +370,27 @@ const ProgressTracker = () => {
                   <CRow className="g-4 mb-4">
                     <CCol xs={12} lg={7}>
                       <CCard className="h-100">
-                        <CCardHeader className="fw-semibold">
-                          Lifetime momentum
+                        <CCardHeader className="fw-semibold d-flex justify-content-between align-items-center flex-wrap gap-2">
+                          <span>
+                            {selectedHabitName} · {TIMEFRAMES[timeframe]?.description}
+                          </span>
+                          <span className="text-body-secondary small">
+                            {formatPercent(timeframeTotals.completionRate ?? 0)}
+                            {" completion"}
+                            {timeframeTotals.total
+                              ? ` · ${timeframeTotals.done} done · ${timeframeTotals.missed} missed`
+                              : " · Track this habit to populate stats"}
+                          </span>
                         </CCardHeader>
                         <CCardBody style={{ height: 280 }}>
-                          {momentumTrend.length ? (
+                          {timeframeSeries.length ? (
                             <ResponsiveContainer
                               width="100%"
                               height="100%"
                               minWidth={200}
                               minHeight={200}
                             >
-                              <AreaChart data={momentumTrend}>
+                              <AreaChart data={timeframeSeries}>
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="date" tickFormatter={formatDate} />
                                 <YAxis allowDecimals={false} />
@@ -287,7 +414,8 @@ const ProgressTracker = () => {
                             </ResponsiveContainer>
                           ) : (
                             <div className="text-body-secondary text-center my-5">
-                              Keep logging progress to see your lifetime momentum.
+                              Log progress for this habit to visualize how you perform
+                              over time.
                             </div>
                           )}
                         </CCardBody>
