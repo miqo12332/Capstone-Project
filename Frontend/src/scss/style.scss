@@ -363,6 +363,12 @@ body {
   .list-group-item.bg-white .text-muted {
     color: var(--cui-body-secondary-color) !important;
   }
+
+  /* Ensure helper text remains readable on hover in dark mode */
+  .small.text-body-secondary:hover,
+  .text-body-secondary.small:hover {
+    color: #000 !important;
+  }
 }
 
 // ===== Enhanced surfaces =====
