@@ -754,14 +754,6 @@ const Dashboard = () => {
               🧠 AI summary
             </CButton>
             <CButton
-              color="primary"
-              className="action-chip"
-              variant="outline"
-              onClick={analyzeHabitPatterns}
-            >
-              🔍 AI pattern detection
-            </CButton>
-            <CButton
               color="light"
               className="action-chip text-primary"
               variant="ghost"
