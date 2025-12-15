@@ -467,14 +467,18 @@ const UserProfile = () => {
                   onChange={(event) => setProfile((prev) => ({ ...prev, gender: event.target.value }))}
                 >
                   <option value="">Select gender</option>
-                  <option value="female">Female</option>
                   <option value="male">Male</option>
-                  <option value="non-binary">Non-binary</option>
-                  <option value="prefer_not_to_say">Prefer not to say</option>
+                  <option value="female">Female</option>
                 </CFormSelect>
                 <small className="text-body-secondary">Optional, helps us tailor insights.</small>
               </CCol>
             </CRow>
+            <div className="d-flex justify-content-end mt-4">
+              <CButton color="primary" type="submit" onClick={handleSave} disabled={saving}>
+                {saving ? <CSpinner size="sm" className="me-2" /> : <CIcon icon={cilSettings} className="me-2" />}
+                {saving ? "Saving" : "Save account changes"}
+              </CButton>
+            </div>
           </CCardBody>
         </CCard>
       </CCol>

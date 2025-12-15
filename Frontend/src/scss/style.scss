@@ -363,6 +363,17 @@ body {
   .list-group-item.bg-white .text-muted {
     color: var(--cui-body-secondary-color) !important;
   }
+
+  /* Ensure helper text remains readable on hover in dark mode */
+  .small.text-body-secondary:hover,
+  .text-body-secondary.small:hover {
+    color: #000 !important;
+  }
+
+  /* Keep option helper text readable when the button is hovered */
+  .btn.btn-outline-light.w-100.h-100.text-start.p-3:hover .small.text-body-secondary.mt-1 {
+    color: #000 !important;
+  }
 }
 
 // ===== Enhanced surfaces =====
@@ -794,11 +805,11 @@ body {
   }
 
   &.habit-col {
-    position: sticky;
-    left: 0;
-    z-index: 4;
+    position: static;
+    left: auto;
+    z-index: auto;
     background: inherit;
-    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.05);
+    box-shadow: none;
   }
 }
 

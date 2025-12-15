@@ -403,23 +403,21 @@ const Register = () => {
     }
 
     return (
-      <div className="d-flex flex-column gap-3">
-        <div className="p-3 bg-light rounded border">
-          <div className="d-flex align-items-center gap-2 mb-1">
-            <CIcon icon={cilEnvelopeClosed} className="text-primary" />
-            <h5 className="mb-0">Check your inbox</h5>
-          </div>
-          <p className="mb-2">We’ve sent a 6-digit code to {form.email || "your email"}. Enter it below to finish.</p>
-          <CButton
-            color="link"
-            className="px-0"
-            type="button"
-            onClick={requestVerificationCode}
-            disabled={sendingCode || submitting}
-          >
-            {sendingCode ? "Sending another code..." : "Didn’t get it? Resend code"}
-          </CButton>
+      <div className="d-flex flex-column gap-2">
+        <div className="d-flex align-items-center gap-2">
+          <CIcon icon={cilEnvelopeClosed} className="text-primary" />
+          <h5 className="mb-0">Check your inbox</h5>
         </div>
+        <p className="mb-1">We’ve sent a 6-digit code to {form.email || "your email"}. Enter it below to finish.</p>
+        <CButton
+          color="link"
+          className="px-0 align-self-start"
+          type="button"
+          onClick={requestVerificationCode}
+          disabled={sendingCode || submitting}
+        >
+          {sendingCode ? "Sending another code..." : "Didn’t get it? Resend code"}
+        </CButton>
 
         <CInputGroup className="mb-2">
           <CInputGroupText>
