@@ -9,6 +9,7 @@ import {
   CCardHeader,
   CCol,
   CForm,
+  CFormSelect,
   CFormTextarea,
   CListGroup,
   CListGroupItem,
@@ -69,6 +70,7 @@ const Dashboard = () => {
   const [aiSummary, setAiSummary] = useState("");
   const [aiSummaryAgent, setAiSummaryAgent] = useState(null);
   const [aiSummaryError, setAiSummaryError] = useState("");
+  const [selectedHabitId, setSelectedHabitId] = useState(null);
   const [patternModalOpen, setPatternModalOpen] = useState(false);
   const [patternInsights, setPatternInsights] = useState([]);
   const [patternRecommendation, setPatternRecommendation] = useState("");
@@ -292,25 +294,108 @@ const Dashboard = () => {
     [analytics]
   );
 
-  const trend = useMemo(
-    () => analytics?.summary?.dailyTrend?.slice(-10) ?? [],
-    [analytics]
-  );
+  const habitOptions = useMemo(() => {
+    const analyticHabits = analytics?.habits ?? [];
+    return analyticHabits
+      .filter((habit) => habit?.habitId)
+      .map((habit) => ({ id: String(habit.habitId), name: habit.habitName || "Habit" }));
+  }, [analytics?.habits]);
 
-  const weeklyTrend = useMemo(() => {
-    let streak = 0;
-    return trend.slice(-7).map((day) => {
-      const completed = Number(day.completed) || 0;
-      const missed = Number(day.missed) || 0;
-      const total = completed + missed;
-      streak = missed > 0 ? 0 : total > 0 ? streak + 1 : streak;
+  useEffect(() => {
+    if (!habitOptions.length) {
+      setSelectedHabitId(null);
+      return;
+    }
+
+    if (!habitOptions.some((option) => option.id === selectedHabitId)) {
+      setSelectedHabitId(habitOptions[0].id);
+    }
+  }, [habitOptions, selectedHabitId]);
+
+  const selectedHabitLabel = useMemo(() => {
+    return habitOptions.find((option) => option.id === selectedHabitId)?.name || "Select a habit";
+  }, [habitOptions, selectedHabitId]);
+
+  const formatShortDate = useCallback((dateString) => {
+    const parsed = new Date(dateString);
+    if (Number.isNaN(parsed.getTime())) return dateString;
+
+    return parsed.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+  }, []);
+
+  const buildWeeklyMomentumSeries = useCallback((entries = []) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const byDate = new Map(entries.map((entry) => [entry.date, entry]));
+
+    return Array.from({ length: 7 }, (_, idx) => {
+      const cursor = new Date(today);
+      cursor.setDate(today.getDate() - (6 - idx));
+      const iso = cursor.toISOString().slice(0, 10);
+      const entry = byDate.get(iso) || {};
+
+      const completedCount = entry.completed ?? entry.completedCount;
+      const missedCount = entry.missed ?? entry.missedCount;
+
+      let completedRate = 0;
+      let missedRate = 0;
+
+      if (completedCount != null || missedCount != null) {
+        const completed = Number(completedCount) || 0;
+        const missed = Number(missedCount) || 0;
+        const total = completed + missed;
+        completedRate = total ? completed / total : 0;
+        missedRate = total ? missed / total : 0;
+      } else {
+        completedRate = Math.max(0, Math.min(1, Number(entry.completedRate) || 0));
+        missedRate = Math.max(0, Math.min(1, Number(entry.missedRate) || 0));
+      }
+
       return {
-        ...day,
-        completionRate: total ? Math.round((completed / total) * 100) : 0,
-        runningStreak: streak,
+        date: iso,
+        completedRate,
+        missedRate,
       };
     });
-  }, [trend]);
+  }, []);
+
+  const selectedHabitAnalytics = useMemo(
+    () => analytics?.habits?.find((habit) => String(habit.habitId) === selectedHabitId) || null,
+    [analytics?.habits, selectedHabitId],
+  );
+
+  const overallTrend = useMemo(
+    () => analytics?.summary?.dailyTrend ?? [],
+    [analytics?.summary?.dailyTrend],
+  );
+
+  const weeklyMomentumTrend = useMemo(() => {
+    const source = selectedHabitAnalytics?.productivity?.length
+      ? selectedHabitAnalytics.productivity
+      : overallTrend;
+
+    return buildWeeklyMomentumSeries(source);
+  }, [buildWeeklyMomentumSeries, overallTrend, selectedHabitAnalytics?.productivity]);
+
+  const weeklyHabitStats = useMemo(() => {
+    const analyticHabits = analytics?.habits ?? [];
+
+    return analyticHabits.map((habit) => {
+      const completionRate = Math.round(
+        habit?.recent?.completionRate ?? habit?.successRate ?? 0,
+      );
+
+      return {
+        habitId: habit.habitId,
+        habitName: habit.habitName || "Habit",
+        completionRate,
+      };
+    });
+  }, [analytics?.habits]);
 
   const upcomingPlans = useMemo(() => {
     const schedulePlans = schedules
@@ -1049,26 +1134,52 @@ const Dashboard = () => {
 
             <CCol xs={12} lg={5}>
               <CCard className="h-100 elevated-card">
-                <CCardHeader className="fw-semibold">Momentum Trend</CCardHeader>
+                <CCardHeader className="fw-semibold">
+                  <div className="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <div className="d-flex flex-column flex-md-row align-items-md-center gap-2">
+                      <div className="text-body-secondary small">Focused habit</div>
+                      <CFormSelect
+                        size="sm"
+                        value={selectedHabitId || ""}
+                        onChange={(e) => setSelectedHabitId(e.target.value || null)}
+                        aria-label="Choose a habit to view weekly momentum"
+                        style={{ minWidth: 180 }}
+                      >
+                        <option value="">Select a habit</option>
+                        {habitOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </CFormSelect>
+                    </div>
+                  </div>
+                </CCardHeader>
                 <CCardBody style={{ height: 320 }}>
-                  {trend.length ? (
+                  <div className="small text-body-secondary mb-2">
+                    {selectedHabitLabel} · Week view
+                  </div>
+                  {weeklyMomentumTrend.length ? (
                     <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
-                      <AreaChart data={trend}>
+                      <AreaChart data={weeklyMomentumTrend}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis allowDecimals={false} />
-                        <Tooltip />
+                        <XAxis dataKey="date" tickFormatter={formatShortDate} />
+                        <YAxis domain={[0, 1]} ticks={[0, 1]} allowDecimals={false} />
+                        <Tooltip
+                          formatter={(value) => `${Math.round(Number(value) * 100)}%`}
+                          labelFormatter={formatShortDate}
+                        />
                         <Legend />
                         <Area
                           type="monotone"
-                          dataKey="completed"
+                          dataKey="completedRate"
                           name="Completed"
                           stroke="#2eb85c"
                           fill="rgba(46, 184, 92, 0.2)"
                         />
                         <Area
                           type="monotone"
-                          dataKey="missed"
+                          dataKey="missedRate"
                           name="Missed"
                           stroke="#e55353"
                           fill="rgba(229, 83, 83, 0.2)"
@@ -1077,7 +1188,9 @@ const Dashboard = () => {
                     </ResponsiveContainer>
                   ) : (
                     <div className="text-body-secondary text-center">
-                      Not enough data yet. Keep logging to unlock your trendline.
+                      {selectedHabitId
+                        ? `No weekly data yet for ${selectedHabitLabel}. Keep logging this habit.`
+                        : "Select a habit to view its weekly momentum trend."}
                     </div>
                   )}
                   {analyticsError && (
@@ -1091,40 +1204,33 @@ const Dashboard = () => {
 
             <CCol xs={12} lg={5}>
               <CCard className="h-100 elevated-card">
-                <CCardHeader className="fw-semibold">
-                  Weekly streak & completion
+                <CCardHeader className="fw-semibold d-flex justify-content-between align-items-center">
+                  <div className="d-flex flex-column">
+                    <span className="text-body-secondary small">Habit</span>
+                    <span>Weekly success</span>
+                  </div>
+                  <div className="text-body-secondary small">Success rate for each habit (last 7 days)</div>
                 </CCardHeader>
                 <CCardBody style={{ height: 280 }}>
-                  {weeklyTrend.length ? (
+                  {weeklyHabitStats.length ? (
                     <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
-                      <ComposedChart data={weeklyTrend}>
+                      <ComposedChart data={weeklyHabitStats}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis yAxisId="left" domain={[0, 100]} />
-                        <YAxis yAxisId="right" orientation="right" allowDecimals={false} />
-                        <Tooltip />
+                        <XAxis dataKey="habitName" interval={0} angle={-20} textAnchor="end" height={60} />
+                        <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} />
+                        <Tooltip formatter={(value) => `${value}%` } />
                         <Legend />
                         <Bar
-                          yAxisId="left"
                           dataKey="completionRate"
-                          name="Completion %"
+                          name="Weekly success %"
                           fill="#39f"
                           radius={[6, 6, 0, 0]}
-                        />
-                        <Line
-                          yAxisId="right"
-                          type="monotone"
-                          dataKey="runningStreak"
-                          name="Running streak"
-                          stroke="#2eb85c"
-                          strokeWidth={3}
-                          dot={false}
                         />
                       </ComposedChart>
                     </ResponsiveContainer>
                   ) : (
                     <div className="text-body-secondary text-center my-5">
-                      Complete check-ins this week to unlock your streak graph.
+                      Complete check-ins this week to see success for each habit.
                     </div>
                   )}
                 </CCardBody>
