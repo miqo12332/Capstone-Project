@@ -29,6 +29,11 @@ export const fetchChallengeMessages = (challengeId, userId) =>
     .get(`/group-challenges/${challengeId}/messages`, { params: { userId } })
     .then((response) => response.data);
 
+export const fetchChallengeMessageSummary = (challengeId, userId) =>
+  api
+    .get(`/group-challenges/${challengeId}/messages/summary`, { params: { userId } })
+    .then((response) => response.data);
+
 export const sendChallengeMessage = (challengeId, userId, content) =>
   api
     .post(`/group-challenges/${challengeId}/messages`, { userId, content })

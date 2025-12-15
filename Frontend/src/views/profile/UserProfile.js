@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useRef, useState } from "react"
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import {
   CAlert,
   CAvatar,
@@ -48,7 +48,9 @@ import { AuthContext } from "../../context/AuthContext"
 import { HabitContext } from "../../context/HabitContext"
 import { fetchUserSettings, saveUserSettings } from "../../services/settings"
 import { getProgressAnalytics } from "../../services/analytics"
+import { fetchCalendarOverview } from "../../services/calendar"
 import { API_BASE, ASSET_BASE } from "../../utils/apiConfig"
+import { useDataRefresh, REFRESH_SCOPES } from "../../utils/refreshBus"
 import ResetPasswordModal from "../../components/auth/ResetPasswordModal"
 
 const THEME_STORAGE_KEY = "coreui-free-react-admin-template-theme"
@@ -199,6 +201,46 @@ const UserProfile = () => {
   useEffect(() => {
     setColorMode(mapThemeToColorMode(preferences.theme))
   }, [preferences.theme, setColorMode])
+
+  const refreshCalendarConnection = useCallback(async () => {
+    if (!user?.id) return
+    try {
+      const overview = await fetchCalendarOverview(user.id, { days: 7 })
+
+      const integrations =
+        overview?.integrations || overview?.overview?.integrations || overview?.data?.integrations || []
+      const providersMap =
+        overview?.summary?.providers || overview?.overview?.summary?.providers || overview?.data?.providers || {}
+      const hasEventData = Array.isArray(overview?.events) && overview.events.length > 0
+
+      const hasGoogleIntegration = integrations.some((integration) => {
+        const provider = (integration.provider || integration.type || "").toLowerCase()
+        const label = (integration.label || "").toLowerCase()
+        return provider === "google" || label.includes("google")
+      })
+
+      const hasGoogleProviderCount = Boolean(
+        Object.entries(providersMap || {}).some(([key, count]) => {
+          const normalizedKey = key.toLowerCase()
+          return normalizedKey === "google" && Number(count || 0) > 0
+        }),
+      )
+
+      setConnectedApps((prev) => ({
+        ...prev,
+        googleCalendar:
+          hasGoogleIntegration || hasGoogleProviderCount || hasEventData || prev.googleCalendar,
+      }))
+    } catch (err) {
+      console.error("Failed to refresh calendar integrations", err)
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    refreshCalendarConnection()
+  }, [refreshCalendarConnection])
+
+  useDataRefresh([REFRESH_SCOPES.INTEGRATIONS], refreshCalendarConnection)
 
   useEffect(() => {
     const mappedTheme = mapColorModeToTheme(colorMode)
@@ -533,52 +575,41 @@ const UserProfile = () => {
           <CListGroupItem className="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
               <div className="fw-semibold">Google Calendar</div>
-              <small className="text-body-secondary">Block time for routines alongside events.</small>
+              <small className="text-body-secondary">
+                Status is checked automatically based on your account connection.
+              </small>
             </div>
             <div className="d-flex align-items-center gap-2">
               <CBadge color={connectedApps.googleCalendar ? "success" : "secondary"}>
                 {connectedApps.googleCalendar ? "Connected" : "Not connected"}
               </CBadge>
-              <CFormSwitch
-                checked={connectedApps.googleCalendar}
-                onChange={(event) =>
-                  setConnectedApps((prev) => ({ ...prev, googleCalendar: event.target.checked }))
-                }
-              />
+              <CBadge color="info" className="text-uppercase">Auto</CBadge>
             </div>
           </CListGroupItem>
           <CListGroupItem className="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
               <div className="fw-semibold">Apple Calendar</div>
-              <small className="text-body-secondary">See habits next to your schedule.</small>
+              <small className="text-body-secondary">Future improvement to see habits next to your schedule.</small>
             </div>
             <div className="d-flex align-items-center gap-2">
               <CBadge color={connectedApps.appleCalendar ? "success" : "secondary"}>
                 {connectedApps.appleCalendar ? "Connected" : "Not connected"}
               </CBadge>
-              <CFormSwitch
-                checked={connectedApps.appleCalendar}
-                onChange={(event) =>
-                  setConnectedApps((prev) => ({ ...prev, appleCalendar: event.target.checked }))
-                }
-              />
+              <CBadge color="warning" className="text-uppercase">Coming soon</CBadge>
             </div>
           </CListGroupItem>
           <CListGroupItem className="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
               <div className="fw-semibold">Fitness Sync</div>
-              <small className="text-body-secondary">Import steps and workouts to fuel streaks.</small>
+              <small className="text-body-secondary">
+                Future improvement to import steps and workouts to fuel streaks.
+              </small>
             </div>
             <div className="d-flex align-items-center gap-2">
               <CBadge color={connectedApps.fitnessSync ? "success" : "secondary"}>
                 {connectedApps.fitnessSync ? "Connected" : "Not connected"}
               </CBadge>
-              <CFormSwitch
-                checked={connectedApps.fitnessSync}
-                onChange={(event) =>
-                  setConnectedApps((prev) => ({ ...prev, fitnessSync: event.target.checked }))
-                }
-              />
+              <CBadge color="warning" className="text-uppercase">Coming soon</CBadge>
             </div>
           </CListGroupItem>
         </CListGroup>

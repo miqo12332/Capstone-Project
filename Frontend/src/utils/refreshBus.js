@@ -8,6 +8,7 @@ export const REFRESH_SCOPES = {
   SCHEDULES: "schedules",
   PROGRESS: "progress",
   ANALYTICS: "analytics",
+  INTEGRATIONS: "integrations",
 }
 
 export const emitDataRefresh = (scope = REFRESH_SCOPES.ALL, meta = {}) => {

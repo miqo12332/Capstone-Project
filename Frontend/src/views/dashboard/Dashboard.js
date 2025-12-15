@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CAlert,
   CBadge,
@@ -9,9 +9,6 @@ import {
   CCardHeader,
   CCol,
   CForm,
-  CFormInput,
-  CInputGroup,
-  CInputGroupText,
   CFormTextarea,
   CListGroup,
   CListGroupItem,
@@ -19,6 +16,7 @@ import {
   CModalBody,
   CModalFooter,
   CModalHeader,
+  CModalTitle,
   CProgress,
   CProgressBar,
   CRow,
@@ -40,11 +38,7 @@ import {
 } from "recharts";
 import { getHabits } from "../../services/habits";
 import { getSchedules } from "../../services/schedules";
-import {
-  getTodayProgressLogs,
-  logHabitProgress,
-  updateHabitProgressCount,
-} from "../../services/progress";
+import { getTodayProgressLogs, updateHabitProgressCount } from "../../services/progress";
 import { formatPercent, getProgressAnalytics } from "../../services/analytics";
 import { fetchCalendarOverview } from "../../services/calendar";
 import {
@@ -58,14 +52,13 @@ import { useDataRefresh, REFRESH_SCOPES } from "../../utils/refreshBus";
 const Dashboard = () => {
   const [habits, setHabits] = useState([]);
   const [todayCounts, setTodayCounts] = useState({});
+  const [todayStatus, setTodayStatus] = useState({});
   const [analytics, setAnalytics] = useState(null);
   const [analyticsError, setAnalyticsError] = useState("");
   const [schedules, setSchedules] = useState([]);
   const [calendarOverview, setCalendarOverview] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [editingHabitId, setEditingHabitId] = useState(null);
-  const [editCounts, setEditCounts] = useState({ done: 0, missed: 0 });
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [aiNote, setAiNote] = useState("");
   const [aiProfile, setAiProfile] = useState(null);
@@ -81,6 +74,14 @@ const Dashboard = () => {
   const [patternRecommendation, setPatternRecommendation] = useState("");
   const [patternLoading, setPatternLoading] = useState(false);
   const [patternError, setPatternError] = useState("");
+  const [noteModal, setNoteModal] = useState({
+    open: false,
+    habitId: null,
+    status: null,
+    habitTitle: "",
+    note: "",
+  });
+  const statusClickTimers = useRef({});
   const navigate = useNavigate();
 
   const user = useMemo(
@@ -88,30 +89,41 @@ const Dashboard = () => {
     []
   );
 
-  const rowsToCounts = (rows) => {
-    return rows.reduce((acc, row) => {
-      const hid = row.habit_id;
-      if (!acc[hid]) {
-        acc[hid] = { done: 0, missed: 0 };
-      }
-      if (row.status === "done") {
-        acc[hid].done += 1;
-      } else if (row.status === "missed") {
-        acc[hid].missed += 1;
-      }
-      return acc;
-    }, {});
-  };
+  const parseTodayRows = useCallback((rows) => {
+    return rows.reduce(
+      (acc, row) => {
+        const hid = row.habit_id;
+        if (!hid) return acc;
 
-  const loadTodayProgress = async () => {
+        if (!acc.counts[hid]) {
+          acc.counts[hid] = { done: 0, missed: 0 };
+        }
+
+        if (row.status === "done") {
+          acc.counts[hid].done += 1;
+          acc.status[hid] = { status: "done", note: row.reason || row.note || "" };
+        } else if (row.status === "missed") {
+          acc.counts[hid].missed += 1;
+          acc.status[hid] = { status: "missed", note: row.reason || row.note || "" };
+        }
+
+        return acc;
+      },
+      { counts: {}, status: {} },
+    );
+  }, []);
+
+  const loadTodayProgress = useCallback(async () => {
     try {
       if (!user?.id) return;
       const rows = await getTodayProgressLogs(user.id);
-      setTodayCounts(rowsToCounts(rows));
+      const parsed = parseTodayRows(rows);
+      setTodayCounts(parsed.counts);
+      setTodayStatus(parsed.status);
     } catch (err) {
       console.warn("⚠️ Failed to fetch today’s progress:", err);
     }
-  };
+  }, [parseTodayRows, user?.id]);
 
   const loadCore = useCallback(async () => {
     try {
@@ -128,14 +140,16 @@ const Dashboard = () => {
       ]);
 
       setHabits(habitData);
-      setTodayCounts(rowsToCounts(progressRows));
+      const parsed = parseTodayRows(progressRows);
+      setTodayCounts(parsed.counts);
+      setTodayStatus(parsed.status);
     } catch (err) {
       console.error("❌ Error loading dashboard essentials", err);
       setError(err.message || "Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [parseTodayRows, user?.id]);
 
   const loadAnalytics = useCallback(async () => {
     if (!user?.id) return;
@@ -346,98 +360,100 @@ const Dashboard = () => {
       .slice(0, 5);
   }, [schedules, calendarOverview]);
 
-  const startEdit = (habitId) => {
-    const current = todayCounts[habitId] ?? { done: 0, missed: 0 };
-    setEditingHabitId(habitId);
-    setEditCounts(current);
-  };
+  const getHabitStatus = useCallback(
+    (habitId) => {
+      const explicitStatus = todayStatus[habitId]?.status;
+      if (explicitStatus) return explicitStatus;
 
-  const cancelEdit = () => {
-    setEditingHabitId(null);
-    setEditCounts({ done: 0, missed: 0 });
-  };
+      if (todayCounts[habitId]?.done) return "done";
+      if (todayCounts[habitId]?.missed) return "missed";
 
-  const startMissedLog = (habitId, habitTitle) => {
-    setMissedError("");
-    setMissedReason("");
-    setMissedLogModal({
-      open: true,
-      habitId,
-      habitTitle: habitTitle || "this habit",
-    });
-  };
+      return null;
+    },
+    [todayCounts, todayStatus],
+  );
 
-  const closeMissedLog = () => {
-    setMissedLogModal({ open: false, habitId: null, habitTitle: "" });
-    setMissedReason("");
-    setMissedSaving(false);
-  };
+  const applyTodayStatus = useCallback(
+    async (habitId, status, note = "") => {
+      if (!user?.id || !habitId) return;
 
-  const submitEdit = async (habitId) => {
-    if (!user?.id) return;
-    try {
-      const { done, missed } = editCounts;
+      const trimmedNote = note?.trim() || "";
+
       await Promise.all([
         updateHabitProgressCount(habitId, {
           userId: user.id,
           status: "done",
-          targetCount: Number(done) || 0,
+          targetCount: status === "done" ? 1 : 0,
+          note: status === "done" ? trimmedNote || null : null,
         }),
         updateHabitProgressCount(habitId, {
           userId: user.id,
           status: "missed",
-          targetCount: Number(missed) || 0,
+          targetCount: status === "missed" ? 1 : 0,
+          note: status === "missed" ? trimmedNote || null : null,
         }),
       ]);
+
       await loadTodayProgress();
-      cancelEdit();
-    } catch (err) {
-      console.error("❌ Failed to update counts", err);
-      alert("Couldn't save the updated counts. Please try again.");
-    }
-  };
-
-  const handleQuickLog = async (habitId, status, reason) => {
-    if (!user?.id) return;
-
-    const payload = { userId: user.id, status };
-    if (status === "missed") {
-      const trimmed = reason?.trim();
-      if (!trimmed) {
-        throw new Error("Please share a short note about why you missed it.");
-      }
-      payload.reason = trimmed;
-    }
-
-    await logHabitProgress(habitId, payload);
-    await loadTodayProgress();
-    cancelEdit();
-  };
+    },
+    [loadTodayProgress, user?.id],
+  );
 
   const handleDoneClick = async (habitId) => {
+    if (getHabitStatus(habitId) === "done") return;
+
     try {
-      await handleQuickLog(habitId, "done");
+      await applyTodayStatus(habitId, "done");
     } catch (err) {
       console.error("❌ Server error logging progress", err);
       alert("Failed to log progress. Please try again.");
     }
   };
 
-  const submitMissedLog = async () => {
-    if (!missedLogModal.habitId) return;
+  const handleMissedClick = async (habitId) => {
+    if (getHabitStatus(habitId) === "missed") return;
 
     try {
-      setMissedSaving(true);
-      setMissedError("");
-      await handleQuickLog(missedLogModal.habitId, "missed", missedReason);
-      closeMissedLog();
+      await applyTodayStatus(habitId, "missed");
     } catch (err) {
-      console.error("❌ Failed to log missed reason", err);
-      setMissedError(
-        err.message || "We couldn't save your reflection. Please try again."
-      );
-    } finally {
-      setMissedSaving(false);
+      console.error("❌ Failed to log missed progress", err);
+      alert("Failed to log progress. Please try again.");
+    }
+  };
+
+  const openDescriptionModal = (habit, status) => {
+    if (!status) return;
+
+    const noteDetails = todayStatus[habit.id];
+
+    setNoteModal({
+      open: true,
+      habitId: habit.id,
+      status,
+      habitTitle: habit.title || habit.name || "Habit",
+      note: noteDetails?.status === status ? noteDetails?.note || "" : "",
+    });
+  };
+
+  const closeDescriptionModal = () => {
+    setNoteModal({
+      open: false,
+      habitId: null,
+      status: null,
+      habitTitle: "",
+      note: "",
+    });
+  };
+
+  const submitDescription = async () => {
+    if (!noteModal.habitId || !noteModal.status) return;
+
+    try {
+      await applyTodayStatus(noteModal.habitId, noteModal.status, noteModal.note);
+      closeDescriptionModal();
+    } catch (err) {
+      console.error("❌ Failed to save description", err);
+      alert("We couldn't save that description. Please try again.");
     }
   };
 
@@ -491,6 +507,40 @@ const Dashboard = () => {
     { label: "Add Schedule", icon: "📅", path: "/schedules" },
     { label: "Log Progress", icon: "📝", path: "/progress-tracker" },
   ];
+
+  useEffect(() => {
+    return () => {
+      Object.values(statusClickTimers.current || {}).forEach((timer) => {
+        if (timer) clearTimeout(timer);
+      });
+    };
+  }, []);
+
+  const scheduleStatusAction = (habit, status) => {
+    const key = `${habit.id}-${status}`;
+    if (statusClickTimers.current[key]) {
+      clearTimeout(statusClickTimers.current[key]);
+    }
+
+    statusClickTimers.current[key] = setTimeout(() => {
+      statusClickTimers.current[key] = null;
+      if (status === "done") {
+        handleDoneClick(habit.id);
+      } else if (status === "missed") {
+        handleMissedClick(habit.id);
+      }
+    }, 200);
+  };
+
+  const handleStatusDoubleClick = (event, habit, status) => {
+    event.preventDefault();
+    const key = `${habit.id}-${status}`;
+    if (statusClickTimers.current[key]) {
+      clearTimeout(statusClickTimers.current[key]);
+      statusClickTimers.current[key] = null;
+    }
+    openDescriptionModal(habit, status);
+  };
 
   const formatTrendLabel = (entry) => {
     if (!entry) return "recent day";
@@ -927,11 +977,15 @@ const Dashboard = () => {
                     </CAlert>
                   )}
 
+                  <div className="text-body-secondary small mb-3">
+                    Double-click a status to add a description, just like in My Habits.
+                  </div>
+
                   {habits.map((habit) => {
                     const counts = todayCounts[habit.id] ?? { done: 0, missed: 0 };
                     const total = counts.done + counts.missed;
                     const rate = total ? Math.round((counts.done / total) * 100) : 0;
-                    const inEdit = editingHabitId === habit.id;
+                    const status = getHabitStatus(habit.id);
 
                     return (
                       <div
@@ -963,89 +1017,36 @@ const Dashboard = () => {
                               />
                             </CProgress>
                             <div className="text-body-secondary small">
-                              {counts.done} done · {counts.missed} missed today
+                              {status
+                                ? `Marked ${status} today${
+                                    todayStatus[habit.id]?.note ? ` • ${todayStatus[habit.id]?.note}` : ""
+                                  }`
+                                : "Waiting for today's check-in."}
                             </div>
                           </div>
 
-                          {!inEdit && (
-                            <CButtonGroup size="sm">
-                              <CButton
-                                color="danger"
-                                onClick={() =>
-                                  startMissedLog(habit.id, habit.title || habit.name)
-                                }
-                              >
-                                Missed
-                              </CButton>
-                              <CButton
-                                color="success"
-                                onClick={() => handleDoneClick(habit.id)}
-                              >
-                                Done
-                              </CButton>
-                              <CButton
-                                color="secondary"
-                                variant="outline"
-                                onClick={() => startEdit(habit.id)}
-                              >
-                                Adjust
-                              </CButton>
-                            </CButtonGroup>
-                          )}
-
-                          {inEdit && (
-                            <div className="flex-grow-1">
-                              <CForm
-                                className="d-flex flex-column flex-lg-row gap-2"
-                                onSubmit={(event) => {
-                                  event.preventDefault();
-                                  submitEdit(habit.id);
-                                }}
-                              >
-                                <CInputGroup>
-                                  <CInputGroupText>Done</CInputGroupText>
-                                  <CFormInput
-                                    type="number"
-                                    min={0}
-                                    value={editCounts.done}
-                                    onChange={(event) =>
-                                      setEditCounts((prev) => ({
-                                        ...prev,
-                                        done: event.target.value,
-                                      }))
-                                    }
-                                  />
-                                </CInputGroup>
-                                <CInputGroup>
-                                  <CInputGroupText>Missed</CInputGroupText>
-                                  <CFormInput
-                                    type="number"
-                                    min={0}
-                                    value={editCounts.missed}
-                                    onChange={(event) =>
-                                      setEditCounts((prev) => ({
-                                        ...prev,
-                                        missed: event.target.value,
-                                      }))
-                                    }
-                                  />
-                                </CInputGroup>
-                                <CButtonGroup size="sm" className="align-self-start">
-                                  <CButton color="primary" type="submit">
-                                    Save
-                                  </CButton>
-                                  <CButton
-                                    color="secondary"
-                                    variant="outline"
-                                    type="button"
-                                    onClick={cancelEdit}
-                                  >
-                                    Cancel
-                                  </CButton>
-                                </CButtonGroup>
-                              </CForm>
-                            </div>
-                          )}
+                          <CButtonGroup size="sm">
+                            <CButton
+                              color="danger"
+                              variant={status === "missed" ? undefined : "outline"}
+                              active={status === "missed"}
+                              onClick={() => scheduleStatusAction(habit, "missed")}
+                              onDoubleClick={(event) =>
+                                handleStatusDoubleClick(event, habit, "missed")
+                              }
+                            >
+                              Missed
+                            </CButton>
+                            <CButton
+                              color="success"
+                              variant={status === "done" ? undefined : "outline"}
+                              active={status === "done"}
+                              onClick={() => scheduleStatusAction(habit, "done")}
+                              onDoubleClick={(event) => handleStatusDoubleClick(event, habit, "done")}
+                            >
+                              Done
+                            </CButton>
+                          </CButtonGroup>
                         </div>
                       </div>
                     );
@@ -1290,6 +1291,39 @@ const Dashboard = () => {
           </CRow>
         </>
       )}
+
+      <CModal alignment="center" visible={noteModal.open} onClose={closeDescriptionModal}>
+        <CModalHeader closeButton>
+          <CModalTitle>Add a description for today</CModalTitle>
+        </CModalHeader>
+        <CModalBody className="d-flex flex-column gap-3">
+          <div className="text-muted">
+            {noteModal.habitTitle} · {noteModal.status}
+          </div>
+          <CFormTextarea
+            rows={3}
+            value={noteModal.note}
+            onChange={(event) =>
+              setNoteModal((prev) => ({
+                ...prev,
+                note: event.target.value,
+              }))
+            }
+            placeholder={`Description for today's ${noteModal.status || ""} log (optional).`}
+          />
+          <div className="text-body-secondary small">
+            Notes stay connected to your My Habits descriptions for this exact status.
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" variant="outline" onClick={closeDescriptionModal}>
+            Cancel
+          </CButton>
+          <CButton color="primary" onClick={submitDescription}>
+            Save description
+          </CButton>
+        </CModalFooter>
+      </CModal>
 
       <CModal
         alignment="center"

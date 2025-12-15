@@ -33,6 +33,7 @@ import {
   syncCalendar,
   disconnectIntegration,
 } from "../../services/calendar";
+import { emitDataRefresh, REFRESH_SCOPES } from "../../utils/refreshBus";
 
 const providerDefaults = {
   google: "Google Calendar",
@@ -132,6 +133,10 @@ const CalendarSync = () => {
       setSuccess(
         `${result.integration?.label || providerDefaults[form.provider]} is now synced.`
       );
+      emitDataRefresh(REFRESH_SCOPES.INTEGRATIONS, {
+        provider: form.provider,
+        connected: true,
+      });
       setForm((prev) => ({
         ...prev,
         icsText: "",
@@ -158,6 +163,10 @@ const CalendarSync = () => {
       });
       setOverview(result.overview);
       setSuccess(`${integration.label} refreshed successfully.`);
+      emitDataRefresh(REFRESH_SCOPES.INTEGRATIONS, {
+        provider: integration.provider,
+        connected: true,
+      });
     } catch (err) {
       setError(err.message || "Unable to refresh calendar feed.");
     } finally {
@@ -172,6 +181,10 @@ const CalendarSync = () => {
       const data = await fetchCalendarOverview(userId, { days: 45 });
       setOverview(data);
       setSuccess(`${integration.label} was disconnected.`);
+      emitDataRefresh(REFRESH_SCOPES.INTEGRATIONS, {
+        provider: integration.provider,
+        connected: false,
+      });
     } catch (err) {
       setError(err.message || "Unable to disconnect calendar.");
     }

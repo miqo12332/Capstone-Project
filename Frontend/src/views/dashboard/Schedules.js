@@ -321,6 +321,10 @@ const MySchedule = () => {
       if (calendarFileInputRef.current) {
         calendarFileInputRef.current.value = ""
       }
+      emitDataRefresh(REFRESH_SCOPES.INTEGRATIONS, {
+        provider: payload.provider,
+        connected: true,
+      })
     } catch (err) {
       console.error("❌ Failed to sync Google Calendar:", err)
       setCalendarError(err?.message || "Could not sync Google Calendar")

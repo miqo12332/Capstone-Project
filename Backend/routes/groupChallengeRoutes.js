@@ -265,6 +265,55 @@ router.get("/:challengeId/messages", async (req, res) => {
   }
 });
 
+// Get message count/metadata for a challenge
+router.get("/:challengeId/messages/summary", async (req, res) => {
+  try {
+    const { challengeId } = req.params;
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    const challenge = await GroupChallenge.findByPk(challengeId);
+    if (!challenge) {
+      return res.status(404).json({ error: "Challenge not found" });
+    }
+
+    const membership = await UserGroupChallenge.findOne({
+      where: {
+        challenge_id: challengeId,
+        user_id: userId,
+        status: "accepted",
+      },
+    });
+
+    if (!membership) {
+      return res
+        .status(403)
+        .json({ error: "You must join this challenge to view chat" });
+    }
+
+    const totalMessages = await GroupChallengeMessage.count({
+      where: { challenge_id: challengeId },
+    });
+
+    const latestMessage = await GroupChallengeMessage.findOne({
+      where: { challenge_id: challengeId },
+      attributes: ["created_at"],
+      order: [["created_at", "DESC"]],
+    });
+
+    res.json({
+      totalMessages,
+      latestMessageAt: latestMessage?.created_at || null,
+    });
+  } catch (err) {
+    console.error("Failed to fetch message summary", err);
+    res.status(500).json({ error: "Failed to fetch message summary" });
+  }
+});
+
 // Post a new chat message to a challenge
 router.post("/:challengeId/messages", async (req, res) => {
   try {

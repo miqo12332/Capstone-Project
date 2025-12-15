@@ -19,7 +19,6 @@ import { cilCalendar, cilList, cilLoopCircular, cilPlus, cilSync } from "@coreui
 
 import CalendarSync from "../sync/CalendarSync"
 import MyRoutine from "../pages/MyRoutine"
-import SmartScheduler from "./SmartScheduler"
 import Schedules from "./Schedules"
 import "./Planner.css"
 
@@ -110,11 +109,6 @@ const Planner = () => {
               </CNavLink>
             </CNavItem>
             <CNavItem>
-              <CNavLink active={activeTab === "smart"} onClick={() => setActiveTab("smart")}>
-                <CIcon icon={cilList} className="me-2" /> Smart Scheduling
-              </CNavLink>
-            </CNavItem>
-            <CNavItem>
               <CNavLink active={activeTab === "sync"} onClick={() => setActiveTab("sync")}>
                 <CIcon icon={cilSync} className="me-2" /> Sync
               </CNavLink>
@@ -129,11 +123,6 @@ const Planner = () => {
               <CTabPane visible={activeTab === "add"}>
                 <div className="mt-2">
                   <Schedules />
-                </div>
-              </CTabPane>
-              <CTabPane visible={activeTab === "smart"}>
-                <div className="mt-2">
-                  <SmartScheduler />
                 </div>
               </CTabPane>
               <CTabPane visible={activeTab === "sync"}>

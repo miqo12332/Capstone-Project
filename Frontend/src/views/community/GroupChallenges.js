@@ -41,6 +41,7 @@ import {
   cancelJoinRequest,
   decideJoinRequest,
   fetchChallengeMessages,
+  fetchChallengeMessageSummary,
   sendChallengeMessage,
 } from "../../services/challenges"
 import { fetchFriends } from "../../services/friends"
@@ -97,6 +98,7 @@ const GroupChallenges = () => {
   const [chatLocation, setChatLocation] = useState(null)
   const [chatLocating, setChatLocating] = useState(false)
   const chatFileInputRef = useRef(null)
+  const [messageSummaries, setMessageSummaries] = useState({})
 
   const isAuthenticated = Boolean(user)
 
@@ -274,6 +276,39 @@ const GroupChallenges = () => {
     return status === "accepted" || role === "creator"
   }
 
+  const chatStorageKey = (challengeId) =>
+    user?.id ? `challengeChatRead:${user.id}:${challengeId}` : null
+
+  const getLastReadCount = (challengeId) => {
+    const key = chatStorageKey(challengeId)
+    if (!key) return 0
+    const stored = localStorage.getItem(key)
+    return stored ? Number(stored) || 0 : 0
+  }
+
+  const markMessagesAsRead = (challengeId, totalMessages, latestMessageAt) => {
+    const key = chatStorageKey(challengeId)
+    if (!key) return
+
+    localStorage.setItem(key, String(totalMessages))
+    setMessageSummaries((prev) => ({
+      ...prev,
+      [challengeId]: {
+        ...(prev[challengeId] || {}),
+        totalMessages,
+        latestMessageAt: latestMessageAt ?? prev[challengeId]?.latestMessageAt ?? null,
+      },
+    }))
+  }
+
+  const getUnreadCount = (challengeId) => {
+    const summary = messageSummaries[challengeId]
+    if (!summary) return 0
+
+    const lastRead = getLastReadCount(challengeId)
+    return Math.max(summary.totalMessages - lastRead, 0)
+  }
+
   const formattedChallenges = useMemo(
     () =>
       challenges.map((challenge) => ({
@@ -378,7 +413,16 @@ const GroupChallenges = () => {
         setChatLoading(true)
         setChatError("")
         const data = await fetchChallengeMessages(chatChallenge.id, user.id)
-        setChatMessages(Array.isArray(data) ? data : [])
+        const messagesArray = Array.isArray(data) ? data : []
+        setChatMessages(messagesArray)
+
+        const totalMessages = messagesArray.length
+        const latestMessageAt = totalMessages > 0 ? messagesArray[totalMessages - 1]?.created_at : null
+        setMessageSummaries((prev) => ({
+          ...prev,
+          [chatChallenge.id]: { totalMessages, latestMessageAt },
+        }))
+        markMessagesAsRead(chatChallenge.id, totalMessages, latestMessageAt)
       } catch (err) {
         console.error("Failed to load chat messages", err)
         const message =
@@ -391,6 +435,48 @@ const GroupChallenges = () => {
 
     loadMessages()
   }, [chatChallenge?.id, user?.id])
+
+  useEffect(() => {
+    if (!user?.id) {
+      setMessageSummaries({})
+      return
+    }
+
+    const loadSummaries = async () => {
+      const eligibleChallenges = challenges.filter((challenge) => canChat(challenge))
+      const results = await Promise.all(
+        eligibleChallenges.map(async (challenge) => {
+          try {
+            const summary = await fetchChallengeMessageSummary(challenge.id, user.id)
+            return [challenge.id, summary]
+          } catch (err) {
+            console.error("Failed to fetch challenge message summary", err)
+            return [challenge.id, null]
+          }
+        })
+      )
+
+      setMessageSummaries((prev) => {
+        const next = { ...prev }
+        results.forEach(([id, summary]) => {
+          if (summary) {
+            next[id] = summary
+          }
+        })
+        return next
+      })
+    }
+
+    loadSummaries()
+  }, [challenges, user?.id])
+
+  useEffect(() => {
+    if (!chatChallenge?.id) return
+
+    const totalMessages = chatMessages.length
+    const latestMessageAt = totalMessages > 0 ? chatMessages[totalMessages - 1]?.created_at : null
+    markMessagesAsRead(chatChallenge.id, totalMessages, latestMessageAt)
+  }, [chatChallenge?.id, chatMessages])
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -548,17 +634,31 @@ const GroupChallenges = () => {
                           {challenge.creator?.name ? `Host: ${challenge.creator.name}` : ""}
                         </div>
                         <div className="d-flex align-items-center gap-2">
-                          <CButton
-                            color="secondary"
-                            variant="outline"
-                            size="sm"
-                            disabled={!canChat(challenge) || !isAuthenticated}
-                            onClick={() => openChat(challenge)}
-                            className="rounded-pill"
-                          >
-                            <CIcon icon={cilChatBubble} className="me-2" />
-                            {canChat(challenge) ? "Open chat" : "Join to chat"}
-                          </CButton>
+                          {(() => {
+                            const unreadCount = getUnreadCount(challenge.id)
+
+                            return (
+                              <CButton
+                                color="secondary"
+                                variant="outline"
+                                size="sm"
+                                disabled={!canChat(challenge) || !isAuthenticated}
+                                onClick={() => openChat(challenge)}
+                                className="rounded-pill position-relative"
+                              >
+                                <CIcon icon={cilChatBubble} className="me-2" />
+                                {canChat(challenge) ? "Open chat" : "Join to chat"}
+                                {unreadCount > 0 && (
+                                  <CBadge
+                                    color="danger"
+                                    className="position-absolute top-0 start-100 translate-middle rounded-pill"
+                                  >
+                                    {unreadCount}
+                                  </CBadge>
+                                )}
+                              </CButton>
+                            )
+                          })()}
                           {renderJoinButton(challenge)}
                         </div>
                       </div>
