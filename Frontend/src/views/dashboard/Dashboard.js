@@ -316,39 +316,70 @@ const Dashboard = () => {
     return habitOptions.find((option) => option.id === selectedHabitId)?.name || "Select a habit";
   }, [habitOptions, selectedHabitId]);
 
+  const formatShortDate = useCallback((dateString) => {
+    const parsed = new Date(dateString);
+    if (Number.isNaN(parsed.getTime())) return dateString;
+
+    return parsed.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+  }, []);
+
+  const buildWeeklyMomentumSeries = useCallback((entries = []) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const byDate = new Map(entries.map((entry) => [entry.date, entry]));
+
+    return Array.from({ length: 7 }, (_, idx) => {
+      const cursor = new Date(today);
+      cursor.setDate(today.getDate() - (6 - idx));
+      const iso = cursor.toISOString().slice(0, 10);
+      const entry = byDate.get(iso) || {};
+
+      const completedCount = entry.completed ?? entry.completedCount;
+      const missedCount = entry.missed ?? entry.missedCount;
+
+      let completedRate = 0;
+      let missedRate = 0;
+
+      if (completedCount != null || missedCount != null) {
+        const completed = Number(completedCount) || 0;
+        const missed = Number(missedCount) || 0;
+        const total = completed + missed;
+        completedRate = total ? completed / total : 0;
+        missedRate = total ? missed / total : 0;
+      } else {
+        completedRate = Math.max(0, Math.min(1, Number(entry.completedRate) || 0));
+        missedRate = Math.max(0, Math.min(1, Number(entry.missedRate) || 0));
+      }
+
+      return {
+        date: iso,
+        completedRate,
+        missedRate,
+      };
+    });
+  }, []);
+
+  const selectedHabitAnalytics = useMemo(
+    () => analytics?.habits?.find((habit) => String(habit.habitId) === selectedHabitId) || null,
+    [analytics?.habits, selectedHabitId],
+  );
+
   const overallTrend = useMemo(
     () => analytics?.summary?.dailyTrend ?? [],
     [analytics?.summary?.dailyTrend],
   );
 
-  const trendSource = useMemo(() => {
-    if (selectedHabitId) {
-      const specific = analytics?.habits?.find(
-        (habit) => String(habit.habitId) === selectedHabitId,
-      );
-      if (specific?.dailyTrend?.length) {
-        return specific.dailyTrend;
-      }
-    }
-
-    return overallTrend;
-  }, [analytics?.habits, overallTrend, selectedHabitId]);
-
   const weeklyMomentumTrend = useMemo(() => {
-    return trendSource.slice(-7).map((day) => {
-      const completed = Number(day.completed) || 0;
-      const missed = Number(day.missed) || 0;
-      const total = completed + missed;
-      const completedRate = total ? completed / total : 0;
-      const missedRate = total ? missed / total : 0;
+    const source = selectedHabitAnalytics?.productivity?.length
+      ? selectedHabitAnalytics.productivity
+      : overallTrend;
 
-      return {
-        ...day,
-        completedRate,
-        missedRate,
-      };
-    });
-  }, [trendSource]);
+    return buildWeeklyMomentumSeries(source);
+  }, [buildWeeklyMomentumSeries, overallTrend, selectedHabitAnalytics?.productivity]);
 
   const weeklyHabitStats = useMemo(() => {
     const analyticHabits = analytics?.habits ?? [];
@@ -1132,11 +1163,11 @@ const Dashboard = () => {
                     <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
                       <AreaChart data={weeklyMomentumTrend}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
+                        <XAxis dataKey="date" tickFormatter={formatShortDate} />
                         <YAxis domain={[0, 1]} ticks={[0, 1]} allowDecimals={false} />
                         <Tooltip
                           formatter={(value) => `${Math.round(Number(value) * 100)}%`}
-                          labelFormatter={(label) => label}
+                          labelFormatter={formatShortDate}
                         />
                         <Legend />
                         <Area
