@@ -4,6 +4,8 @@ import path from 'node:path'
 import autoprefixer from 'autoprefixer'
 
 export default defineConfig(() => {
+  const backendTarget = process.env.VITE_API_ORIGIN || 'http://localhost:5001'
+
   return {
     base: './',
     build: {
@@ -44,7 +46,11 @@ export default defineConfig(() => {
       port: Number(process.env.VITE_DEV_PORT) || 80,
       proxy: {
         '/api': {
-          target: process.env.VITE_API_ORIGIN || 'http://localhost:5001',
+          target: backendTarget,
+          changeOrigin: true,
+        },
+        '/uploads': {
+          target: backendTarget,
           changeOrigin: true,
         },
       },
