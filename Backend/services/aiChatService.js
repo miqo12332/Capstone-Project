@@ -25,6 +25,12 @@ const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-3-5-sonnet-20240620";
 const FALLBACK_CLAUDE_MODEL = process.env.CLAUDE_FALLBACK_MODEL || "claude-3-haiku-20240307";
 const MESSAGE_HISTORY_LIMIT = 12;
 
+const parseIntOrNull = (value) => {
+  if (value == null) return null;
+  const parsedValue = Number.parseInt(value, 10);
+  return Number.isFinite(parsedValue) ? parsedValue : null;
+};
+
 const resolveApiKey = () =>
   process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.AI_API_KEY || null;
 
@@ -470,12 +476,6 @@ const parseScheduleJson = (raw) => {
       const name = parsed.name?.trim() || parsed.title?.trim();
       if (!name) return null;
 
-      const parseIntOrNull = (value) => {
-        if (value == null) return null;
-        const parsedValue = Number.parseInt(value, 10);
-        return Number.isFinite(parsedValue) ? parsedValue : null;
-      };
-
       const status = (parsed.status?.trim() || "pending").toLowerCase();
       const allowedStatuses = new Set(["pending", "done", "missed"]);
 
@@ -491,6 +491,33 @@ const parseScheduleJson = (raw) => {
         hoursLabel: parsed.hoursLabel?.trim() || null,
         color: parsed.color?.trim() || null,
         status: allowedStatuses.has(status) ? status : "pending",
+        userReply: parsed.userReply?.trim() || null,
+      };
+    }
+
+    if (parsed.action === "create-reminder") {
+      const title = parsed.title?.trim();
+      const day = parsed.day?.trim();
+      const starttime = parsed.starttime?.trim() || parsed.eventTime?.trim() || null;
+      const remindtime = parsed.remindtime?.trim() || parsed.reminderTime?.trim() || null;
+
+      if (!title || !day || (!remindtime && !starttime)) return null;
+
+      return {
+        action: "create-reminder",
+        title,
+        message: parsed.message?.trim() || null,
+        day,
+        starttime,
+        remindtime,
+        leadMinutes: parseIntOrNull(parsed.leadMinutes ?? parsed.minutesBefore ?? parsed.remindBefore),
+        category: parsed.category?.trim() || "Reminder",
+        priority: parsed.priority?.trim() || "medium",
+        type: parsed.type?.trim() || "assistant_reminder",
+        mode: parsed.mode?.trim() || null,
+        location: parsed.location?.trim() || null,
+        travelMinutes: parseIntOrNull(parsed.travelMinutes),
+        reason: parsed.reason?.trim() || null,
         userReply: parsed.userReply?.trim() || null,
       };
     }
@@ -594,6 +621,40 @@ const minutesToTime = (totalMinutes) => {
   const hours = Math.floor(safeMinutes / 60) % 24;
   const minutes = safeMinutes % 60;
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+};
+
+const ensureTimeWithSeconds = (timeString) => {
+  if (!timeString || typeof timeString !== "string") return null;
+  if (!timeString.includes(":")) return `${timeString}:00`;
+  return timeString.length === 5 ? `${timeString}:00` : timeString;
+};
+
+const combineDayAndTime = (day, timeString) => {
+  if (!day || !timeString) return null;
+  const normalized = ensureTimeWithSeconds(timeString);
+  if (!normalized) return null;
+
+  const date = new Date(`${day}T${normalized}`);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const deriveReminderDate = ({ day, starttime, remindtime, leadMinutes }) => {
+  const explicitReminder = remindtime ? combineDayAndTime(day, remindtime) : null;
+  if (explicitReminder) return explicitReminder;
+
+  const eventDate = starttime ? combineDayAndTime(day, starttime) : null;
+  if (!eventDate || leadMinutes == null) return null;
+
+  const minutes = Number(leadMinutes);
+  if (!Number.isFinite(minutes)) return null;
+
+  return new Date(eventDate.getTime() - minutes * 60000);
+};
+
+const formatDateLabel = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "the scheduled time";
+  const iso = date.toISOString();
+  return `${iso.slice(0, 10)} at ${iso.slice(11, 16)}`;
 };
 
 const parseCustomDays = (customdays) => {
@@ -845,9 +906,11 @@ const requestClaudeScheduleDecision = async ({ message, userContext, history }) 
     "If it's a habit or routine request, respond ONLY with { action: 'habit' }.",
     "If they want to delete or cancel an existing scheduled event, respond ONLY with JSON: { action: 'delete-event', id (prefer id from busySchedules), title (string|null), day (YYYY-MM-DD|null), starttime (HH:mm|null), userReply (short tailored confirmation) }.",
     "If it's a task (a to-do without a precise meeting time), respond ONLY with JSON: { action: 'create-task', name, dueDate (YYYY-MM-DD|null), scheduleAfter (YYYY-MM-DD|null), durationMinutes (integer minutes), minDuration (integer|null), maxDuration (integer|null), splitUp (boolean), hoursLabel (string|null), color (string|null), status ('pending'|'done'|'missed'), userReply (short confirmation sentence tailored to the request) }.",
+    "If they want a reminder/notification, respond ONLY with JSON: { action: 'create-reminder', title, message (string|null), day (YYYY-MM-DD), starttime (HH:mm|null, start of the event being reminded about), remindtime (HH:mm|null, exact reminder time when specified), leadMinutes (integer|null, minutes before the starttime if remindtime is missing), category (default 'Reminder'), priority ('high'|'medium'|'low'), type (default 'assistant_reminder'), mode ('in-person'|'online'|null), location (string|null), travelMinutes (integer|null), reason (short explanation of why you chose the timing), userReply (short confirmation sentence tailored to the request) }.",
     "If it's a calendar event and the user provided a clear title AND an explicit start time, respond ONLY with JSON: { action: 'create-event', title, day (YYYY-MM-DD), starttime (HH:mm, 24h), endtime (HH:mm|null), enddate (YYYY-MM-DD|null, required when repeat is not 'once'), repeat ('once'|'daily'|'weekly'|'custom'), customdays (comma-separated weekdays when repeat='custom' or to pin specific weekdays), notes (string|null), userReply (short confirmation sentence tailored to the request) }.",
-    "Convert relative dates to YYYY-MM-DD. Support recurring ranges like 'every Monday in October' by filling repeat, customdays, and enddate. Never make up times; if any timing or title detail is missing or ambiguous, respond with { action: 'clarify', target: 'event'|'task'|null, question: 'follow-up to ask for missing details' }.",
+    "Convert relative dates to YYYY-MM-DD. Support recurring ranges like 'every Monday in October' by filling repeat, customdays, and enddate. Never make up times; if any timing or title detail is missing or ambiguous, respond with { action: 'clarify', target: 'event'|'task'|'reminder'|null, question: 'follow-up to ask for missing details' }.",
     "Keep the reply strictly JSON with no markdown. Use recent conversation context and user goals to make each userReply feel specific—avoid canned or generic wording.",
+    "Choose reminder timing thoughtfully: default to 60 minutes before in-person classes or appointments (add travelMinutes if the user mentions commute time), 10-15 minutes before online meetings, and around 30 minutes before general habits when details are light.",
     `Interpret all relative dates and times using this reference: today is ${currentDate} and the current time is ${currentTime || 'unknown'} in the ${timezone} timezone.`,
     `User context: ${JSON.stringify(userContext || {})}`,
   ].join("\n");
@@ -1128,6 +1191,8 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
   let scheduleClarification = null;
   let scheduleConflict = null;
   let taskClarification = null;
+  let reminderClarification = null;
+  let createdReminder = null;
 
   if (planDecision?.action === "habit" && finalIntent === "chat") {
     finalIntent = "suggest";
@@ -1138,6 +1203,11 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
       taskClarification = planDecision.question;
       if (finalIntent === "chat") {
         finalIntent = "clarify-task";
+      }
+    } else if (planDecision.target === "reminder") {
+      reminderClarification = planDecision.question;
+      if (finalIntent === "chat") {
+        finalIntent = "clarify-reminder";
       }
     } else {
       scheduleClarification = planDecision.question;
@@ -1177,6 +1247,10 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
 
   if (taskClarification && !replyFromClaude && !loggedProgress) {
     replyFromClaude = taskClarification;
+  }
+
+  if (reminderClarification && !replyFromClaude && !loggedProgress) {
+    replyFromClaude = reminderClarification;
   }
 
   if (progressDecision && !replyFromClaude) {
@@ -1221,6 +1295,52 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
         (await generateTaskCreatedReply({ task: createdTask, context: { dbOverview, userContext, history } }));
     } catch (error) {
       console.error("Failed to save task from Claude decision", error?.message || error);
+    }
+  }
+
+  if (!loggedProgress && planDecision?.action === "create-reminder") {
+    const reminderDate = deriveReminderDate({
+      day: planDecision.day,
+      starttime: planDecision.starttime,
+      remindtime: planDecision.remindtime,
+      leadMinutes: planDecision.leadMinutes,
+    });
+
+    if (!reminderDate) {
+      finalIntent = "clarify-reminder";
+      replyFromClaude =
+        planDecision.userReply ||
+        "I can set that reminder—can you confirm the exact day and time for the alert?";
+    } else {
+      try {
+        const notification = await Notification.create({
+          user_id: userId,
+          title: planDecision.title,
+          message: planDecision.message || `Reminder: ${planDecision.title}`,
+          type: planDecision.type || "assistant_reminder",
+          category: planDecision.category || "Reminder",
+          priority: planDecision.priority || "medium",
+          scheduled_for: reminderDate,
+          metadata: {
+            leadMinutes: planDecision.leadMinutes ?? null,
+            eventDay: planDecision.day,
+            eventStart: planDecision.starttime,
+            reminderTime: planDecision.remindtime,
+            travelMinutes: planDecision.travelMinutes ?? null,
+            location: planDecision.location || null,
+            mode: planDecision.mode || null,
+            reason: planDecision.reason || null,
+          },
+        });
+
+        createdReminder = notification.get({ plain: true });
+        finalIntent = "create-reminder";
+        replyFromClaude =
+          planDecision.userReply ||
+          `Got it—I'll remind you about ${planDecision.title} on ${formatDateLabel(reminderDate)}.`;
+      } catch (error) {
+        console.error("Failed to save reminder from Claude decision", error?.message || error);
+      }
     }
   }
 
@@ -1314,6 +1434,7 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     loggedProgress,
     createdSchedule,
     createdTask,
+    createdReminder,
     deletedSchedule,
     scheduleConflict,
     context: { dbOverview, userContext, history },

@@ -57,6 +57,7 @@ router.post("/message", async (req, res) => {
       habitSuggestion,
       loggedProgress,
       createdSchedule,
+      createdReminder,
       scheduleConflict,
     } = await generateAiChatReply({
       userId,
@@ -102,6 +103,8 @@ router.post("/message", async (req, res) => {
       metadata = { ...(metadata || {}), loggedProgress };
     } else if (intent === "create-schedule" && createdSchedule) {
       metadata = { ...(metadata || {}), createdSchedule };
+    } else if (intent === "create-reminder" && createdReminder) {
+      metadata = { ...(metadata || {}), createdReminder };
     } else if (intent === "schedule-conflict" && scheduleConflict) {
       metadata = { ...(metadata || {}), scheduleConflict };
     }
@@ -122,6 +125,7 @@ router.post("/message", async (req, res) => {
       createdHabit,
       loggedProgress,
       createdSchedule,
+      createdReminder,
       scheduleConflict,
     });
   } catch (error) {
