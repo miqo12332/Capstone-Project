@@ -1,0 +1,14 @@
+node_modules
+build
+dist
+.env
+.env.*
+.DS_Store
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.vscode
+.idea
+
+# Vite output
+coverage
