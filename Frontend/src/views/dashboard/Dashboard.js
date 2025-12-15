@@ -9,6 +9,7 @@ import {
   CCardHeader,
   CCol,
   CForm,
+  CFormSelect,
   CFormTextarea,
   CListGroup,
   CListGroupItem,
@@ -69,7 +70,7 @@ const Dashboard = () => {
   const [aiSummary, setAiSummary] = useState("");
   const [aiSummaryAgent, setAiSummaryAgent] = useState(null);
   const [aiSummaryError, setAiSummaryError] = useState("");
-  const [selectedHabitId, setSelectedHabitId] = useState("all");
+  const [selectedHabitId, setSelectedHabitId] = useState(null);
   const [patternModalOpen, setPatternModalOpen] = useState(false);
   const [patternInsights, setPatternInsights] = useState([]);
   const [patternRecommendation, setPatternRecommendation] = useState("");
@@ -294,51 +295,39 @@ const Dashboard = () => {
   );
 
   const habitOptions = useMemo(() => {
-    const baseOptions = [
-      {
-        id: "all",
-        name: "All habits",
-      },
-    ];
-
     const analyticHabits = analytics?.habits ?? [];
-    const mappedHabits = analyticHabits
+    return analyticHabits
       .filter((habit) => habit?.habitId)
-      .map((habit) => ({ id: habit.habitId, name: habit.habitName || "Habit" }));
-
-    return baseOptions.concat(mappedHabits);
+      .map((habit) => ({ id: String(habit.habitId), name: habit.habitName || "Habit" }));
   }, [analytics?.habits]);
 
   useEffect(() => {
+    if (!habitOptions.length) {
+      setSelectedHabitId(null);
+      return;
+    }
+
     if (!habitOptions.some((option) => option.id === selectedHabitId)) {
-      setSelectedHabitId(habitOptions[0]?.id || "all");
+      setSelectedHabitId(habitOptions[0].id);
     }
   }, [habitOptions, selectedHabitId]);
 
-  const cycleHabitSelection = useCallback(() => {
-    if (!habitOptions.length) return;
-
-    setSelectedHabitId((current) => {
-      const currentIndex = habitOptions.findIndex((option) => option.id === current);
-      const nextIndex = (currentIndex + 1) % habitOptions.length;
-      return habitOptions[nextIndex].id;
-    });
-  }, [habitOptions]);
-
   const selectedHabitLabel = useMemo(() => {
-    return habitOptions.find((option) => option.id === selectedHabitId)?.name || "All habits";
+    return habitOptions.find((option) => option.id === selectedHabitId)?.name || "Select a habit";
   }, [habitOptions, selectedHabitId]);
 
   const trendSource = useMemo(() => {
-    if (selectedHabitId !== "all") {
-      const specific = analytics?.habits?.find((habit) => habit.habitId === selectedHabitId);
+    if (selectedHabitId) {
+      const specific = analytics?.habits?.find(
+        (habit) => String(habit.habitId) === selectedHabitId,
+      );
       if (specific?.dailyTrend) {
         return specific.dailyTrend;
       }
     }
 
-    return analytics?.summary?.dailyTrend ?? [];
-  }, [analytics?.habits, analytics?.summary?.dailyTrend, selectedHabitId]);
+    return [];
+  }, [analytics?.habits, selectedHabitId]);
 
   const weeklyMomentumTrend = useMemo(() => {
     return trendSource.slice(-7).map((day) => {
@@ -1109,18 +1098,32 @@ const Dashboard = () => {
 
             <CCol xs={12} lg={5}>
               <CCard className="h-100 elevated-card">
-                <CCardHeader className="fw-semibold d-flex justify-content-between align-items-center gap-3">
-                  <span>Momentum Trend</span>
-                  <div className="d-flex align-items-center gap-2">
-                    <div className="small text-body-secondary text-nowrap">
-                      {selectedHabitLabel} · Week view
+                  <CCardHeader className="fw-semibold">
+                  <div className="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <span>Momentum Trend</span>
+                    <div className="d-flex flex-column flex-md-row align-items-md-center gap-2">
+                      <div className="text-body-secondary small">Focused habit</div>
+                      <CFormSelect
+                        size="sm"
+                        value={selectedHabitId || ""}
+                        onChange={(e) => setSelectedHabitId(e.target.value || null)}
+                        aria-label="Choose a habit to view weekly momentum"
+                        style={{ minWidth: 180 }}
+                      >
+                        <option value="">Select a habit</option>
+                        {habitOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </CFormSelect>
                     </div>
-                    <CButton size="sm" color="secondary" variant="outline" onClick={cycleHabitSelection}>
-                      Change habit
-                    </CButton>
                   </div>
                 </CCardHeader>
                 <CCardBody style={{ height: 320 }}>
+                  <div className="small text-body-secondary mb-2">
+                    {selectedHabitLabel} · Week view
+                  </div>
                   {weeklyMomentumTrend.length ? (
                     <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
                       <AreaChart data={weeklyMomentumTrend}>
@@ -1150,7 +1153,7 @@ const Dashboard = () => {
                     </ResponsiveContainer>
                   ) : (
                     <div className="text-body-secondary text-center">
-                      Not enough data yet. Keep logging to unlock your trendline.
+                      Select a habit to view its weekly momentum trend.
                     </div>
                   )}
                   {analyticsError && (
