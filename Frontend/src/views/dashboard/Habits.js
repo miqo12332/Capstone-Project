@@ -658,7 +658,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
                           <React.Fragment key={habit.id}>
                             <div className="tracker-cell habit-col">
                                 <div className="habit-meta">
-                                  <div className="d-flex align-items-center gap-2 flex-wrap">
+                                  <div className="d-flex align-items-center gap-2 flex-nowrap habit-header-row">
                                     <CTooltip
                                       content={`${habit.description || "No description yet."}${
                                         habit.target_reps ? ` • Target ${habit.target_reps}` : ""
