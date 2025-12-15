@@ -465,81 +465,96 @@ const ProgressTracker = () => {
                     {habits.length === 0 && (
                       <CListGroupItem>No habits yet</CListGroupItem>
                     )}
-                    {habits.map((habit) => {
-                      const stats = habitStatsMap[habit.id] || {};
-                      const counts = todayCounts[habit.id] || { done: 0, missed: 0 };
-                      const todayTotal = counts.done + counts.missed;
-                      const todayCompletionRate = todayTotal
-                        ? Math.round((counts.done / todayTotal) * 100)
-                        : 0;
-                      const lifetimeTotal =
-                        (stats.totals?.done ?? 0) + (stats.totals?.missed ?? 0);
-                      const donePercent = lifetimeTotal
-                        ? Math.round(((stats.totals?.done ?? 0) / lifetimeTotal) * 100)
-                        : 0;
-                      const missedPercent = lifetimeTotal
-                        ? Math.round(((stats.totals?.missed ?? 0) / lifetimeTotal) * 100)
-                        : 0;
+                    {!selectedHabitId && habits.length > 0 && (
+                      <CListGroupItem>
+                        Choose a habit above to view detailed statistics.
+                      </CListGroupItem>
+                    )}
+                    {habits
+                      .filter((habit) => !selectedHabitId || habit.id === selectedHabitId)
+                      .map((habit) => {
+                        const stats = habitStatsMap[habit.id] || {};
+                        const counts = todayCounts[habit.id] || { done: 0, missed: 0 };
+                        const todayTotal = counts.done + counts.missed;
+                        const todayCompletionRate = todayTotal
+                          ? Math.round((counts.done / todayTotal) * 100)
+                          : 0;
+                        const rangeDone =
+                          habit.id === selectedHabitId
+                            ? timeframeTotals.done
+                            : stats.totals?.done ?? 0;
+                        const rangeMissed =
+                          habit.id === selectedHabitId
+                            ? timeframeTotals.missed
+                            : stats.totals?.missed ?? 0;
+                        const rangeTotal = rangeDone + rangeMissed;
+                        const donePercent = rangeTotal
+                          ? Math.round((rangeDone / rangeTotal) * 100)
+                          : 0;
+                        const missedPercent = rangeTotal
+                          ? Math.round((rangeMissed / rangeTotal) * 100)
+                          : 0;
+                        const rangeCompletionRate = rangeTotal
+                          ? Math.round((rangeDone / rangeTotal) * 100)
+                          : 0;
 
-                      return (
-                        <CListGroupItem key={habit.id} className="py-3">
-                          <div className="d-flex justify-content-between align-items-start gap-3">
-                            <div>
-                              <div className="fw-semibold">
-                                {habit.title || habit.name}
+                        return (
+                          <CListGroupItem key={habit.id} className="py-3">
+                            <div className="d-flex justify-content-between align-items-start gap-3">
+                              <div>
+                                <div className="fw-semibold">
+                                  {habit.title || habit.name}
+                                </div>
+                                <div className="text-body-secondary small">
+                                  {TIMEFRAMES[timeframe]?.label ?? "Range"}: {rangeDone} done /
+                                  {" "}
+                                  {rangeMissed} missed
+                                </div>
+                                <div className="text-body-secondary small">
+                                  Current streak: {stats.streak?.current ?? 0} days ·
+                                  Range success:
+                                  {" "}
+                                  {formatPercent(rangeCompletionRate)}
+                                </div>
+                                <div className="text-body-secondary small">
+                                  Today: {counts.done} done · {counts.missed} missed
+                                  {todayTotal > 0
+                                    ? ` · ${todayCompletionRate}% completion`
+                                    : ""}
+                                </div>
                               </div>
-                              <div className="text-body-secondary small">
-                                Current streak: {stats.streak?.current ?? 0} days ·
-                                Overall success:
-                                {" "}
-                                {formatPercent(stats.successRate ?? 0)}
-                              </div>
-                              <div className="text-body-secondary small">
-                                Lifetime: {stats.totals?.done ?? 0} done /
-                                {" "}
-                                {stats.totals?.missed ?? 0} missed
-                              </div>
-                              <div className="text-body-secondary small">
-                                Today: {counts.done} done · {counts.missed} missed
-                                {todayTotal > 0
-                                  ? ` · ${todayCompletionRate}% completion`
-                                  : ""}
+                              <div className="text-end">
+                                <CBadge
+                                  color={statusBadgeColor(rangeCompletionRate)}
+                                  className="mb-2"
+                                >
+                                  {formatPercent(rangeCompletionRate)} success
+                                </CBadge>
+                                <div className="text-body-secondary small">
+                                  {TIMEFRAMES[timeframe]?.description || "Selected range"}
+                                </div>
                               </div>
                             </div>
-                            <div className="text-end">
-                              <CBadge
-                                color={statusBadgeColor(stats.successRate ?? 0)}
-                                className="mb-2"
-                              >
-                                {formatPercent(stats.successRate ?? 0)} success
-                              </CBadge>
-                              <div className="text-body-secondary small">
-                                {todayTotal > 0
-                                  ? `${formatPercent(todayCompletionRate)} today`
-                                  : "Log today to see completion"}
-                              </div>
-                            </div>
-                          </div>
 
-                          <CProgress className="mt-3" height={12}>
-                            <CProgressBar
-                              color="success"
-                              value={donePercent}
-                              title={`Done: ${stats.totals?.done ?? 0}`}
-                            />
-                            <CProgressBar
-                              color="danger"
-                              value={missedPercent}
-                              title={`Missed: ${stats.totals?.missed ?? 0}`}
-                            />
-                          </CProgress>
-                          <div className="d-flex justify-content-between text-body-secondary small mt-1">
-                            <span>{stats.totals?.done ?? 0} completed</span>
-                            <span>{stats.totals?.missed ?? 0} missed</span>
-                          </div>
-                        </CListGroupItem>
-                      );
-                    })}
+                            <CProgress className="mt-3" height={12}>
+                              <CProgressBar
+                                color="success"
+                                value={donePercent}
+                                title={`Done: ${rangeDone}`}
+                              />
+                              <CProgressBar
+                                color="danger"
+                                value={missedPercent}
+                                title={`Missed: ${rangeMissed}`}
+                              />
+                            </CProgress>
+                            <div className="d-flex justify-content-between text-body-secondary small mt-1">
+                              <span>{rangeDone} completed</span>
+                              <span>{rangeMissed} missed</span>
+                            </div>
+                          </CListGroupItem>
+                        );
+                      })}
                   </CListGroup>
                 </>
               )}
