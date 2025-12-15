@@ -357,7 +357,7 @@ const Notifications = () => {
                     <CButton
                       key={option.value}
                       color={filter === option.value ? "primary" : "secondary"}
-                      variant={filter === option.value ? "" : "outline"}
+                      variant={filter === option.value ? undefined : "outline"}
                       size="sm"
                       onClick={() => setFilter(option.value)}
                     >
@@ -462,7 +462,7 @@ const Notifications = () => {
                         <div className="d-flex flex-column gap-2 align-items-end">
                           <CButton
                             color={notification.isRead ? "secondary" : "primary"}
-                            variant={notification.isRead ? "outline" : ""}
+                            variant={notification.isRead ? "outline" : undefined}
                             size="sm"
                             onClick={() => handleToggleRead(notification)}
                           >
