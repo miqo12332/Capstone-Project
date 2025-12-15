@@ -41,9 +41,12 @@ export default defineConfig(() => {
     },
     server: {
       host: process.env.VITE_DEV_HOST || '0.0.0.0',
-      port: 4000,
+      port: Number(process.env.VITE_DEV_PORT) || 5173,
       proxy: {
-        // https://vitejs.dev/config/server-options.html
+        '/api': {
+          target: process.env.VITE_API_ORIGIN || 'http://localhost:4000',
+          changeOrigin: true,
+        },
       },
     },
     preview: {
