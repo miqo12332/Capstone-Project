@@ -237,32 +237,7 @@ const mapTask = (task) => ({
 const loadUserContext = async (userId) => {
   const user = await User.findByPk(userId, {
     include: [
-      {
-        model: Habit,
-        as: "habits",
-        include: [
-          { model: Schedule, as: "schedules" },
-          {
-            model: Progress,
-            as: "progressLogs",
-            separate: true,
-            limit: 50,
-            order: [
-              ["progress_date", "DESC"],
-              ["created_at", "DESC"],
-              ["id", "DESC"],
-            ],
-            attributes: [
-              "id",
-              "progress_date",
-              "created_at",
-              "status",
-              "reflected_reason",
-              "reflection_reason",
-            ],
-          },
-        ],
-      },
+      { model: Habit, as: "habits", include: [{ model: Schedule, as: "schedules" }, { model: Progress, as: "progressLogs" }] },
       { model: Notification, as: "notifications" },
       { model: Achievement, as: "achievements" },
       { model: UserSetting, as: "settings" },
