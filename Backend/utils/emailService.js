@@ -8,6 +8,8 @@ class EmailConfigError extends Error {
   }
 }
 
+let transporterInstance;
+
 const createTransporter = () => {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE } = process.env;
 
@@ -28,8 +30,29 @@ const createTransporter = () => {
   });
 };
 
+const getTransporter = () => {
+  if (!transporterInstance) {
+    transporterInstance = createTransporter();
+  }
+  return transporterInstance;
+};
+
+export const verifyEmailTransport = async () => {
+  const transporter = getTransporter();
+
+  try {
+    await transporter.verify();
+    return true;
+  } catch (error) {
+    // Add a helpful message for common SMTP issues without failing the server boot.
+    const guidance =
+      "Verify SMTP_HOST/PORT, the username/password (app password for Gmail), and that outbound SMTP is allowed.";
+    throw new Error(`${error.message}. ${guidance}`);
+  }
+};
+
 export const sendEmail = async ({ to, subject, text }) => {
-  const transporter = createTransporter();
+  const transporter = getTransporter();
   const from = process.env.MAIL_FROM || process.env.SMTP_USER;
 
   await transporter.sendMail({ from, to, subject, text });
