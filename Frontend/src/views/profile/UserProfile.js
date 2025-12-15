@@ -216,15 +216,20 @@ const UserProfile = () => {
         const provider = (integration.provider || integration.type || "").toLowerCase()
         const label = (integration.label || "").toLowerCase()
         const status = (integration.status || integration.state || "").toLowerCase()
-        const isGoogle = provider === "google" || label.includes("google")
+        const normalizedProvider = provider.replace(/[_\s-]+/g, " ")
+        const isGoogleProvider =
+          normalizedProvider.includes("google") || provider === "google" || label.includes("google")
         const isDisconnected = ["disconnected", "removed", "revoked", "deleted"].includes(status)
-        return isGoogle && !isDisconnected
+        return isGoogleProvider && !isDisconnected
       })
 
       const hasGoogleProviderCount = Boolean(
         Object.entries(providersMap || {}).some(([key, count]) => {
           const normalizedKey = key.toLowerCase()
-          return normalizedKey === "google" && Number(count || 0) > 0
+          const normalizedProviderKey = normalizedKey.replace(/[_\s-]+/g, " ")
+          const matchesGoogle =
+            normalizedProviderKey.includes("google") || normalizedKey === "google" || key === "google"
+          return matchesGoogle && Number(count || 0) > 0
         }),
       )
 
