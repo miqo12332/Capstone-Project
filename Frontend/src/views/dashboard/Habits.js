@@ -516,7 +516,9 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
         aria-label={title}
         aria-pressed={Boolean(status)}
         disabled={disabled}
-        onClick={() => {
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
           if (clickTimer.current) {
             clearTimeout(clickTimer.current)
             clickTimer.current = null
