@@ -141,6 +141,35 @@ router.patch("/:id/read", async (req, res) => {
   }
 });
 
+router.delete("/:id", async (req, res) => {
+  try {
+    const notificationId = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(notificationId)) {
+      return res.status(400).json({ error: "Invalid notification id" });
+    }
+
+    const notification = await Notification.findByPk(notificationId);
+    if (!notification) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+
+    const userId = Number.parseInt(req.body?.userId ?? req.query?.userId, 10);
+    if (Number.isFinite(userId) && notification.user_id !== userId) {
+      return res.status(403).json({ error: "You cannot delete this notification" });
+    }
+
+    await notification.destroy();
+
+    res.json({
+      message: "Notification deleted",
+      notification: serializeNotification(notification),
+    });
+  } catch (error) {
+    console.error("Failed to delete notification", error);
+    res.status(500).json({ error: "Failed to delete notification" });
+  }
+});
+
 router.post("/:userId/refresh", async (req, res) => {
   try {
     const userId = Number.parseInt(req.params.userId, 10);

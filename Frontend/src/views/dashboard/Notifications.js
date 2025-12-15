@@ -35,6 +35,7 @@ import {
 import { AuthContext } from "../../context/AuthContext";
 import {
   createNotification,
+  deleteNotification,
   fetchNotificationSummary,
   fetchNotifications,
   markAllNotificationsRead,
@@ -74,6 +75,7 @@ const Notifications = () => {
   const [compose, setCompose] = useState(initialComposeState);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     if (!feedback) return undefined;
@@ -212,6 +214,35 @@ const Notifications = () => {
       setFeedback({ type: "danger", message: "We couldn't schedule that reminder yet." });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (notification) => {
+    if (!user?.id || !notification?.id) return;
+
+    setDeletingId(notification.id);
+    try {
+      await deleteNotification(notification.id, user.id);
+      setNotifications((current) => current.filter((item) => item.id !== notification.id));
+      setSummary((current) => {
+        if (!current) return current;
+
+        const isUpcoming =
+          notification.scheduledFor && new Date(notification.scheduledFor).getTime() > Date.now();
+
+        return {
+          ...current,
+          total: Math.max(0, (current.total || 0) - 1),
+          unread: Math.max(0, (current.unread || 0) - (notification.isRead ? 0 : 1)),
+          upcoming: Math.max(0, (current.upcoming || 0) - (isUpcoming ? 1 : 0)),
+        };
+      });
+      setFeedback({ type: "success", message: "Reminder deleted." });
+    } catch (error) {
+      console.error("Failed to delete notification", error);
+      setFeedback({ type: "danger", message: "Couldn't delete that reminder. Please try again." });
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -373,67 +404,86 @@ const Notifications = () => {
               </div>
             ) : (
               <CListGroup className="mb-4">
-                {notifications.map((notification) => (
-                  <CListGroupItem
-                    key={notification.id}
-                    className={`border-0 rounded-3 mb-3 shadow-sm ${
-                      notification.isRead ? "bg-body" : "bg-body-tertiary"
-                    }`}
-                  >
-                    <div className="d-flex justify-content-between align-items-start">
-                      <div className="me-3 flex-grow-1">
-                        <div className="d-flex align-items-center gap-2 mb-1">
-                          <strong>{notification.title}</strong>
-                          <CBadge color={priorityColorMap[notification.priority] || "secondary"}>
-                            {notification.priority}
-                          </CBadge>
-                          {notification.category && (
-                            <CBadge color="secondary" variant="outline">
-                              {notification.category}
+                {notifications.map((notification) => {
+                  const canDelete =
+                    notification.type === "custom" ||
+                    notification.type === "assistant_reminder" ||
+                    notification.category === "Reminder";
+                  const isDeleting = deletingId === notification.id;
+
+                  return (
+                    <CListGroupItem
+                      key={notification.id}
+                      className={`border-0 rounded-3 mb-3 shadow-sm ${
+                        notification.isRead ? "bg-body" : "bg-body-tertiary"
+                      }`}
+                    >
+                      <div className="d-flex justify-content-between align-items-start">
+                        <div className="me-3 flex-grow-1">
+                          <div className="d-flex align-items-center gap-2 mb-1">
+                            <strong>{notification.title}</strong>
+                            <CBadge color={priorityColorMap[notification.priority] || "secondary"}>
+                              {notification.priority}
                             </CBadge>
+                            {notification.category && (
+                              <CBadge color="secondary" variant="outline">
+                                {notification.category}
+                              </CBadge>
+                            )}
+                          </div>
+                          <p className="mb-2 text-medium-emphasis">{notification.message}</p>
+                          <div className="d-flex flex-wrap gap-3 small text-medium-emphasis">
+                            <span>
+                              <CIcon icon={cilCalendar} className="me-1" />
+                              {notification.createdAt
+                                ? new Date(notification.createdAt).toLocaleString()
+                                : "Just now"}
+                            </span>
+                            {notification.scheduledFor && (
+                              <span>
+                                <CIcon icon={cilClock} className="me-1" />
+                                Scheduled for {new Date(notification.scheduledFor).toLocaleString()}
+                              </span>
+                            )}
+                            {notification.readAt && (
+                              <span>
+                                <CIcon icon={cilCheckCircle} className="me-1" />
+                                Read {new Date(notification.readAt).toLocaleString()}
+                              </span>
+                            )}
+                            {notification.ctaUrl && (
+                              <a href={`#${notification.ctaUrl}`} className="text-primary text-decoration-none">
+                                Go to action
+                              </a>
+                            )}
+                          </div>
+                          {renderMetadata(notification)}
+                        </div>
+                        <div className="d-flex flex-column gap-2 align-items-end">
+                          <CButton
+                            color={notification.isRead ? "secondary" : "primary"}
+                            variant={notification.isRead ? "outline" : ""}
+                            size="sm"
+                            onClick={() => handleToggleRead(notification)}
+                          >
+                            {notification.isRead ? "Mark unread" : "Mark read"}
+                          </CButton>
+                          {canDelete && (
+                            <CButton
+                              color="danger"
+                              variant="outline"
+                              size="sm"
+                              disabled={isDeleting}
+                              onClick={() => handleDelete(notification)}
+                            >
+                              {isDeleting ? <CSpinner size="sm" /> : "Delete"}
+                            </CButton>
                           )}
                         </div>
-                        <p className="mb-2 text-medium-emphasis">{notification.message}</p>
-                        <div className="d-flex flex-wrap gap-3 small text-medium-emphasis">
-                          <span>
-                            <CIcon icon={cilCalendar} className="me-1" />
-                            {notification.createdAt
-                              ? new Date(notification.createdAt).toLocaleString()
-                              : "Just now"}
-                          </span>
-                          {notification.scheduledFor && (
-                            <span>
-                              <CIcon icon={cilClock} className="me-1" />
-                              Scheduled for {new Date(notification.scheduledFor).toLocaleString()}
-                            </span>
-                          )}
-                          {notification.readAt && (
-                            <span>
-                              <CIcon icon={cilCheckCircle} className="me-1" />
-                              Read {new Date(notification.readAt).toLocaleString()}
-                            </span>
-                          )}
-                          {notification.ctaUrl && (
-                            <a href={`#${notification.ctaUrl}`} className="text-primary text-decoration-none">
-                              Go to action
-                            </a>
-                          )}
-                        </div>
-                        {renderMetadata(notification)}
                       </div>
-                      <div className="d-flex flex-column gap-2">
-                        <CButton
-                          color={notification.isRead ? "secondary" : "primary"}
-                          variant={notification.isRead ? "outline" : ""}
-                          size="sm"
-                          onClick={() => handleToggleRead(notification)}
-                        >
-                          {notification.isRead ? "Mark unread" : "Mark read"}
-                        </CButton>
-                      </div>
-                    </div>
-                  </CListGroupItem>
-                ))}
+                    </CListGroupItem>
+                  );
+                })}
               </CListGroup>
             )}
           </CCardBody>

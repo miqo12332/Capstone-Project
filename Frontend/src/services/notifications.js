@@ -55,6 +55,17 @@ export const createNotification = async (payload) => {
   return mapNotification(data.notification);
 };
 
+export const deleteNotification = async (id, userId) => {
+  if (!id) {
+    throw new Error("Notification id is required to delete a reminder");
+  }
+
+  const { data } = await api.delete(`/notifications/${id}`, {
+    data: userId ? { userId } : {},
+  });
+  return mapNotification(data.notification);
+};
+
 export const refreshNotifications = async (userId) => {
   if (!userId) {
     return { processed: 0 };

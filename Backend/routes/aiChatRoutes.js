@@ -58,6 +58,7 @@ router.post("/message", async (req, res) => {
       loggedProgress,
       createdSchedule,
       createdReminder,
+      deletedReminder,
       scheduleConflict,
     } = await generateAiChatReply({
       userId,
@@ -126,6 +127,7 @@ router.post("/message", async (req, res) => {
       loggedProgress,
       createdSchedule,
       createdReminder,
+      deletedReminder,
       scheduleConflict,
     });
   } catch (error) {
