@@ -6,8 +6,10 @@ import {
   Habit,
   Progress,
   UserSetting,
+  User,
 } from "../models/index.js";
 import { habitLibraryBlueprint } from "../data/habitLibrary.js";
+import { EmailConfigError, sendEmail } from "../utils/emailService.js";
 
 const router = express.Router();
 
@@ -322,6 +324,46 @@ router.get("/:userId", async (req, res) => {
   }
 });
 
+const scheduleReminderEmail = async ({ notification, user }) => {
+  const subject = `Reminder scheduled: ${notification.title || "Custom reminder"}`;
+  const scheduleNote = notification.scheduled_for
+    ? `Scheduled for ${new Date(notification.scheduled_for).toLocaleString()}`
+    : "Scheduled for now";
+  const greeting = user.name ? `Hi ${user.name},` : "Hi,";
+  const text = `${greeting}\n\n${notification.message}\n\n${scheduleNote}\n\nYou set this reminder in your notifications center.`;
+
+  const delayMs = notification.scheduled_for
+    ? new Date(notification.scheduled_for).getTime() - Date.now()
+    : 0;
+
+  if (delayMs > 0) {
+    setTimeout(async () => {
+      try {
+        await sendEmail({ to: user.email, subject, text });
+      } catch (error) {
+        if (error instanceof EmailConfigError) {
+          console.warn(
+            "Email not sent (scheduled delivery) due to configuration",
+            error.message
+          );
+        } else {
+          console.error("Failed to dispatch scheduled reminder email", error);
+        }
+      }
+    }, delayMs);
+  } else {
+    try {
+      await sendEmail({ to: user.email, subject, text });
+    } catch (error) {
+      if (error instanceof EmailConfigError) {
+        console.warn("Email not sent: configuration missing for reminder", error.message);
+      } else {
+        console.error("Failed to dispatch reminder email", error);
+      }
+    }
+  }
+};
+
 router.post("/", async (req, res) => {
   try {
     const {
@@ -353,6 +395,15 @@ router.post("/", async (req, res) => {
       cta_label: cta_label || null,
       cta_url: cta_url || null,
     });
+
+    const [user, settings] = await Promise.all([
+      User.findByPk(user_id, { attributes: ["name", "email"] }),
+      UserSetting.findOne({ where: { user_id } }),
+    ]);
+
+    if (user?.email && settings?.email_notifications !== false) {
+      await scheduleReminderEmail({ notification, user });
+    }
 
     res.status(201).json({ notification: serializeNotification(notification) });
   } catch (error) {
