@@ -6,7 +6,7 @@ import { PasswordReset, RegistrationVerification, UserSetting } from "../models/
 import { EmailConfigError, sendEmail } from "../utils/emailService.js";
 
 const defaultSettings = {
-  timezone: "UTC",
+  timezone: "Zovuni",
   daily_reminder_time: "08:00",
   weekly_summary_day: "Sunday",
   email_notifications: true,

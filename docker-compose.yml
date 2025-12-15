@@ -1,14 +1,13 @@
-version: "3.9"
 
 services:
   frontend:
     build:
       context: ./Frontend
       dockerfile: Dockerfile
-      args:
-        VITE_API_ORIGIN: http://backend:4000
     ports:
       - "5173:80"
+    environment:
+      TZ: Asia/Yerevan
     depends_on:
       backend:
         condition: service_started
@@ -21,7 +20,8 @@ services:
     env_file:
       - ./Backend/.env
     environment:
-      PORT: ${PORT:-4000}
+      TZ: Asia/Yerevan
+      PORT: 4000
       DB_HOST: postgres
       DB_NAME: ${DB_NAME:-app_db}
       DB_USER: ${DB_USER:-app_user}
@@ -36,6 +36,8 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
+      TZ: Asia/Yerevan
+      PGTZ: Asia/Yerevan
       POSTGRES_DB: ${DB_NAME:-app_db}
       POSTGRES_USER: ${DB_USER:-app_user}
       POSTGRES_PASSWORD: ${DB_PASS:-app_password}
