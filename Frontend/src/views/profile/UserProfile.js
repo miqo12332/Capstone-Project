@@ -278,16 +278,6 @@ const UserProfile = () => {
     [habits.length, analytics]
   )
 
-  const badgeNames = useMemo(() => {
-    return (achievementsSummary.badges || []).map((badge, index) => {
-      if (typeof badge === "string") return badge
-      if (typeof badge === "object" && badge !== null) {
-        return badge.name || badge.title || `Badge ${index + 1}`
-      }
-      return `Badge ${index + 1}`
-    })
-  }, [achievementsSummary.badges])
-
   const handleAvatarChange = async (event) => {
     const file = event.target.files?.[0]
     if (!file || !user?.id) return
@@ -621,73 +611,6 @@ const UserProfile = () => {
     </CCard>
   )
 
-  const renderAchievementsTab = () => (
-    <CRow className="g-4">
-      <CCol md={4}>
-        <CCard className="glass-panel border-0 h-100">
-          <CCardBody>
-            <div className="d-flex align-items-center mb-3">
-              <div className="icon-chip icon-chip-primary">
-                <CIcon icon={cilStar} />
-              </div>
-              <div>
-                <div className="fw-semibold">Badges</div>
-                <small className="text-body-secondary">Celebrations for consistent wins.</small>
-              </div>
-            </div>
-            <h2 className="fw-bold mb-1">{achievementsSummary.badges.length}</h2>
-            <div className="text-body-secondary small mb-3">Earned so far</div>
-            <CListGroup flush className="rounded-3 bg-body-tertiary">
-              {badgeNames.length ? (
-                badgeNames.slice(0, 3).map((badge, index) => (
-                  <CListGroupItem key={badge + index} className="border-0">
-                    <CIcon icon={cilCheckCircle} className="me-2 text-success" /> {badge}
-                  </CListGroupItem>
-                ))
-              ) : (
-                <CListGroupItem className="border-0 text-body-secondary">No badges yet—start a streak!</CListGroupItem>
-              )}
-            </CListGroup>
-          </CCardBody>
-        </CCard>
-      </CCol>
-      <CCol md={4}>
-        <CCard className="glass-panel border-0 h-100">
-          <CCardBody>
-            <div className="d-flex align-items-center mb-3">
-              <div className="icon-chip icon-chip-success">
-                <CIcon icon={cilSettings} />
-              </div>
-              <div>
-                <div className="fw-semibold">Active streak</div>
-                <small className="text-body-secondary">Stay consistent to keep it climbing.</small>
-              </div>
-            </div>
-            <h2 className="fw-bold mb-1">{achievementsSummary.streak} days</h2>
-            <div className="text-body-secondary small">Current streak</div>
-          </CCardBody>
-        </CCard>
-      </CCol>
-      <CCol md={4}>
-        <CCard className="glass-panel border-0 h-100">
-          <CCardBody>
-            <div className="d-flex align-items-center mb-3">
-              <div className="icon-chip icon-chip-warning">
-                <CIcon icon={cilBell} />
-              </div>
-              <div>
-                <div className="fw-semibold">Milestones</div>
-                <small className="text-body-secondary">Habit completions logged in StepHabit.</small>
-              </div>
-            </div>
-            <h2 className="fw-bold mb-1">{achievementsSummary.totalHabits}</h2>
-            <div className="text-body-secondary small">Habits tracked</div>
-          </CCardBody>
-        </CCard>
-      </CCol>
-    </CRow>
-  )
-
   const renderHelpTab = () => (
     <CRow className="g-4">
       <CCol md={4}>
@@ -753,8 +676,6 @@ const UserProfile = () => {
         return renderNotificationsTab()
       case "connected-apps":
         return renderConnectedAppsTab()
-      case "achievements":
-        return renderAchievementsTab()
       case "help":
         return renderHelpTab()
       default:
@@ -916,15 +837,6 @@ const UserProfile = () => {
               onClick={() => setActiveTab("connected-apps")}
             >
               <CIcon icon={cilLink} className="me-2" /> Connected Apps
-            </CNavLink>
-          </CNavItem>
-          <CNavItem>
-            <CNavLink
-              className="profile-tab"
-              active={activeTab === "achievements"}
-              onClick={() => setActiveTab("achievements")}
-            >
-              <CIcon icon={cilStar} className="me-2" /> Achievements
             </CNavLink>
           </CNavItem>
           <CNavItem>

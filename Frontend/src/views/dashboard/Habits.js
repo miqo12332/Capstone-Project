@@ -29,14 +29,12 @@ import {
   CTabPane,
   CProgress,
   CProgressBar,
-  CFormSwitch,
   CTooltip,
 } from "@coreui/react"
 import CIcon from "@coreui/icons-react"
 import {
   cilClock,
   cilChartLine,
-  cilBadge,
   cilList,
   cilBolt,
   cilPlus,
@@ -1283,158 +1281,6 @@ const HistoryTab = ({ entries, loading, error, onRefresh }) => {
   )
 }
 
-const AutomationTab = ({ summary, loading }) => {
-  const [rules, setRules] = useState([
-    {
-      id: 1,
-      title: "If habit missed 2 days → prompt reflection",
-      description: "Trigger a short note so you can capture what got in the way.",
-      active: true,
-      tone: "info",
-    },
-    {
-      id: 2,
-      title: "If streak reaches 5 → award badge",
-      description: "Celebrate momentum with a subtle badge and XP boost.",
-      active: true,
-      tone: "success",
-    },
-    {
-      id: 3,
-      title: "Notify if scheduled habit window passes without completion",
-      description: "Send a quiet nudge to reschedule or log a reason.",
-      active: false,
-      tone: "warning",
-    },
-  ])
-
-  const toggleRule = (ruleId) => {
-    setRules((prev) => prev.map((rule) => (rule.id === ruleId ? { ...rule, active: !rule.active } : rule)))
-  }
-
-  return (
-    <div className="mt-3">
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div className="text-muted small">Automations respond to your latest check-ins.</div>
-        {loading && <CSpinner size="sm" />}
-      </div>
-      <CRow className="g-4">
-        {rules.map((rule) => (
-          <CCol key={rule.id} lg={4}>
-            <CCard className="shadow-sm border-0 h-100 habits-panel">
-              <CCardHeader className="bg-white d-flex align-items-center justify-content-between">
-                <div className="d-flex align-items-center gap-2">
-                  <CIcon icon={cilBolt} className={`text-${rule.tone}`} />
-                  <span className="fw-semibold">Automation</span>
-                </div>
-                <CFormSwitch checked={rule.active} onChange={() => toggleRule(rule.id)} />
-              </CCardHeader>
-              <CCardBody className="d-flex flex-column gap-2">
-                <h6 className="mb-1">{rule.title}</h6>
-                <p className="text-body-secondary mb-0">{rule.description}</p>
-                <div className="d-flex align-items-center gap-2 mt-auto">
-                  <CBadge color={rule.tone}>{rule.active ? "Enabled" : "Disabled"}</CBadge>
-                  <small className="text-muted">
-                    {summary?.totalMissed ? `${summary.totalMissed} missed logs reviewed this week.` : "Ready to react."}
-                  </small>
-                </div>
-              </CCardBody>
-            </CCard>
-          </CCol>
-        ))}
-      </CRow>
-    </div>
-  )
-}
-
-const RewardsTab = ({ summary, loading }) => {
-  const totalDone = summary?.totalDone ?? 0
-  const totalMissed = summary?.totalMissed ?? 0
-  const xp = Math.max(0, totalDone * 10 + totalMissed * 2)
-  const level = Math.max(1, Math.floor(xp / 500) + 1)
-  const nextLevel = level + 1
-  const progressToNext = Math.min(100, Math.round(((xp % 500) / 500) * 100))
-
-  const badges = [
-    { name: "Momentum", note: `${totalDone} completions logged`, color: "success" },
-    { name: "Consistency", note: `${summary?.totalHabits ?? 0} habits tracked`, color: "info" },
-    { name: "Reflection", note: `${totalMissed} honest misses`, color: "warning" },
-  ]
-
-  return (
-    <div className="mt-3">
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div className="text-muted small">Rewards update with every log.</div>
-        {loading && <CSpinner size="sm" />}
-      </div>
-      <CRow className="g-4">
-        <CCol lg={5}>
-          <CCard className="shadow-sm border-0 h-100 habits-panel">
-            <CCardHeader className="bg-gradient-primary text-white">
-              <div className="d-flex align-items-center gap-2">
-                <CIcon icon={cilBadge} />
-                <span className="fw-semibold">Rewards</span>
-              </div>
-            </CCardHeader>
-            <CCardBody className="d-flex flex-column gap-3">
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <div className="text-uppercase small text-muted">Current level</div>
-                  <h3 className="fw-bold mb-0">Level {level}</h3>
-                  <small className="text-body-secondary">Next: Level {nextLevel}</small>
-                </div>
-                <CBadge color="light" className="text-dark">{xp} XP</CBadge>
-              </div>
-              <div>
-                <div className="d-flex justify-content-between mb-1">
-                  <span className="text-muted">Progress to next level</span>
-                  <span className="fw-semibold">{progressToNext}%</span>
-                </div>
-                <CProgress value={progressToNext} color="success" />
-              </div>
-              <div className="p-3 rounded-3 bg-body-tertiary">
-                <div className="text-muted small mb-1">How XP works</div>
-                <p className="mb-0 text-body-secondary">
-                  Earn XP for completions, streak milestones, and automations that keep you consistent.
-                </p>
-              </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
-        <CCol lg={7}>
-          <CCard className="shadow-sm border-0 h-100 habits-panel">
-            <CCardHeader className="bg-white">
-              <div className="d-flex align-items-center gap-2">
-                <CIcon icon={cilChartLine} className="text-success" />
-                <span className="fw-semibold">Badges & levels</span>
-              </div>
-            </CCardHeader>
-            <CCardBody className="d-flex flex-column gap-3">
-              <div className="d-flex flex-wrap gap-2">
-                {badges.map((badge) => (
-                  <CBadge key={badge.name} color={badge.color} className="px-3 py-2">
-                    <span className="fw-semibold">{badge.name}</span>
-                    <div className="small text-white-50">{badge.note}</div>
-                  </CBadge>
-                ))}
-              </div>
-              <div className="bg-body-tertiary p-3 rounded-3">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <span className="fw-semibold">Minimal gamification</span>
-                  <CBadge color="primary" className="text-uppercase small">Focused</CBadge>
-                </div>
-                <p className="mb-0 text-body-secondary">
-                  Stay motivated without distraction—rewards stay subtle and purposeful so the habit stays center stage.
-                </p>
-              </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
-      </CRow>
-    </div>
-  )
-}
-
 const Habits = () => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -1615,16 +1461,6 @@ const Habits = () => {
             History
           </CNavLink>
         </CNavItem>
-        <CNavItem>
-          <CNavLink active={activeTab === "automation"} onClick={() => setActiveTab("automation")}>
-            Automation
-          </CNavLink>
-        </CNavItem>
-        <CNavItem>
-          <CNavLink active={activeTab === "rewards"} onClick={() => setActiveTab("rewards")}>
-            Rewards
-          </CNavLink>
-        </CNavItem>
       </CNav>
 
       {signalsError && <CAlert color="warning">{signalsError}</CAlert>}
@@ -1677,12 +1513,6 @@ const Habits = () => {
               onRefresh={refreshSignals}
             />
           )}
-        </CTabPane>
-        <CTabPane visible={activeTab === "automation"}>
-          {activeTab === "automation" && <AutomationTab summary={summary} loading={signalsLoading} />}
-        </CTabPane>
-        <CTabPane visible={activeTab === "rewards"}>
-          {activeTab === "rewards" && <RewardsTab summary={summary} loading={signalsLoading} />}
         </CTabPane>
       </CTabContent>
 
