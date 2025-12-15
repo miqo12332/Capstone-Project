@@ -2,10 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CAlert,
   CBadge,
+  CButton,
+  CButtonGroup,
   CCard,
   CCardBody,
   CCardHeader,
   CCol,
+  CFormSelect,
   CListGroup,
   CListGroupItem,
   CProgress,
@@ -40,6 +43,38 @@ const formatDate = (date) => {
   });
 };
 
+const TIMEFRAMES = {
+  weekly: { label: "Weekly", days: 7, description: "Last 7 days" },
+  monthly: { label: "Monthly", days: 30, description: "Last 30 days" },
+  yearly: { label: "Yearly", days: 365, description: "Last 12 months" },
+};
+
+const buildTimeframeSeries = (productivity = [], timeframeKey = "weekly") => {
+  const config = TIMEFRAMES[timeframeKey] || TIMEFRAMES.weekly;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const map = new Map(
+    productivity.map((entry) => [entry.date, { ...entry }])
+  );
+
+  const series = [];
+  for (let i = config.days - 1; i >= 0; i -= 1) {
+    const current = new Date(today);
+    current.setDate(today.getDate() - i);
+    const iso = current.toISOString().slice(0, 10);
+    const existing = map.get(iso) || {};
+
+    const completed = existing.completed ?? 0;
+    const missed = existing.missed ?? 0;
+    const net = existing.net ?? completed - missed;
+
+    series.push({ date: iso, completed, missed, net });
+  }
+
+  return series;
+};
+
 const ProgressTracker = () => {
   const [habits, setHabits] = useState([]);
   const [err, setErr] = useState("");
@@ -47,6 +82,8 @@ const ProgressTracker = () => {
   const [analyticsErr, setAnalyticsErr] = useState("");
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [todayCounts, setTodayCounts] = useState({});
+  const [selectedHabitId, setSelectedHabitId] = useState(null);
+  const [timeframe, setTimeframe] = useState("weekly");
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const userId = user?.id;
@@ -69,6 +106,12 @@ const ProgressTracker = () => {
   useEffect(() => {
     loadHabits();
   }, [loadHabits]);
+
+  useEffect(() => {
+    if (!selectedHabitId && habits.length) {
+      setSelectedHabitId(habits[0].id);
+    }
+  }, [habits, selectedHabitId]);
 
   const loadAnalytics = useCallback(
     async (options = { showSpinner: true }) => {
@@ -147,9 +190,35 @@ const ProgressTracker = () => {
     }, {});
   }, [analytics]);
 
+  const selectedHabitStats = useMemo(
+    () => (selectedHabitId ? habitStatsMap[selectedHabitId] : null),
+    [habitStatsMap, selectedHabitId]
+  );
+
+  const selectedHabitName = useMemo(() => {
+    const fromHabitList = habits.find((h) => h.id === selectedHabitId);
+    return (
+      selectedHabitStats?.habitName ||
+      fromHabitList?.title ||
+      fromHabitList?.name ||
+      "Choose a habit"
+    );
+  }, [habits, selectedHabitId, selectedHabitStats]);
+
+  const timeframeSeries = useMemo(() => {
+    if (!selectedHabitId) return [];
+    return buildTimeframeSeries(selectedHabitStats?.productivity, timeframe);
+  }, [selectedHabitId, selectedHabitStats, timeframe]);
+
+  const timeframeTotals = useMemo(() => {
+    const done = timeframeSeries.reduce((sum, day) => sum + day.completed, 0);
+    const missed = timeframeSeries.reduce((sum, day) => sum + day.missed, 0);
+    const total = done + missed;
+    const completionRate = total ? Math.round((done / total) * 100) : 0;
+    return { done, missed, total, completionRate };
+  }, [timeframeSeries]);
+
   const summary = analytics?.summary;
-  const dailyTrend = summary?.dailyTrend ?? [];
-  const momentumTrend = useMemo(() => dailyTrend, [dailyTrend]);
   const leaderboard = summary?.habitLeaderboard ?? [];
 
   const statusBadgeColor = (rate) => {
@@ -174,6 +243,55 @@ const ProgressTracker = () => {
                 </div>
               ) : (
                 <>
+                  <CRow className="g-3 align-items-end mb-3">
+                    <CCol xs={12} md={7} lg={8} xl={9}>
+                      <div className="text-body-secondary small mb-1">
+                        Focused habit
+                      </div>
+                      <CFormSelect
+                        value={selectedHabitId || ""}
+                        onChange={(e) =>
+                          setSelectedHabitId(Number(e.target.value) || null)
+                        }
+                        aria-label="Choose a habit to view statistics"
+                      >
+                        <option value="">Select a habit</option>
+                        {habits.map((habit) => (
+                          <option key={habit.id} value={habit.id}>
+                            {habit.title || habit.name}
+                          </option>
+                        ))}
+                      </CFormSelect>
+                    </CCol>
+                    <CCol
+                      xs={12}
+                      md={5}
+                      lg={4}
+                      xl={3}
+                      className="d-flex justify-content-md-end"
+                    >
+                      <div className="d-flex flex-wrap gap-2 w-100 justify-content-end">
+                        <div className="text-body-secondary small align-self-center">
+                          Range
+                        </div>
+                        <CButtonGroup role="group" aria-label="Timeframe selector">
+                          {Object.entries(TIMEFRAMES).map(([key, meta]) => (
+                            <CButton
+                              key={key}
+                              color="primary"
+                              variant={timeframe === key ? undefined : "outline"}
+                              onClick={() => setTimeframe(key)}
+                              active={timeframe === key}
+                              size="sm"
+                            >
+                              {meta.label}
+                            </CButton>
+                          ))}
+                        </CButtonGroup>
+                      </div>
+                    </CCol>
+                  </CRow>
+
                   <CRow className="g-3 mb-4">
                     <CCol xs={12} md={6} xl={3}>
                       <CCard className="h-100 bg-body-tertiary">
@@ -252,18 +370,27 @@ const ProgressTracker = () => {
                   <CRow className="g-4 mb-4">
                     <CCol xs={12} lg={7}>
                       <CCard className="h-100">
-                        <CCardHeader className="fw-semibold">
-                          Lifetime momentum
+                        <CCardHeader className="fw-semibold d-flex justify-content-between align-items-center flex-wrap gap-2">
+                          <span>
+                            {selectedHabitName} · {TIMEFRAMES[timeframe]?.description}
+                          </span>
+                          <span className="text-body-secondary small">
+                            {formatPercent(timeframeTotals.completionRate ?? 0)}
+                            {" completion"}
+                            {timeframeTotals.total
+                              ? ` · ${timeframeTotals.done} done · ${timeframeTotals.missed} missed`
+                              : " · Track this habit to populate stats"}
+                          </span>
                         </CCardHeader>
                         <CCardBody style={{ height: 280 }}>
-                          {momentumTrend.length ? (
+                          {timeframeSeries.length ? (
                             <ResponsiveContainer
                               width="100%"
                               height="100%"
                               minWidth={200}
                               minHeight={200}
                             >
-                              <AreaChart data={momentumTrend}>
+                              <AreaChart data={timeframeSeries}>
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="date" tickFormatter={formatDate} />
                                 <YAxis allowDecimals={false} />
@@ -287,7 +414,8 @@ const ProgressTracker = () => {
                             </ResponsiveContainer>
                           ) : (
                             <div className="text-body-secondary text-center my-5">
-                              Keep logging progress to see your lifetime momentum.
+                              Log progress for this habit to visualize how you perform
+                              over time.
                             </div>
                           )}
                         </CCardBody>
@@ -337,81 +465,96 @@ const ProgressTracker = () => {
                     {habits.length === 0 && (
                       <CListGroupItem>No habits yet</CListGroupItem>
                     )}
-                    {habits.map((habit) => {
-                      const stats = habitStatsMap[habit.id] || {};
-                      const counts = todayCounts[habit.id] || { done: 0, missed: 0 };
-                      const todayTotal = counts.done + counts.missed;
-                      const todayCompletionRate = todayTotal
-                        ? Math.round((counts.done / todayTotal) * 100)
-                        : 0;
-                      const lifetimeTotal =
-                        (stats.totals?.done ?? 0) + (stats.totals?.missed ?? 0);
-                      const donePercent = lifetimeTotal
-                        ? Math.round(((stats.totals?.done ?? 0) / lifetimeTotal) * 100)
-                        : 0;
-                      const missedPercent = lifetimeTotal
-                        ? Math.round(((stats.totals?.missed ?? 0) / lifetimeTotal) * 100)
-                        : 0;
+                    {!selectedHabitId && habits.length > 0 && (
+                      <CListGroupItem>
+                        Choose a habit above to view detailed statistics.
+                      </CListGroupItem>
+                    )}
+                    {habits
+                      .filter((habit) => !selectedHabitId || habit.id === selectedHabitId)
+                      .map((habit) => {
+                        const stats = habitStatsMap[habit.id] || {};
+                        const counts = todayCounts[habit.id] || { done: 0, missed: 0 };
+                        const todayTotal = counts.done + counts.missed;
+                        const todayCompletionRate = todayTotal
+                          ? Math.round((counts.done / todayTotal) * 100)
+                          : 0;
+                        const rangeDone =
+                          habit.id === selectedHabitId
+                            ? timeframeTotals.done
+                            : stats.totals?.done ?? 0;
+                        const rangeMissed =
+                          habit.id === selectedHabitId
+                            ? timeframeTotals.missed
+                            : stats.totals?.missed ?? 0;
+                        const rangeTotal = rangeDone + rangeMissed;
+                        const donePercent = rangeTotal
+                          ? Math.round((rangeDone / rangeTotal) * 100)
+                          : 0;
+                        const missedPercent = rangeTotal
+                          ? Math.round((rangeMissed / rangeTotal) * 100)
+                          : 0;
+                        const rangeCompletionRate = rangeTotal
+                          ? Math.round((rangeDone / rangeTotal) * 100)
+                          : 0;
 
-                      return (
-                        <CListGroupItem key={habit.id} className="py-3">
-                          <div className="d-flex justify-content-between align-items-start gap-3">
-                            <div>
-                              <div className="fw-semibold">
-                                {habit.title || habit.name}
+                        return (
+                          <CListGroupItem key={habit.id} className="py-3">
+                            <div className="d-flex justify-content-between align-items-start gap-3">
+                              <div>
+                                <div className="fw-semibold">
+                                  {habit.title || habit.name}
+                                </div>
+                                <div className="text-body-secondary small">
+                                  {TIMEFRAMES[timeframe]?.label ?? "Range"}: {rangeDone} done /
+                                  {" "}
+                                  {rangeMissed} missed
+                                </div>
+                                <div className="text-body-secondary small">
+                                  Current streak: {stats.streak?.current ?? 0} days ·
+                                  Range success:
+                                  {" "}
+                                  {formatPercent(rangeCompletionRate)}
+                                </div>
+                                <div className="text-body-secondary small">
+                                  Today: {counts.done} done · {counts.missed} missed
+                                  {todayTotal > 0
+                                    ? ` · ${todayCompletionRate}% completion`
+                                    : ""}
+                                </div>
                               </div>
-                              <div className="text-body-secondary small">
-                                Current streak: {stats.streak?.current ?? 0} days ·
-                                Overall success:
-                                {" "}
-                                {formatPercent(stats.successRate ?? 0)}
-                              </div>
-                              <div className="text-body-secondary small">
-                                Lifetime: {stats.totals?.done ?? 0} done /
-                                {" "}
-                                {stats.totals?.missed ?? 0} missed
-                              </div>
-                              <div className="text-body-secondary small">
-                                Today: {counts.done} done · {counts.missed} missed
-                                {todayTotal > 0
-                                  ? ` · ${todayCompletionRate}% completion`
-                                  : ""}
+                              <div className="text-end">
+                                <CBadge
+                                  color={statusBadgeColor(rangeCompletionRate)}
+                                  className="mb-2"
+                                >
+                                  {formatPercent(rangeCompletionRate)} success
+                                </CBadge>
+                                <div className="text-body-secondary small">
+                                  {TIMEFRAMES[timeframe]?.description || "Selected range"}
+                                </div>
                               </div>
                             </div>
-                            <div className="text-end">
-                              <CBadge
-                                color={statusBadgeColor(stats.successRate ?? 0)}
-                                className="mb-2"
-                              >
-                                {formatPercent(stats.successRate ?? 0)} success
-                              </CBadge>
-                              <div className="text-body-secondary small">
-                                {todayTotal > 0
-                                  ? `${formatPercent(todayCompletionRate)} today`
-                                  : "Log today to see completion"}
-                              </div>
-                            </div>
-                          </div>
 
-                          <CProgress className="mt-3" height={12}>
-                            <CProgressBar
-                              color="success"
-                              value={donePercent}
-                              title={`Done: ${stats.totals?.done ?? 0}`}
-                            />
-                            <CProgressBar
-                              color="danger"
-                              value={missedPercent}
-                              title={`Missed: ${stats.totals?.missed ?? 0}`}
-                            />
-                          </CProgress>
-                          <div className="d-flex justify-content-between text-body-secondary small mt-1">
-                            <span>{stats.totals?.done ?? 0} completed</span>
-                            <span>{stats.totals?.missed ?? 0} missed</span>
-                          </div>
-                        </CListGroupItem>
-                      );
-                    })}
+                            <CProgress className="mt-3" height={12}>
+                              <CProgressBar
+                                color="success"
+                                value={donePercent}
+                                title={`Done: ${rangeDone}`}
+                              />
+                              <CProgressBar
+                                color="danger"
+                                value={missedPercent}
+                                title={`Missed: ${rangeMissed}`}
+                              />
+                            </CProgress>
+                            <div className="d-flex justify-content-between text-body-secondary small mt-1">
+                              <span>{rangeDone} completed</span>
+                              <span>{rangeMissed} missed</span>
+                            </div>
+                          </CListGroupItem>
+                        );
+                      })}
                   </CListGroup>
                 </>
               )}
