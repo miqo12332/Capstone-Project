@@ -121,6 +121,106 @@ const buildRecentNotesDigest = (habits = []) => {
   return sections.length ? sections.join("\n") : "No recent habit notes recorded.";
 };
 
+const normalizeReasonText = (text) =>
+  (text || "")
+    .replace(/\s+/g, " ")
+    .replace(/[\n\r]+/g, " ")
+    .trim();
+
+const loadReflectionInsights = async (userId) => {
+  if (!userId) return null;
+
+  const reflections = await Progress.findAll({
+    where: {
+      user_id: userId,
+      reflected_reason: { [Op.ne]: null },
+    },
+    include: [{ model: Habit, as: "habit", attributes: ["title"] }],
+    order: [
+      ["progress_date", "DESC"],
+      ["created_at", "DESC"],
+      ["id", "DESC"],
+    ],
+    limit: 200,
+  });
+
+  if (!reflections.length) return null;
+
+  const statusCounts = {};
+  const reasonMap = new Map();
+  const recent = [];
+
+  reflections.forEach((entry) => {
+    const progress = entry.get({ plain: true });
+    const status = progress.status?.toLowerCase();
+    const reason = normalizeReasonText(progress.reflected_reason || progress.reflection_reason);
+
+    if (status) {
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+    }
+
+    if (reason) {
+      const existing = reasonMap.get(reason) || { reason, count: 0, statuses: {} };
+      existing.count += 1;
+      if (status) existing.statuses[status] = (existing.statuses[status] || 0) + 1;
+      reasonMap.set(reason, existing);
+    }
+
+    if (recent.length < 8 && reason) {
+      recent.push({
+        reason,
+        status,
+        habit: progress.habit?.title || null,
+        date: progress.progress_date || progress.created_at || null,
+      });
+    }
+  });
+
+  const topReasons = Array.from(reasonMap.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  return { statusCounts, topReasons, recent };
+};
+
+const formatReflectionInsights = (insights) => {
+  if (!insights) return "No reflection notes found yet.";
+
+  const statusLine = Object.keys(insights.statusCounts || {}).length
+    ? `Status mix: ${Object.entries(insights.statusCounts)
+        .map(([status, count]) => `${status}: ${count}`)
+        .join(", ")}.`
+    : "Status mix: no progress logged yet.";
+
+  const reasonsLine = (insights.topReasons || []).length
+    ? (insights.topReasons || [])
+        .map((entry, idx) => {
+          const statuses = Object.keys(entry.statuses || {}).length
+            ? ` (${Object.entries(entry.statuses)
+                .map(([status, count]) => `${status}:${count}`)
+                .join(", ")})`
+            : "";
+          return `${idx + 1}. "${entry.reason}" noted ${entry.count} time${
+            entry.count === 1 ? "" : "s"
+          }${statuses}`;
+        })
+        .join("; ")
+    : "No repeating reasons captured yet.";
+
+  const recentLine = (insights.recent || []).length
+    ? insights.recent
+        .map((entry) => {
+          const habit = entry.habit ? `for ${entry.habit}` : "";
+          const status = entry.status ? ` (${entry.status})` : "";
+          const date = entry.date ? ` on ${entry.date}` : "";
+          return `${entry.reason}${habit}${status}${date}`;
+        })
+        .join("; ")
+    : "No recent reflections found.";
+
+  return [statusLine, `Common reasons: ${reasonsLine}`, `Recent reflections: ${recentLine}`].join("\n");
+};
+
 const mapTask = (task) => ({
   id: task.id,
   name: task.name,
@@ -219,7 +319,19 @@ const analyzeHabitIntent = (message, history = []) => {
   const lower = normalized.toLowerCase();
   const pendingSuggestion = findPendingHabitSuggestion(history);
 
+  const reflectionQuery =
+    /\bwhy\b/.test(lower) ||
+    /\breason\b/.test(lower) ||
+    /\bstruggl/.test(lower) ||
+    /\bfail/.test(lower) ||
+    /\bmiss/.test(lower) ||
+    /\bskip/.test(lower);
+
   if (!normalized) {
+    return { intent: "chat", habitSuggestion: null, reply: null };
+  }
+
+  if (reflectionQuery) {
     return { intent: "chat", habitSuggestion: null, reply: null };
   }
 
@@ -1148,12 +1260,13 @@ const generateScheduleNotFoundReply = async ({ decision, context }) => {
 };
 
 export const generateAiChatReply = async ({ userId, message, history: providedHistory = null }) => {
-  const [dbOverview, userContext, history] = await Promise.all([
+  const [dbOverview, userContext, history, reflectionInsights] = await Promise.all([
     describeTables(),
     loadUserContext(userId),
     providedHistory
       ? Promise.resolve(providedHistory)
       : getChatHistory(userId, MESSAGE_HISTORY_LIMIT),
+    loadReflectionInsights(userId),
   ]);
 
   const habitAnalysis = analyzeHabitIntent(message, history);
@@ -1175,10 +1288,11 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     "Respond with short, human-feeling paragraphs (avoid bullet lists unless requested).",
     "You can see the database overview and the current user's context—use them naturally in conversation.",
     "Stay encouraging and keep the chat flowing with one clear next step in each reply.",
-    "When users ask why a habit is missed or succeeds, study the recentNotes on that habit to describe patterns or reasons.",
+    "When users ask why a habit is missed or succeeds, study the recentNotes on that habit and the reflected reasons from the progress table to describe patterns or reasons before suggesting new habits.",
     "Database overview:\n" + formatTableSummary(dbOverview),
     "User context:\n" + JSON.stringify(userContext || {}, null, 2),
     "Recent habit notes:\n" + buildRecentNotesDigest(userContext?.habits || []),
+    "Reflected reasons:\n" + formatReflectionInsights(reflectionInsights),
   ].join("\n\n");
 
   let habitSuggestion = habitAnalysis.habitSuggestion;
@@ -1437,6 +1551,6 @@ export const generateAiChatReply = async ({ userId, message, history: providedHi
     createdReminder,
     deletedSchedule,
     scheduleConflict,
-    context: { dbOverview, userContext, history },
+    context: { dbOverview, userContext, history, reflectionInsights },
   };
 };
