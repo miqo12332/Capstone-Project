@@ -1405,18 +1405,86 @@ const Habits = () => {
 
   const summary = analytics?.summary
   const streakLeader = summary?.streakLeader
-  const streakDays = streakLeader?.streak?.current ?? 0
-  const streakLabel = streakLeader?.habitName
-    ? `${streakDays} days · ${streakLeader.habitName}`
-    : `${streakDays} days`
+
+  const weeklyWinRate = useMemo(() => {
+    if (!historyEntries?.length) return 0
+    const now = new Date()
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+    start.setUTCDate(start.getUTCDate() - 6)
+
+    let done = 0
+    let missed = 0
+
+    historyEntries.forEach((entry) => {
+      const dateKey = (entry.progressDate || entry.createdAt || "").slice(0, 10)
+      if (!dateKey) return
+      const dateValue = new Date(`${dateKey}T00:00:00Z`)
+      if (Number.isNaN(dateValue.getTime())) return
+      if (dateValue < start || dateValue > now) return
+      if (entry.status === "done") done += 1
+      if (entry.status === "missed") missed += 1
+    })
+
+    const total = done + missed
+    return total ? Math.round((done / total) * 100) : 0
+  }, [historyEntries])
+
+  const streakCarousel = useMemo(() => {
+    const list = (analytics?.habits || [])
+      .map((habit) => ({
+        id: habit.habitId || habit.id,
+        name: habit.habitName || habit.title || "Habit",
+        days: habit.streak?.current ?? 0,
+      }))
+      .filter((item) => item.id)
+
+    if (list.length === 0 && streakLeader) {
+      return [
+        {
+          id: streakLeader.habitId || streakLeader.habit_id || "streak-leader",
+          name: streakLeader.habitName || "Habit",
+          days: streakLeader.streak?.current ?? 0,
+        },
+      ]
+    }
+
+    return list
+  }, [analytics?.habits, streakLeader])
+
+  const [activeStreakIndex, setActiveStreakIndex] = useState(0)
+
+  useEffect(() => {
+    setActiveStreakIndex(0)
+  }, [streakCarousel.length])
+
+  useEffect(() => {
+    if (streakCarousel.length <= 1) return undefined
+
+    const timer = setInterval(() => {
+      setActiveStreakIndex((prev) => {
+        return (prev + 1) % streakCarousel.length
+      })
+    }, 5000)
+
+    return () => clearInterval(timer)
+  }, [streakCarousel.length])
+
+  const streakDisplay = streakCarousel[activeStreakIndex] || {
+    name: streakLeader?.habitName || "",
+    days: streakLeader?.streak?.current ?? 0,
+  }
+
+  const streakLabel = streakDisplay.name
+    ? `${streakDisplay.days} days · ${streakDisplay.name}`
+    : `${streakDisplay.days} days`
 
   const heroStats = useMemo(
     () => [
-      { label: "Weekly win rate", value: formatPercent(summary?.completionRate ?? 0), tone: "success" },
+      { label: "Weekly win rate", value: formatPercent(weeklyWinRate ?? 0), tone: "success" },
       { label: "Current streak", value: streakLabel, tone: "info" },
       { label: "Active habits", value: `${summary?.totalHabits ?? 0}`, tone: "warning" },
     ],
-    [streakLabel, summary?.completionRate, summary?.totalHabits],
+    [streakLabel, summary?.totalHabits, weeklyWinRate],
   )
 
   return (
