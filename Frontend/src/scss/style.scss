@@ -907,12 +907,12 @@ body {
 }
 
 .month-checkbox {
-  width: 100%;
+  width: 90%;
   max-width: 60px;
   aspect-ratio: 1 / 1;
   min-height: 56px;
   margin-inline: auto;
-  margin-left: -2px;
+  margin-left: 1px;
   display: grid;
   place-items: center;
   padding: 0.35rem;
