@@ -39,7 +39,6 @@ import {
   cilMoodGood,
   cilSettings,
   cilSpeedometer,
-  cilStar,
   cilUser,
 } from "@coreui/icons"
 import axios from "axios"
@@ -272,7 +271,6 @@ const UserProfile = () => {
   const achievementsSummary = useMemo(
     () => ({
       totalHabits: habits.length,
-      streak: analytics?.streak ?? analytics?.longestStreak ?? 0,
       badges: analytics?.badges || analytics?.milestones || [],
     }),
     [habits.length, analytics]
@@ -776,15 +774,8 @@ const UserProfile = () => {
             color: "success",
             icon: cilBell,
           },
-          {
-            label: "Streak heat",
-            value: `${achievementsSummary.streak} days`,
-            helper: "Stay on your momentum",
-            color: "warning",
-            icon: cilStar,
-          },
         ].map((card) => (
-          <CCol md={4} key={card.label}>
+          <CCol xs={12} lg={6} key={card.label}>
             <CCard className="glass-panel h-100">
               <CCardBody className="d-flex align-items-start gap-3">
                 <div className={`icon-chip icon-chip-${card.color}`}>
