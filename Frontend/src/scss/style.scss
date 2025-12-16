@@ -1303,6 +1303,10 @@ body {
   color: var(--cui-info);
 }
 
+.help-card-header {
+  column-gap: 10px;
+}
+
 .profile-nav__list {
   padding: 0.25rem;
   gap: 0.25rem;
