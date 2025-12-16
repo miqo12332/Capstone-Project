@@ -1452,6 +1452,8 @@ const Habits = () => {
   }, [analytics?.habits, streakLeader])
 
   const [activeStreakIndex, setActiveStreakIndex] = useState(0)
+  const [prevStreak, setPrevStreak] = useState(null)
+  const [showPrevStreak, setShowPrevStreak] = useState(false)
 
   useEffect(() => {
     setActiveStreakIndex(0)
@@ -1472,7 +1474,21 @@ const Habits = () => {
   const streakDisplay = streakCarousel[activeStreakIndex] || {
     name: streakLeader?.habitName || "",
     days: streakLeader?.streak?.current ?? 0,
+    id: streakLeader?.habitId || streakLeader?.habit_id || "streak-leader",
   }
+
+  const streakDisplayKey = streakDisplay.id || activeStreakIndex
+
+  useEffect(() => {
+    if (!streakDisplay) return undefined
+    setShowPrevStreak(true)
+    const timer = setTimeout(() => setShowPrevStreak(false), 450)
+    return () => clearTimeout(timer)
+  }, [streakDisplayKey])
+
+  useEffect(() => {
+    setPrevStreak(streakDisplay)
+  }, [streakDisplay])
 
   const streakLabel = streakDisplay.name
     ? `${streakDisplay.days} days · ${streakDisplay.name}`
@@ -1481,10 +1497,17 @@ const Habits = () => {
   const streakValueNode = useMemo(
     () => (
       <span className="streak-roller" aria-live="polite">
-        <span className="streak-slide" key={streakDisplay.id || activeStreakIndex}>{streakLabel}</span>
+        {showPrevStreak && prevStreak && prevStreak.id !== streakDisplay.id && (
+          <span className="streak-slide streak-slide--out" key={`prev-${prevStreak.id || "prev"}`}>
+            {prevStreak.name ? `${prevStreak.days} days · ${prevStreak.name}` : `${prevStreak.days} days`}
+          </span>
+        )}
+        <span className="streak-slide streak-slide--in" key={`curr-${streakDisplayKey}`}>
+          {streakLabel}
+        </span>
       </span>
     ),
-    [activeStreakIndex, streakDisplay.id, streakLabel],
+    [prevStreak, showPrevStreak, streakDisplay.id, streakDisplayKey, streakLabel],
   )
 
   const heroStats = useMemo(

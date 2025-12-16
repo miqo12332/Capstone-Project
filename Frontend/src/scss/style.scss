@@ -652,26 +652,51 @@ body {
 }
 
 .streak-roller {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  min-height: 1.25em;
+  min-height: 1.4em;
   overflow: hidden;
 }
 
 .streak-slide {
-  display: inline-block;
-  animation: streakSlide 0.45s ease;
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  animation-duration: 0.45s;
+  animation-timing-function: ease;
   white-space: nowrap;
 }
 
-@keyframes streakSlide {
+.streak-slide--in {
+  animation-name: streakSlideIn;
+}
+
+.streak-slide--out {
+  animation-name: streakSlideOut;
+}
+
+@keyframes streakSlideIn {
   from {
     opacity: 0;
-    transform: translateY(10%);
+    transform: translateY(-40%);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes streakSlideOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(40%);
   }
 }
 
