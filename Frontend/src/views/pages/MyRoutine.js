@@ -10,6 +10,13 @@ import {
   CButton,
   CAlert,
   CSpinner,
+  CModal,
+  CModalBody,
+  CModalFooter,
+  CModalHeader,
+  CModalTitle,
+  CFormLabel,
+  CFormInput,
 } from "@coreui/react";
 import CIcon from "@coreui/icons-react";
 import {
@@ -24,7 +31,8 @@ import "react-calendar/dist/Calendar.css";
 
 import { getSchedules } from "../../services/schedules";
 import { fetchCalendarOverview } from "../../services/calendar";
-import { useDataRefresh, REFRESH_SCOPES } from "../../utils/refreshBus";
+import { useDataRefresh, REFRESH_SCOPES, emitDataRefresh } from "../../utils/refreshBus";
+import { API_BASE } from "../../utils/apiConfig";
 
 const toDateKey = (date) => {
   if (!date) return null;
@@ -46,9 +54,14 @@ const formatTimeRange = (entry) => {
 const MyRoutine = ({ onSyncClick }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [actionError, setActionError] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [schedules, setSchedules] = useState([]);
   const [calendarOverview, setCalendarOverview] = useState(null);
+  const [editSchedule, setEditSchedule] = useState(null);
+  const [editValues, setEditValues] = useState({ day: "", starttime: "", endtime: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const user = JSON.parse(localStorage.getItem("user"));
   const userId = user?.id;
@@ -62,6 +75,7 @@ const MyRoutine = ({ onSyncClick }) => {
 
     try {
       setError(null);
+      setActionError(null);
       setLoading(true);
       const [scheduleData, calendarData] = await Promise.all([
         getSchedules(userId),
@@ -152,6 +166,99 @@ const MyRoutine = ({ onSyncClick }) => {
     return key && entriesByDate[key] ? entriesByDate[key] : [];
   }, [entriesByDate, selectedDate]);
 
+  const getScheduleFromEntry = useCallback(
+    (entry) => {
+      if (entry.type !== "timeblock" || !entry.id?.startsWith("schedule-")) return null;
+      const scheduleId = entry.id.replace("schedule-", "");
+      return schedules.find((schedule) => String(schedule.id) === String(scheduleId)) || null;
+    },
+    [schedules],
+  );
+
+  const openEditModal = (entry) => {
+    const schedule = getScheduleFromEntry(entry);
+    if (!schedule) return;
+    setEditSchedule(schedule);
+    setEditValues({
+      day: schedule.day || "",
+      starttime: schedule.starttime || "",
+      endtime: schedule.endtime || "",
+    });
+  };
+
+  const closeEditModal = () => {
+    setEditSchedule(null);
+    setEditValues({ day: "", starttime: "", endtime: "" });
+    setSavingEdit(false);
+  };
+
+  const handleUpdate = async () => {
+    if (!editSchedule) return;
+    if (!editValues.day || !editValues.starttime) {
+      setActionError("Day and start time are required.");
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+      setActionError(null);
+
+      const payload = {
+        day: editValues.day || null,
+        starttime: editValues.starttime || null,
+        endtime: editValues.endtime || null,
+      };
+
+      const res = await fetch(
+        `${API_BASE}/schedules/${editSchedule.id}${
+          editSchedule.type ? `?type=${editSchedule.type}` : ""
+        }`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      if (!res.ok) throw new Error("Unable to update time block.");
+
+      await loadData();
+      emitDataRefresh(REFRESH_SCOPES.SCHEDULES, {
+        reason: "schedule-updated",
+        scheduleId: editSchedule.id,
+      });
+      closeEditModal();
+    } catch (err) {
+      setActionError(err.message || "Failed to update time block.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDelete = async (entry) => {
+    const schedule = getScheduleFromEntry(entry);
+    if (!schedule) return;
+
+    try {
+      setDeletingId(String(schedule.id));
+      setActionError(null);
+      const res = await fetch(
+        `${API_BASE}/schedules/${schedule.id}${schedule.type ? `?type=${schedule.type}` : ""}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) throw new Error("Unable to delete time block.");
+      await loadData();
+      emitDataRefresh(REFRESH_SCOPES.SCHEDULES, {
+        reason: "schedule-deleted",
+        scheduleId: schedule.id,
+      });
+    } catch (err) {
+      setActionError(err.message || "Failed to delete time block.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const nextFreeDay = useMemo(() => {
     const today = new Date();
     const lookaheadDays = 90;
@@ -219,6 +326,7 @@ const MyRoutine = ({ onSyncClick }) => {
 
   return (
     <div className="py-4 py-lg-5">
+      {actionError && <CAlert color="danger">{actionError}</CAlert>}
       <div className="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
         <div>
           <h2 className="fw-bold mb-1">My Routine Planner</h2>
@@ -370,7 +478,7 @@ const MyRoutine = ({ onSyncClick }) => {
                     <div key={entry.id} className="timeline-item">
                       <div className={`timeline-dot ${entry.type}`} />
                       <div className="timeline-content">
-                        <div className="d-flex align-items-center justify-content-between gap-3">
+                        <div className="d-flex align-items-center justify-content-between gap-3 flex-wrap">
                           <div>
                             <div className="fw-semibold">{entry.title}</div>
                             <div className="small text-body-secondary">
@@ -383,9 +491,36 @@ const MyRoutine = ({ onSyncClick }) => {
                                 : ""}
                             </div>
                           </div>
-                          <CBadge color={entry.type === "calendar" ? "info" : "success"}>
-                            {entry.type === "calendar" ? "Calendar" : "Time block"}
-                          </CBadge>
+                          <div className="d-flex align-items-center gap-2 flex-wrap">
+                            <CBadge color={entry.type === "calendar" ? "info" : "success"}>
+                              {entry.type === "calendar" ? "Calendar" : "Time block"}
+                            </CBadge>
+                            {entry.type === "timeblock" && (
+                              <>
+                                <CButton
+                                  size="sm"
+                                  color="primary"
+                                  variant="ghost"
+                                  onClick={() => openEditModal(entry)}
+                                >
+                                  Edit
+                                </CButton>
+                                <CButton
+                                  size="sm"
+                                  color="danger"
+                                  variant="ghost"
+                                  disabled={deletingId === String(getScheduleFromEntry(entry)?.id)}
+                                  onClick={() => handleDelete(entry)}
+                                >
+                                  {deletingId === String(getScheduleFromEntry(entry)?.id) ? (
+                                    <CSpinner size="sm" />
+                                  ) : (
+                                    "Delete"
+                                  )}
+                                </CButton>
+                              </>
+                            )}
+                          </div>
                         </div>
                         {entry.notes && (
                           <div className="small text-body-secondary mt-2">{entry.notes}</div>
@@ -535,6 +670,56 @@ const MyRoutine = ({ onSyncClick }) => {
           color: var(--cui-body-color);
         }
       `}</style>
+
+      <CModal visible={Boolean(editSchedule)} onClose={closeEditModal} alignment="center">
+        <CModalHeader closeButton>
+          <CModalTitle>Edit time block</CModalTitle>
+        </CModalHeader>
+        <CModalBody className="d-flex flex-column gap-3">
+          <div>
+            <CFormLabel className="text-uppercase text-muted fw-semibold small">Day</CFormLabel>
+            <CFormInput
+              type="date"
+              value={editValues.day}
+              onChange={(e) => setEditValues({ ...editValues, day: e.target.value })}
+            />
+          </div>
+          <div className="row g-3">
+            <div className="col-12 col-md-6">
+              <CFormLabel className="text-uppercase text-muted fw-semibold small">Start time</CFormLabel>
+              <CFormInput
+                type="time"
+                value={editValues.starttime}
+                onChange={(e) => setEditValues({ ...editValues, starttime: e.target.value })}
+              />
+            </div>
+            <div className="col-12 col-md-6">
+              <CFormLabel className="text-uppercase text-muted fw-semibold small">End time</CFormLabel>
+              <CFormInput
+                type="time"
+                value={editValues.endtime || ""}
+                onChange={(e) => setEditValues({ ...editValues, endtime: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="small text-body-secondary">
+            Update when this busy block occurs. Saving will refresh the day view immediately.
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" variant="ghost" onClick={closeEditModal} disabled={savingEdit}>
+            Cancel
+          </CButton>
+          <CButton
+            color="primary"
+            onClick={handleUpdate}
+            disabled={!editValues.day || !editValues.starttime || savingEdit}
+          >
+            {savingEdit ? <CSpinner size="sm" className="me-2" /> : null}
+            Save changes
+          </CButton>
+        </CModalFooter>
+      </CModal>
     </div>
   );
 };

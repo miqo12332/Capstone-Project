@@ -1314,6 +1314,7 @@ const Habits = () => {
   const [historyEntries, setHistoryEntries] = useState([])
   const [signalsLoading, setSignalsLoading] = useState(false)
   const [signalsError, setSignalsError] = useState("")
+  const refreshTimerRef = useRef(null)
 
   const user = useMemo(() => JSON.parse(localStorage.getItem("user") || "{}"), [])
 
@@ -1340,10 +1341,30 @@ const Habits = () => {
     refreshSignals()
   }, [refreshSignals])
 
+  const requestSignalRefresh = useCallback(() => {
+    if (refreshTimerRef.current) return
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null
+      refreshSignals()
+    }, 150)
+  }, [refreshSignals])
+
+  useEffect(() => () => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current)
+      refreshTimerRef.current = null
+    }
+  }, [])
+
   useEffect(() => {
     const nextTab = tabFromPath(location.pathname)
     setActiveTab(nextTab)
   }, [location.pathname, tabFromPath])
+
+  useDataRefresh(
+    [REFRESH_SCOPES.ANALYTICS, REFRESH_SCOPES.PROGRESS, REFRESH_SCOPES.HABITS],
+    requestSignalRefresh,
+  )
 
   const handleTabChange = useCallback(
     (tab) => {
@@ -1383,14 +1404,119 @@ const Habits = () => {
   }, [activeTab, scrollToAddSection])
 
   const summary = analytics?.summary
+  const streakLeader = summary?.streakLeader
+
+  const weeklyWinRate = useMemo(() => {
+    if (!historyEntries?.length) return 0
+    const now = new Date()
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+    start.setUTCDate(start.getUTCDate() - 6)
+
+    let done = 0
+    let missed = 0
+
+    historyEntries.forEach((entry) => {
+      const dateKey = (entry.progressDate || entry.createdAt || "").slice(0, 10)
+      if (!dateKey) return
+      const dateValue = new Date(`${dateKey}T00:00:00Z`)
+      if (Number.isNaN(dateValue.getTime())) return
+      if (dateValue < start || dateValue > now) return
+      if (entry.status === "done") done += 1
+      if (entry.status === "missed") missed += 1
+    })
+
+    const total = done + missed
+    return total ? Math.round((done / total) * 100) : 0
+  }, [historyEntries])
+
+  const streakCarousel = useMemo(() => {
+    const list = (analytics?.habits || [])
+      .map((habit) => ({
+        id: habit.habitId || habit.id,
+        name: habit.habitName || habit.title || "Habit",
+        days: habit.streak?.current ?? 0,
+      }))
+      .filter((item) => item.id)
+
+    if (list.length === 0 && streakLeader) {
+      return [
+        {
+          id: streakLeader.habitId || streakLeader.habit_id || "streak-leader",
+          name: streakLeader.habitName || "Habit",
+          days: streakLeader.streak?.current ?? 0,
+        },
+      ]
+    }
+
+    return list
+  }, [analytics?.habits, streakLeader])
+
+  const [activeStreakIndex, setActiveStreakIndex] = useState(0)
+  const [prevStreak, setPrevStreak] = useState(null)
+  const [showPrevStreak, setShowPrevStreak] = useState(false)
+
+  useEffect(() => {
+    setActiveStreakIndex(0)
+  }, [streakCarousel.length])
+
+  useEffect(() => {
+    if (streakCarousel.length <= 1) return undefined
+
+    const timer = setInterval(() => {
+      setActiveStreakIndex((prev) => {
+        return (prev + 1) % streakCarousel.length
+      })
+    }, 5000)
+
+    return () => clearInterval(timer)
+  }, [streakCarousel.length])
+
+  const streakDisplay = streakCarousel[activeStreakIndex] || {
+    name: streakLeader?.habitName || "",
+    days: streakLeader?.streak?.current ?? 0,
+    id: streakLeader?.habitId || streakLeader?.habit_id || "streak-leader",
+  }
+
+  const streakDisplayKey = streakDisplay.id || activeStreakIndex
+
+  useEffect(() => {
+    if (!streakDisplay) return undefined
+    setShowPrevStreak(true)
+    const timer = setTimeout(() => setShowPrevStreak(false), 650)
+    return () => clearTimeout(timer)
+  }, [streakDisplayKey])
+
+  useEffect(() => {
+    setPrevStreak(streakDisplay)
+  }, [streakDisplay])
+
+  const streakLabel = streakDisplay.name
+    ? `${streakDisplay.days} days · ${streakDisplay.name}`
+    : `${streakDisplay.days} days`
+
+  const streakValueNode = useMemo(
+    () => (
+      <span className="streak-roller" aria-live="polite">
+        {showPrevStreak && prevStreak && prevStreak.id !== streakDisplay.id && (
+          <span className="streak-slide streak-slide--out" key={`prev-${prevStreak.id || "prev"}`}>
+            {prevStreak.name ? `${prevStreak.days} days · ${prevStreak.name}` : `${prevStreak.days} days`}
+          </span>
+        )}
+        <span className="streak-slide streak-slide--in" key={`curr-${streakDisplayKey}`}>
+          {streakLabel}
+        </span>
+      </span>
+    ),
+    [prevStreak, showPrevStreak, streakDisplay.id, streakDisplayKey, streakLabel],
+  )
 
   const heroStats = useMemo(
     () => [
-      { label: "Weekly win rate", value: formatPercent(summary?.completionRate ?? 0), tone: "success" },
-      { label: "Current streak", value: `${summary?.streakLeader?.streak?.current ?? 0} days`, tone: "info" },
+      { label: "Weekly win rate", value: formatPercent(weeklyWinRate ?? 0), tone: "success" },
+      { label: "Current streak", value: streakValueNode, tone: "info" },
       { label: "Active habits", value: `${summary?.totalHabits ?? 0}`, tone: "warning" },
     ],
-    [summary?.completionRate, summary?.streakLeader?.streak?.current, summary?.totalHabits],
+    [streakValueNode, summary?.totalHabits, weeklyWinRate],
   )
 
   return (

@@ -445,11 +445,11 @@ const Register = () => {
   }
 
   return (
-    <div className="min-vh-100 d-flex flex-row align-items-center bg-light">
+    <div className="auth-page">
       <CContainer>
         <CRow className="justify-content-center">
           <CCol lg={7} xl={6}>
-            <CCard className="p-4 shadow-sm border-0">
+            <CCard className="p-4 shadow-lg auth-card border-0">
               <CCardBody>
                 <CForm onSubmit={handleSubmit}>
                   <div className="d-flex justify-content-between align-items-start mb-3">

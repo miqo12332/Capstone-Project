@@ -701,7 +701,7 @@ const Tasks = () => {
         </CModalFooter>
       </CModal>
 
-      <CModal alignment="center" visible={Boolean(selectedTask)} onClose={closeDetails} size="lg">
+      <CModal alignment="center" visible={Boolean(selectedTask)} onClose={closeDetails} size="lg" className="task-detail-modal">
         <CModalHeader closeButton className="border-0 pb-1">
           <CModalTitle className="w-100">
             <div className="d-flex align-items-center gap-3">
@@ -737,7 +737,7 @@ const Tasks = () => {
               <div>
                 <CFormLabel className="text-medium-emphasis">Description</CFormLabel>
                 <textarea
-                  className="form-control rounded-3 border-0 bg-light"
+                  className="form-control rounded-3 border-0 task-surface-input"
                   style={{ minHeight: 120 }}
                   placeholder="Add a more detailed description..."
                   value={editDescription}
@@ -758,12 +758,12 @@ const Tasks = () => {
                   const visibleItems = list.hideCompleted ? list.items.filter((item) => !item.done) : list.items
 
                   return (
-                    <div key={list.id} className="border rounded-3 p-3 bg-light">
+                    <div key={list.id} className="border rounded-3 p-3 task-surface">
                       <div className="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
                         <CFormInput
                           value={list.title}
                           onChange={(e) => handleChecklistTitleChange(list.id, e.target.value)}
-                          className="flex-grow-1"
+                          className="flex-grow-1 task-surface-input"
                         />
                         <div className="d-flex gap-2 align-items-center flex-shrink-0">
                           <input
@@ -880,6 +880,7 @@ const Tasks = () => {
                           onChange={(e) =>
                             setChecklistInputs((prev) => ({ ...prev, [list.id]: e.target.value || "" }))
                           }
+                          className="task-surface-input"
                         />
                         <CButton color="primary" variant="outline" onClick={() => handleAddItem(list.id)}>
                           Add

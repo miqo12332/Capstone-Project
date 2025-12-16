@@ -33,7 +33,7 @@ import { emitDataRefresh, REFRESH_SCOPES } from "../../utils/refreshBus";
 
 const roleConfig = {
   user: { color: "primary", label: "You", icon: cilUser },
-  assistant: { color: "info", label: "AI", icon: cilSpeech },
+  assistant: { color: "info", label: "HabitCoach", icon: cilSpeech },
 };
 
 const MessageBubble = ({ entry }) => {
@@ -240,7 +240,7 @@ const HabitCoach = () => {
                     history.map((entry) => <MessageBubble key={entry.id} entry={entry} />)
                   ) : (
                     <div className="text-medium-emphasis text-center py-5">
-                      Start the conversation to see the AI's replies.
+                      Start the conversation to see HabitCoach's replies.
                     </div>
                   )}
                   <div ref={bottomRef} />
