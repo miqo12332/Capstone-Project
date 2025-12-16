@@ -4,8 +4,17 @@
 @use "@coreui/chartjs/scss/coreui-chartjs";
 @use "vendors/simplebar";
 
+:root {
+  --app-wallpaper: url("../assets/images/2.jpg");
+}
+
 body {
   background-color: var(--cui-tertiary-bg);
+  background-image: linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)), var(--app-wallpaper);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 .wrapper {
@@ -528,10 +537,34 @@ body {
   min-height: 100vh;
   display: flex;
   align-items: center;
-  background: radial-gradient(circle at 20% 20%, rgba(50, 31, 219, 0.14), transparent 25%),
-    radial-gradient(circle at 80% 0%, rgba(57, 153, 255, 0.14), transparent 25%),
-    linear-gradient(180deg, #f7f9fb, #eef3ff);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   padding: clamp(1.5rem, 3vw, 3rem);
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--app-wallpaper) center / cover no-repeat fixed;
+    opacity: 0.9;
+    z-index: -2;
+  }
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 20% 20%, rgba(50, 31, 219, 0.14), transparent 25%),
+      radial-gradient(circle at 80% 0%, rgba(57, 153, 255, 0.14), transparent 25%),
+      linear-gradient(180deg, rgba(247, 249, 251, 0.25), rgba(238, 243, 255, 0.35));
+    z-index: -1;
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
 }
 
 .auth-card {
