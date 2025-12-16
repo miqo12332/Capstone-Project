@@ -1471,11 +1471,15 @@ const Habits = () => {
     return () => clearInterval(timer)
   }, [streakCarousel.length])
 
-  const streakDisplay = streakCarousel[activeStreakIndex] || {
-    name: streakLeader?.habitName || "",
-    days: streakLeader?.streak?.current ?? 0,
-    id: streakLeader?.habitId || streakLeader?.habit_id || "streak-leader",
-  }
+  const streakDisplay = useMemo(
+    () =>
+      streakCarousel[activeStreakIndex] || {
+        name: streakLeader?.habitName || "",
+        days: streakLeader?.streak?.current ?? 0,
+        id: streakLeader?.habitId || streakLeader?.habit_id || "streak-leader",
+      },
+    [activeStreakIndex, streakCarousel, streakLeader?.habitId, streakLeader?.habitName, streakLeader?.habit_id, streakLeader?.streak?.current],
+  )
 
   const streakDisplayKey = streakDisplay.id || activeStreakIndex
 
@@ -1488,7 +1492,7 @@ const Habits = () => {
 
   useEffect(() => {
     setPrevStreak(streakDisplay)
-  }, [streakDisplay])
+  }, [streakDisplay, streakDisplayKey])
 
   const streakLabel = streakDisplay.name
     ? `${streakDisplay.days} days · ${streakDisplay.name}`
