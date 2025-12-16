@@ -1160,7 +1160,7 @@ const Dashboard = () => {
                     {selectedHabitLabel} · Week view
                   </div>
                   {weeklyMomentumTrend.length ? (
-                    <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
+                    <ResponsiveContainer width="100%" height={240} minWidth={200}>
                       <AreaChart data={weeklyMomentumTrend}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="date" tickFormatter={formatShortDate} />
