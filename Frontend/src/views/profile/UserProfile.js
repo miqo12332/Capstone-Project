@@ -616,7 +616,7 @@ const UserProfile = () => {
       <CCol md={4}>
         <CCard className="glass-panel border-0 h-100">
           <CCardBody>
-            <div className="d-flex align-items-center mb-3">
+            <div className="d-flex align-items-center mb-3 help-card-header">
               <div className="icon-chip icon-chip-info">
                 <CIcon icon={cilInfo} />
               </div>
@@ -634,7 +634,7 @@ const UserProfile = () => {
       <CCol md={4}>
         <CCard className="glass-panel border-0 h-100">
           <CCardBody>
-            <div className="d-flex align-items-center mb-3">
+            <div className="d-flex align-items-center mb-3 help-card-header">
               <div className="icon-chip icon-chip-primary">
                 <CIcon icon={cilLifeRing} />
               </div>
@@ -650,7 +650,7 @@ const UserProfile = () => {
       <CCol md={4}>
         <CCard className="glass-panel border-0 h-100">
           <CCardBody>
-            <div className="d-flex align-items-center mb-3">
+            <div className="d-flex align-items-center mb-3 help-card-header">
               <div className="icon-chip icon-chip-warning">
                 <CIcon icon={cilContact} />
               </div>
