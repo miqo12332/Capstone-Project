@@ -1482,7 +1482,7 @@ const Habits = () => {
   useEffect(() => {
     if (!streakDisplay) return undefined
     setShowPrevStreak(true)
-    const timer = setTimeout(() => setShowPrevStreak(false), 450)
+    const timer = setTimeout(() => setShowPrevStreak(false), 650)
     return () => clearTimeout(timer)
   }, [streakDisplayKey])
 
