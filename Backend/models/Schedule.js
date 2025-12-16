@@ -10,13 +10,7 @@ const Schedule = sequelize.define(
     // your actual DB columns
     habit_id: { type: DataTypes.INTEGER, allowNull: false },
 
-    // Align the attribute naming with the rest of the codebase while keeping
-    // compatibility with the existing `userid` column in the database.
-    user_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      field: "userid",
-    },
+    user_id: { type: DataTypes.INTEGER, allowNull: false },
 
     day:       { type: DataTypes.DATEONLY, allowNull: false },
     starttime: { type: DataTypes.TIME, allowNull: false },
@@ -31,8 +25,8 @@ const Schedule = sequelize.define(
     tableName: "schedules",
     // Map Sequelize's timestamps to your actual lowercase columns
     timestamps: true,
-    createdAt: "createdat",
-    updatedAt: "updatedat",
+    createdAt: "created_at",
+    updatedAt: "updated_at",
     underscored: false,
   }
 );
