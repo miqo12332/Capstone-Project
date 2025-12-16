@@ -8,11 +8,7 @@ const BusySchedule = sequelize.define(
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
 
     // Link to the user who created the busy event
-    user_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      field: "userid",
-    },
+    user_id: { type: DataTypes.INTEGER, allowNull: false },
 
     // Event metadata
     title: { type: DataTypes.STRING(255), allowNull: false },
@@ -27,8 +23,8 @@ const BusySchedule = sequelize.define(
   {
     tableName: "busy_schedules",
     timestamps: true,
-    createdAt: "createdat",
-    updatedAt: "updatedat",
+    createdAt: "created_at",
+    updatedAt: "updated_at",
     underscored: false,
   }
 );
