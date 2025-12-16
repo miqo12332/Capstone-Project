@@ -41,6 +41,7 @@ import {
   getLibraryRecommendations,
   getLibraryWindows,
 } from "../../services/library";
+import { emitDataRefresh, REFRESH_SCOPES } from "../../utils/refreshBus";
 
 const HabitLibrary = () => {
   const { user } = useContext(AuthContext);
@@ -185,10 +186,14 @@ const HabitLibrary = () => {
 
     try {
       setAddingId(habit.id);
-      await addHabitFromLibrary(user.id, habit);
+      const created = await addHabitFromLibrary(user.id, habit);
       setFeedback({
         type: "success",
         message: `\u2705 ${habit.name || habit.title} was added to your habit list.`,
+      });
+      emitDataRefresh(REFRESH_SCOPES.HABITS, {
+        reason: "habit-added-from-library",
+        habitId: created?.id,
       });
     } catch (error) {
       console.error("Failed to add habit", error);
