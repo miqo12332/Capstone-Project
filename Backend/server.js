@@ -25,6 +25,7 @@ import assistantRoutes from "./routes/assistantRoutes.js";
 import calendarRoutes from "./routes/calendarRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import aiRoutes from "./routes/ai.js";
+import { verifyEmailTransport, EmailConfigError } from "./utils/emailService.js";
 
 // === Node path handling for ES modules ===
 import path from "path";
@@ -136,6 +137,17 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
 
+
+    try {
+      await verifyEmailTransport();
+      console.log("📧 Email service verified and ready to send.");
+    } catch (emailError) {
+      if (emailError instanceof EmailConfigError) {
+        console.warn("⚠️ Email configuration missing:", emailError.message);
+      } else {
+        console.warn("⚠️ Email transport could not be verified:", emailError.message);
+      }
+    }
 
   } catch (err) {
     console.error("❌ Database connection failed:", err);
