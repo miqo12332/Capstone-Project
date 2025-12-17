@@ -8,10 +8,15 @@ class EmailConfigError extends Error {
   }
 }
 
+const hasEmailConfig = () => {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+  return Boolean(SMTP_HOST && SMTP_PORT && SMTP_USER && SMTP_PASS);
+};
+
 const createTransporter = () => {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE } = process.env;
 
-  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
+  if (!hasEmailConfig()) {
     throw new EmailConfigError(
       "Email service is not configured. Please set SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS."
     );
@@ -35,5 +40,5 @@ export const sendEmail = async ({ to, subject, text }) => {
   await transporter.sendMail({ from, to, subject, text });
 };
 
-export { EmailConfigError };
+export { EmailConfigError, hasEmailConfig };
 

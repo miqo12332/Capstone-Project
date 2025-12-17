@@ -9,7 +9,7 @@ import {
   User,
 } from "../models/index.js";
 import { habitLibraryBlueprint } from "../data/habitLibrary.js";
-import { EmailConfigError, sendEmail } from "../utils/emailService.js";
+import { EmailConfigError, hasEmailConfig, sendEmail } from "../utils/emailService.js";
 
 const router = express.Router();
 
@@ -430,11 +430,24 @@ router.post("/", async (req, res) => {
       UserSetting.findOne({ where: { user_id } }),
     ]);
 
+    let emailQueued = false;
+    let emailWarning = null;
+
     if (user?.email && settings?.email_notifications !== false) {
-      await scheduleReminderEmail({ notification, user });
+      if (!hasEmailConfig()) {
+        emailWarning =
+          "Email service is not configured. Please set SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS.";
+      } else {
+        await scheduleReminderEmail({ notification, user });
+        emailQueued = true;
+      }
     }
 
-    res.status(201).json({ notification: serializeNotification(notification) });
+    res.status(201).json({
+      notification: serializeNotification(notification),
+      emailQueued,
+      emailWarning,
+    });
   } catch (error) {
     console.error("Failed to create notification", error);
     res.status(500).json({ error: "Failed to create notification" });
