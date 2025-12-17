@@ -514,7 +514,13 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
         aria-label={title}
         aria-pressed={Boolean(status)}
         disabled={disabled}
-        onClick={() => {
+        onMouseDown={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+        }}
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
           if (clickTimer.current) {
             clearTimeout(clickTimer.current)
             clickTimer.current = null
@@ -526,6 +532,7 @@ const MyHabitsTab = ({ onAddClick, onProgressLogged }) => {
         }}
         onDoubleClick={(event) => {
           event.preventDefault()
+          event.stopPropagation()
           if (clickTimer.current) {
             clearTimeout(clickTimer.current)
             clickTimer.current = null
