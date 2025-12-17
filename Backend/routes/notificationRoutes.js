@@ -122,6 +122,89 @@ router.patch("/:userId/read-all", async (req, res) => {
   }
 });
 
+const buildEmailDigest = ({ notifications, user }) => {
+  const header = user.name ? `Hi ${user.name},` : "Hi,";
+  const intro =
+    "Here is your latest notifications summary from StepHabit. You can manage these in the app's notifications center.";
+
+  if (!notifications.length) {
+    return `${header}\n\n${intro}\n\nYou currently have no notifications.`;
+  }
+
+  const formattedNotifications = notifications
+    .map((notification, index) => {
+      const scheduledFor = notification.scheduled_for
+        ? ` (scheduled for ${new Date(notification.scheduled_for).toLocaleString()})`
+        : "";
+      return `${index + 1}. ${notification.title || "Notification"}${scheduledFor}\n${
+        notification.message
+      }`;
+    })
+    .join("\n\n");
+
+  return `${header}\n\n${intro}\n\n${formattedNotifications}\n\n`;
+};
+
+router.post("/:userId/email", async (req, res) => {
+  try {
+    const userId = Number.parseInt(req.params.userId, 10);
+    const { onlyUnread = true } = req.body || {};
+
+    if (!Number.isFinite(userId)) {
+      return res.status(400).json({ error: "Invalid user id" });
+    }
+
+    const user = await User.findByPk(userId, { attributes: ["name", "email"] });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!user.email) {
+      return res.status(400).json({ error: "User does not have a valid email" });
+    }
+
+    const settings = await UserSetting.findOne({ where: { user_id: userId } });
+    if (settings && settings.email_notifications === false) {
+      return res
+        .status(403)
+        .json({ error: "Email notifications are disabled for this user" });
+    }
+
+    const notificationWhere = { user_id: userId };
+    if (onlyUnread) {
+      notificationWhere.is_read = false;
+    }
+
+    const notifications = await Notification.findAll({
+      where: notificationWhere,
+      order: [["created_at", "ASC"]],
+    });
+
+    const text = buildEmailDigest({ notifications, user });
+
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: onlyUnread
+          ? "Your unread StepHabit notifications"
+          : "Your StepHabit notifications",
+        text,
+      });
+    } catch (error) {
+      if (error instanceof EmailConfigError) {
+        return res.status(503).json({ error: error.message });
+      }
+      throw error;
+    }
+
+    res.json({ sent: true, count: notifications.length });
+  } catch (error) {
+    console.error("Failed to send notification email", error);
+    res.status(500).json({ error: "Failed to send notification email" });
+  }
+});
+
 router.patch("/:id/read", async (req, res) => {
   try {
     const notification = await Notification.findByPk(req.params.id);
