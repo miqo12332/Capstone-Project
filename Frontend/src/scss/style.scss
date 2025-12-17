@@ -1090,11 +1090,26 @@ body {
   gap: 0.25rem;
 }
 
+.habit-header-row {
+  min-width: 0;
+}
+
+.habit-header-row .habit-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.habit-tag {
+  white-space: nowrap;
+}
+
 .habit-actions {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   margin-left: auto;
+  flex-shrink: 0;
 }
 
 .habit-col .habit-title {
