@@ -31,7 +31,7 @@
   \includegraphics[width=0.55\textwidth]{images/Aua_logo.png}\par
   \vspace{1cm}
 
-  {\Large \textbf{CSE 296: Capstone Project}\par}
+  {\Large \textbf{CS 296: Capstone Project}\par}
   \vspace{0.8cm}
 
   {\Huge \textbf{StepHabit}\par}
@@ -76,7 +76,7 @@
 
 \section{Introduction}
 \subsection{System Overview}
-
+\indent\hspace*{1em}
 StepHabit is a secure, AI-assisted platform. It is created to help
 users transform long-term goals into consistent daily routines. The system demonstrates strong focus on the structure, motivation, and sustainability. It allows users to manage, create, and track tasks, habits and schedules, even to use ready templates for habit creation A secure registration and authentication process ensures account
 integrity. At the same time personalized dashboards allow users to monitor progress, streaks and achievements over time.
@@ -93,6 +93,7 @@ In summary, StepHabit combines secure account management, structured planning an
 intelligent productivity experience. The platform demonstrates how modern web technologies and artificial intelligence can be wisely integrated to support sustainable habit formation and long-term personal growth.
 
 \subsection{Objectives}
+\indent\hspace*{1em}
 The primary objective of this project is to design and develop a secure, AI-assisted
 productivity and habit-building platform that enables users to translate long-term
 goals into consistent daily actions. The system aims to provide a structured yet
@@ -112,6 +113,7 @@ modern frameworks, ensuring data security and user privacy, and establishing a
 robust architectural foundation that can support future extensions such as mobile
 clients, advanced analytics, or enhanced AI-driven personalization.
 \subsection{Scope}
+\indent\hspace*{1em}
 The primary objective of this project is to design and develop a secure, AI-assisted
 productivity and habit-building platform that enables users to translate long-term
 goals into consistent daily actions. The system aims to provide a structured yet
@@ -134,7 +136,7 @@ clients, advanced analytics, or enhanced AI-driven personalization.
 
 \newpage
 \section{Methodology}
-
+\indent\hspace*{1em}
 During the initial phases of the project, secondary research was conducted to support the
 development of the product. The research involved peer-reviewed academic literature, industry
 reports, and existing digital habit-tracking applications. The findings helped to establish the need
@@ -142,13 +144,13 @@ for the system, identify prevailing design patterns, and inform the definition o
 requirements.
 
 \subsection{Justification for the Need of the Product}
-
+\indent\hspace*{1em}
 Findings from prior studies and industry analysis show that individuals often struggle to
 maintain consistent habits due to a lack of motivation, competing responsibilities, and the
 absence of structured feedback. Secondary research further indicates that, despite the wide
 availability of habit-tracking applications, sustained user engagement remains limited.
 
-Prior research by Lally et al.\ (2010)\footnote{Lally, P., van Jaarsveld, C. H. M., Potts, H. W. W., \& Wardle, J. (2010). How are habits formed: Modelling habit formation in the real world. \textit{European Journal of Social Psychology, 40}(6), 998--1009. https://doi.org/10.1002/ejsp.674}
+Prior research by Lally et al.\ (2010)\cite{lally2010}
 examined the process of habit formation in real-world settings and demonstrated that habit
 development occurs gradually and varies substantially between individuals. The study found
 that repeatedly performing a behavior in a consistent context supports the development of
@@ -157,7 +159,7 @@ formation process. These findings are directly relevant to the design of StepHab
 support long-term tracking, consistency-oriented reminders, and tolerance for missed
 instances, rather than an assumption of short-term behavior change.
 
-The study by Stawarz, Cox, and Blandford (2015)\footnote{Stawarz, K., Cox, A. L., \& Blandford, A. (2015). Beyond self-tracking and reminders: Designing smartphone apps that support habit formation. \textit{Proceedings of the 33rd Annual ACM Conference on Human Factors in Computing Systems}, 2653--2662. https://doi.org/10.1145/2702123.2702230}
+The study by Stawarz, Cox, and Blandford (2015)\cite{stawarz2015}
 provides one of the most comprehensive academic examinations of how applications support
 habit formation. Through both an empirical study and a large-scale review of existing habit-
 tracking systems, the authors show that most mobile applications rely primarily on self-tracking
@@ -168,20 +170,19 @@ than fostering habitual behavior. These insights inform the design of StepHabit,
 habit-based design principles without claiming guaranteed behavioral change outcomes.
 
 \subsection{Market Research}
-
+\indent\hspace*{1em}
 An examination of widely used habit-tracking applications reveals several established systems
 that support basic habit management functionality. Commonly used applications include
 Streaks, Habitica, Habitify, Loop Habit Tracker, and Fabulous. For example, Streaks emphasizes
-maintaining completion streaks and provides visual feedback on daily progress\footnote{Streaks. (n.d.). \textit{Streaks: Habit tracking app}. https://streaksapp.com}, while Habitica motivates users through gamification
-elements such as points and virtual rewards\footnote{Habitica. (n.d.). \textit{Habitica: Gamified habit-building and productivity app}. https://habitica.com}.
+maintaining completion streaks and provides visual feedback on daily progress\cite{streaks}, while Habitica motivates users through gamification elements such as points and virtual rewards\cite{habitica}
+.
 Habitify focuses on habit tracking complemented by basic analytics and performance
-summaries\footnote{Habitify. (n.d.). \textit{Habitify: Habit tracker and routine planner}. https://habitify.me}, whereas Loop Habit Tracker adopts a minimalist,
-open-source approach centered on manual tracking with limited personalization\footnote{Soron, A. (n.d.). \textit{Loop Habit Tracker} [Open-source software]. GitHub. https://github.com/iSoron/uhabits}.
+summaries\cite{habitify}, whereas Loop Habit Tracker adopts a minimalist,open-source approach centered on manual tracking with limited personalization\cite{soron}.
 
 Although these applications effectively support self-monitoring and short-term engagement,
 academic and industry analyses indicate that they largely rely on static reminders and
 descriptive feedback, offering limited adaptive or context-aware support for sustained habit
-development\footnote{Zapier. (2025). \textit{The best habit tracker apps}. https://zapier.com/blog/best-habit-tracker-app/}.
+development\cite{zapier2025}.
 
 While existing habit-tracking applications provide valuable baseline functionality, StepHabit is
 designed to address several limitations identified through prior research and market analysis.
@@ -201,6 +202,7 @@ contextual understanding and long-term engagement over reliance on repetitive no
 
 \section{System Architecture}
 \subsection{Overview of System Components}
+\indent\hspace*{1em}
 The StepHabit platform is designed using a modular system architecture, in which each
 major component is responsible for a clearly defined set of responsibilities. This
 architectural approach improves clarity, maintainability, and scalability, while
@@ -243,6 +245,7 @@ StepHabit combines modern web technologies with intelligent feedback mechanisms 
 deliver a productivity platform that supports sustainable habit formation and long-term
 personal growth.
 \subsection{Technology Stack and Frameworks}
+\indent\hspace*{1em}
 The StepHabit platform utilizes a modern, modular technology stack designed to ensure
 performance, scalability, maintainability, and ease of future extension across all
 layers of the system. Each technology was selected to support rapid development while
@@ -252,13 +255,13 @@ maintaining architectural clarity and long-term sustainability.
 \begin{itemize}[leftmargin=*]
   \item \textbf{React with Vite}: Builds responsive and interactive user interfaces while
   leveraging Vite for fast development cycles and optimized production bundles.
-  \item \textbf{CoreUI\footnote{CoreUI. (n.d.). \textit{CoreUI React admin template and UI components}. https://coreui.io/react}}: Provides component-based layouts, navigation structures,
+  \item \textbf{CoreUI\cite{coreui}}: Provides component-based layouts, navigation structures,
   dashboards, and visualization patterns used across the application.
 \end{itemize}
 
 \subsubsection{Backend}
 \begin{itemize}[leftmargin=*]
-  \item \textbf{Node.js\footnote{Node.js Foundation. (n.d.). \textit{Node.js documentation}. https://nodejs.org/en/docs} with Express}: Supplies the runtime and HTTP framework used for
+  \item \textbf{Node.js\cite{nodejs} with Express}: Supplies the runtime and HTTP framework used for
   routing, middleware composition, and request handling.
   \item \textbf{Sequelize ORM}: Manages relational interactions with PostgreSQL through
   model definitions, associations, and schema synchronization.
@@ -271,14 +274,14 @@ maintaining architectural clarity and long-term sustainability.
 
 \subsubsection{Database}
 \begin{itemize}[leftmargin=*]
-  \item \textbf{PostgreSQL\footnote{PostgreSQL Global Development Group. (n.d.). \textit{Why PostgreSQL? Advantages and features}. PostgreSQL Documentation. https://www.postgresql.org/about/}}: Stores structured data for profiles, habits, tasks,
+  \item \textbf{PostgreSQL\cite{postgresql}}: Stores structured data for profiles, habits, tasks,
   schedules, progress logs, achievements, notifications, and social relationships while
   preserving integrity for analytics and dashboard queries.
 \end{itemize}
 
 \subsubsection{AI Integration}
 \begin{itemize}[leftmargin=*]
-  \item \textbf{LangChain with Large Language Models (Anthropic)\footnote{IBM. (n.d.). \textit{What is Claude AI and why it matters}. IBM Think. https://www.ibm.com/think/topics/ai}}: Powers AI-assisted
+  \item \textbf{LangChain with Large Language Models (Anthropic)\cite{ibmclaude}}: Powers AI-assisted
   habit coaching, plan generation, idea refinement, and contextual guidance through a
   flexible abstraction layer for prompt management and provider configuration.
 \end{itemize}
@@ -289,37 +292,13 @@ maintaining architectural clarity and long-term sustainability.
   sensitive credentials and adapt deployments across development and production
   environments.
 \end{itemize}
-\subsection{Development and DevOps Tools}
-The development of the StepHabit platform relied on a set of modern development and
-DevOps tools to support efficient implementation, testing, collaboration, and
-deployment. These tools contributed to code quality, system reliability, and
-developer productivity throughout the project lifecycle.
-
-\begin{itemize}[leftmargin=*]
-  \item \textbf{Visual Studio Code (VS Code)}: Primary IDE for frontend and backend
-  development, providing language support, debugging, and extension-based tooling for
-  full-stack workflows.
-  \item \textbf{Postman}: Used to test RESTful API endpoints, validate payloads, and
-  debug authentication and business logic.
-  \item \textbf{Git and GitHub}: Supports version control, repository hosting, issue
-  tracking, and pull-request-driven collaboration.
-  \item \textbf{Docker and Docker Desktop}: Containerizes backend services, the frontend
-  client, and the database; Docker Compose orchestrates multi-container environments.
-  \item \textbf{Navicat}: Provides database administration, table inspection, and data
-  validation for PostgreSQL during development and testing.
-  \item \textbf{ESLint and Prettier}: Enforce coding standards, detect issues early, and
-  maintain readability across the codebase.
-  \item \textbf{Email and Notification Monitoring Tools}: Verify account verification and
-  notification delivery workflows for user-facing communication.
-
-\end{itemize}
-
 
 \newpage
 
 
 \section{Database Design}
 \subsection{Database Choice}
+\indent\hspace*{1em}
 PostgreSQL was chosen for this project because of its excellent support for relational data,
 adherence to ACID principles, and support for TypeORM integration. PostgreSQL's support for
 complex querying and indexing provides an effective solution to managing the complex
@@ -655,6 +634,7 @@ Each password reset request is associated with a single user email.
 
 
 \subsection{Data Security Measures}
+\indent\hspace*{1em}
 The StepHabit platform implements multiple layers of security to protect user data,
 ensure privacy, and maintain system integrity across authentication, authorization,
 and data processing workflows.
@@ -709,107 +689,12 @@ creating habits, schedules, progress records, or social relationships—are eith
 completed or fully rolled back in the event of an error, preserving database
 consistency.
 
-
-\newpage
-
-
-\section{Backend Endpoints}
-\subsection{Habit Endpoints}
-\begin{longtable}{|p{3cm}|p{4cm}|p{6cm}|p{2.5cm}|}
-\hline
-\textbf{Method} & \textbf{Path} & \textbf{Description} & \textbf{Auth Required} \\ \hline
-GET & /habits & Retrieve all habits for the authenticated user & Yes \\ \hline
-GET & /habits/:id & Retrieve a habit by its identifier & Yes \\ \hline
-POST & /habits & Create a new habit & Yes \\ \hline
-PUT & /habits/:id & Update an existing habit & Yes \\ \hline
-DELETE & /habits/:id & Delete a habit and related data & Yes \\ \hline
-POST & /habits/ai/plan & Generate AI-based habit plan & Yes \\ \hline
-POST & /habits/ai/rewrite & Rewrite habit description using AI & Yes \\ \hline
-\end{longtable}
-\subsection{Task Endpoints}
-\begin{longtable}{|p{3cm}|p{4cm}|p{6cm}|p{2.5cm}|}
-\hline
-\textbf{Method} & \textbf{Path} & \textbf{Description} & \textbf{Auth Required} \\ \hline
-GET & /tasks & Retrieve all tasks for the user & Yes \\ \hline
-POST & /tasks & Create a new task & Yes \\ \hline
-PUT & /tasks/:id & Update task details & Yes \\ \hline
-PATCH & /tasks/:id/status & Update task status & Yes \\ \hline
-DELETE & /tasks/:id & Delete a task & Yes \\ \hline
-\end{longtable}
-\subsection{Progress Tracking Endpoints}
-\begin{longtable}{|p{3cm}|p{4cm}|p{6cm}|p{2.5cm}|}
-\hline
-\textbf{Method} & \textbf{Path} & \textbf{Description} & \textbf{Auth Required} \\ \hline
-GET & /progress & Retrieve habit progress logs & Yes \\ \hline
-POST & /progress & Log habit completion & Yes \\ \hline
-DELETE & /progress/:id & Delete a progress record & Yes \\ \hline
-\end{longtable}
-
-\subsection{User & Authentication Endpoints}
-\begin{longtable}{|p{3cm}|p{4cm}|p{6cm}|p{2.5cm}|}
-\hline
-\textbf{Method} & \textbf{Path} & \textbf{Description} & \textbf{Auth Required} \\ \hline
-POST & /users/register & Register a new user & No \\ \hline
-PATCH & /users/register/verify & Complete registration via code & No \\ \hline
-POST & /users/login & Login with email and password & No \\ \hline
-PATCH & /users/login/verify & Login using verification code & No \\ \hline
-GET & /users/me & Get authenticated user profile & Yes \\ \hline
-PUT & /users/:id & Update user profile & Yes \\ \hline
-DELETE & /users & Delete user account & Yes \\ \hline
-POST & /users/logout & Logout authenticated user & Yes \\ \hline
-POST & /users/forgot-password & Request password reset & No \\ \hline
-PATCH & /users/reset-password & Reset password via code & Yes \\ \hline
-\end{longtable}
-\subsection{Notification Endpoints}
-\begin{longtable}{|p{3cm}|p{4cm}|p{6cm}|p{2.5cm}|}
-\hline
-\textbf{Method} & \textbf{Path} & \textbf{Description} & \textbf{Auth Required} \\ \hline
-GET & /notifications & Retrieve user notifications & Yes \\ \hline
-POST & /notifications & Create a notification & Yes \\ \hline
-PATCH & /notifications/mark-all-read & Mark all notifications as read & Yes \\ \hline
-PATCH & /notifications/:id/read & Mark a notification as read & Yes \\ \hline
-\end{longtable}
-
-\subsection{Messaging & Social Endpoints}
-\begin{longtable}{|p{3cm}|p{4cm}|p{6cm}|p{2.5cm}|}
-\hline
-\textbf{Method} & \textbf{Path} & \textbf{Description} & \textbf{Auth Required} \\ \hline
-GET & /messages & Retrieve chat messages & Yes \\ \hline
-POST & /messages & Send a direct message & Yes \\ \hline
-POST & /group-challenges & Create a group challenge & Yes \\ \hline
-GET & /group-challenges & List group challenges & Yes \\ \hline
-POST & /group-challenges/:id/join & Join a challenge & Yes \\ \hline
-\end{longtable}
-
-\subsection{API Tools and Documentation}
-
-To support development, testing, and long-term maintainability, the StepHabit platform
-provides comprehensive API documentation and testing tools. These tools allow developers
-and reviewers to explore endpoint behavior, request formats, and response structures in
-a transparent and interactive manner.
-
-\begin{longtable}{|p{4cm}|p{8cm}|p{3cm}|}
-\hline
-\textbf{Tool} & \textbf{Description} & \textbf{Access URL} \\ \hline
-Swagger UI &
-Interactive API documentation that exposes all available endpoints, including
-request parameters, authentication requirements, and response schemas. It enables
-real-time testing of API calls directly from the browser. &
-\texttt{/api\#} \\ \hline
-Postman Collection &
-A curated Postman collection used for manual API testing and debugging during
-development. It includes preconfigured requests for authentication, habits, tasks,
-notifications, AI coaching, and social features. &
-\texttt{Postman Workspace} \\ \hline
-\end{longtable}
-
-
 \newpage
 
 \section{Application and functionality}
 
 \subsection{User Registration Process}
-
+\indent\hspace*{1em}
 The user registration workflow in StepHabit is designed to ensure account integrity,
 data validity, and protection against unauthorized access. The process is divided
 into three structured stages, each incorporating validation rules and security
@@ -879,7 +764,7 @@ mechanisms to maintain platform reliability.
 \end{enumerate}
 
 \subsubsection*{Registration Completion}
-
+\indent\hspace*{1em}
 Upon completing all required steps, the user is redirected to the main dashboard
 and granted full access to the platform’s core functionality, including habit
 creation, task planning, scheduling, and AI-assisted coaching.
@@ -890,7 +775,7 @@ creation, task planning, scheduling, and AI-assisted coaching.
 \end{figure}
 
 \subsubsection*{Dashboard (Personal Hub)}
-
+\indent\hspace*{1em}
 The Dashboard is the primary landing screen after authentication. It provides a
 high-level snapshot of the user’s daily progress, shortcuts to core actions, and
 AI-assisted guidance. The page is designed to minimize friction by letting users
@@ -910,6 +795,7 @@ consistent daily execution while maintaining visibility into progress.
 \end{figure}
 
 \subsection{Planner Module}
+\indent\hspace*{1em}
 The Planner is the central scheduling component of StepHabit. It enables users to
 design structured daily and weekly routines by combining habit-related time blocks,
 busy periods, and externally imported calendar events into a single, unified view.
@@ -960,14 +846,14 @@ persisted in the database and associated with the authenticated user. This allow
 the AI assistant, notification system, and progress analytics modules to operate
 on a shared, consistent view of the user’s time and routines.
 \subsection{Tasks Module}
-
+\indent\hspace*{1em}
 The Tasks module allows users to capture, organize, and prepare actionable tasks
 before they are scheduled into the planner. This separation enables users to think
 clearly about task scope, duration, and deadlines without immediately committing
 to a specific time block.
 
 \subsubsection*{Task Board Overview}
-
+\indent\hspace*{1em}
 The Task Board provides a centralized list of all user-created tasks. From this
 interface, users can view their tasks, create new ones, and track progress at a
 high level.
@@ -979,6 +865,7 @@ high level.
 When no tasks exist, the system displays a clear call-to-action prompting the user
 to create their first task.
 \subsubsection*{Creating a New Task}
+\indent\hspace*{1em}
 Users can add a new task by clicking the \textit{New Task} button, which opens a
 modal form. This form collects structured task metadata required for intelligent
 scheduling and planning.
@@ -1000,6 +887,7 @@ The task creation form includes the following configurable fields:
 \end{itemize}
 Once submitted, the task is persisted and becomes visible in the task board.
 \subsubsection*{Task List and Feedback}
+\indent\hspace*{1em}
 After a task is created, the system provides immediate visual feedback confirming
 successful creation. Tasks are displayed in a reorderable list, allowing users to
 prioritize items manually.
@@ -1011,6 +899,7 @@ prioritize items manually.
 Tasks can be reordered via drag-and-drop, marked as completed or missed, or opened
 for further editing.
 \subsubsection*{Task Details and Checklists}
+\indent\hspace*{1em}
 Clicking on a task opens a detailed editor where users can enrich the task with
 descriptions and actionable checklists. This enables breaking down complex tasks
 into smaller, trackable steps.
@@ -1024,11 +913,13 @@ displaying a real-time progress indicator to reflect overall task completion.
 This design supports both lightweight task tracking and deeper task decomposition,
 depending on user needs.
 \subsection{Habits Module}
+\indent\hspace*{1em}
 The Habits module is the core component of the StepHabit platform. It allows users to
 create, manage, track, and analyze daily habits while receiving structured insights and
 AI-supported guidance. The interface is designed to remain calm, minimal, and data-driven,
 encouraging consistency and long-term behavior change.
 \subsubsection*{Habits Overview}
+\indent\hspace*{1em}
 The Habits overview page serves as the central hub for habit-related activity. It provides
 a summary of the user's current progress, including weekly win rate, current streak, and
 the total number of active habits. From this page, users can navigate to habit creation,
@@ -1039,6 +930,7 @@ the habit library, progress analytics, AI coaching, insights, and historical log
 \caption{Habits overview dashboard showing summary statistics and navigation tabs}
 \end{figure}
 \subsubsection*{Habit Creation}
+\indent\hspace*{1em}
 Users can create a new habit using the structured habit creation form. This form collects
 essential information such as the habit title, description, category, and target
 repetitions. An AI-powered habit rewriter is also available, allowing users to input rough
@@ -1049,6 +941,7 @@ ideas and receive refined habit definitions.
 \caption{Habit creation interface with AI habit rewriting and live preview}
 \end{figure}
 \subsubsection*{Habit Library}
+\indent\hspace*{1em}
 The Habit Library provides a curated collection of pre-designed habits that users can add
 to their routine with a single click. Habits are categorized by focus area, difficulty,
 and time of day. Popular and trending habits are highlighted to assist users in discovery.
@@ -1058,6 +951,7 @@ and time of day. Popular and trending habits are highlighted to assist users in 
 \caption{Habit library with filters, curated habits, and trending recommendations}
 \end{figure}
 \subsubsection*{Progress Tracking}
+\indent\hspace*{1em}
 The Progress section visualizes habit performance over time. Users can analyze weekly,
 monthly, or yearly completion rates, monitor streaks, and identify their most productive
 days. This data-driven view reinforces consistency and helps users adjust their routines.
@@ -1067,6 +961,7 @@ days. This data-driven view reinforces consistency and helps users adjust their 
 \caption{Habit progress tracker with completion rates and streak analysis}
 \end{figure}
 \subsubsection*{Insights and Analytics}
+\indent\hspace*{1em}
 The Insights page transforms logged habit data into meaningful feedback. It highlights
 high-performing habits, identifies habits needing attention, and provides recommendations
 for optimization. Insights are refreshed dynamically as users log progress.
@@ -1076,6 +971,7 @@ for optimization. Insights are refreshed dynamically as users log progress.
 \caption{Insights dashboard showing habit performance analysis and recommendations}
 \end{figure}
 \subsubsection*{Habit History}
+\indent\hspace*{1em}
 The History section maintains a chronological record of the user's habit check-ins,
 including optional reflections. Users can filter by habit and date range or export data
 for external analysis.
@@ -1084,8 +980,8 @@ for external analysis.
 \includegraphics[width=0.82\textwidth]{images/habit_history.png}
 \caption{Habit history view with filters and export functionality}
 \end{figure}
-\subsection{HabitCoach(AI Assistant) Module}
 \subsection{HabitCoach: AI-Powered Personal Assistant}
+\indent\hspace*{1em}
 HabitCoach is an intelligent conversational assistant integrated deeply into the StepHabit
 platform. Unlike a traditional chatbot, HabitCoach has full contextual awareness of the
 user’s profile, habits, schedules, tasks, calendar events, and historical activity. This
@@ -1096,6 +992,7 @@ relevant database tables, including habits, schedules, tasks, progress logs, not
 and calendar integrations. This enables it to perform direct actions on behalf of the user
 instead of only providing suggestions.
 \subsubsection*{Smart Scheduling and Reminders}
+\indent\hspace*{1em}
 HabitCoach can create, modify, and manage schedules through natural language commands.
 Users can request recurring events, time blocks, or habit-linked activities without manual
 form interaction. For example, a user can ask HabitCoach to schedule a daily class or
@@ -1111,6 +1008,7 @@ Reminder behavior is adaptive and priority-aware:
   importance.
 \end{itemize}
 \subsubsection*{Personalization and Learning}
+\indent\hspace*{1em}
 HabitCoach continuously learns from user behavior, preferences, and interaction patterns.
 As users log habits, complete tasks, miss routines, or reschedule activities, the assistant
 refines its understanding of the user’s lifestyle and energy patterns.
@@ -1122,6 +1020,7 @@ Over time, this learning process allows HabitCoach to:
   \item Provide increasingly relevant guidance and next-step suggestions.
 \end{itemize}
 \subsubsection*{Conversational Control}
+\indent\hspace*{1em}
 HabitCoach supports free-form natural language interaction. Users can communicate with the
 assistant as they would with a human coach, asking questions, requesting changes, or
 seeking advice. The assistant responds in a supportive, encouraging tone while maintaining
@@ -1135,11 +1034,13 @@ interfaces.
 \caption{HabitCoach scheduling a recurring class and configuring a smart reminder through conversation}
 \end{figure}
 \subsection{Communiy Module}
+\indent\hspace*{1em}
 The Community module of StepHabit provides a controlled social layer that enhances
 accountability, motivation, and long-term habit adherence. Rather than functioning as a
 traditional social network, this module is designed around purposeful interaction,
 progress sharing, and collaborative challenges, while maintaining strong privacy controls.
 \subsubsection*{Friends Management}
+\indent\hspace*{1em}
 Users can discover, add, and manage friends through the Community interface. Friend
 connections are established via searchable identifiers such as name or email and require
 explicit acceptance, ensuring consent-based social interaction.
@@ -1153,6 +1054,7 @@ personal boundaries.
 \caption{Community friends view with pending requests, search, and sharing controls}
 \end{figure}
 \subsubsection*{Private Messaging}
+\indent\hspace*{1em}
 The messaging system allows users to communicate directly with their connected friends.
 Conversations are organized into clean, threaded dialogs that support text messages and
 optional attachments such as images or location data.
@@ -1165,6 +1067,7 @@ only to authenticated participants in the conversation.
 \caption{Direct messaging interface between connected users}
 \end{figure}
 \subsubsection*{Group Challenges}
+\indent\hspace*{1em}
 The Challenges feature allows users to create or join group-based goals designed to promote
 collective accountability. A challenge includes a title, date range, optional approval
 requirements, and a host who manages participation.
@@ -1177,12 +1080,14 @@ focus on shared objectives rather than competition.
 \caption{Group challenges overview with joinable challenges and challenge creation}
 \end{figure}
 \subsubsection*{Challenge Chat}
+\indent\hspace*{1em}
 Each group challenge includes an embedded chat interface where members can share updates,
 encouragement, or progress milestones. The challenge chat is isolated to the group and
 distinct from direct messages, ensuring contextual and goal-oriented communication.
 This communication channel strengthens group cohesion and reinforces accountability
 through shared progress visibility.
 \subsection{Profile Module}
+\indent\hspace*{1em}
 The Profile module serves as the centralized control center for user identity,
 preferences, personalization, and system integrations. It allows users to manage
 their account information, configure how the platform behaves, and fine-tune how
@@ -1191,6 +1096,7 @@ This module is designed to balance personalization, transparency, and user contr
 ensuring that recommendations and reminders remain aligned with individual goals
 and preferences.
 \subsubsection*{Account Information}
+\indent\hspace*{1em}
 Users can manage their core account details, including display name, email address,
 and optional demographic information. Profile completion progress is visualized to
 encourage users to provide sufficient data for better personalization while keeping
@@ -1204,6 +1110,7 @@ server-side validation.
 \caption{Profile account management with completion progress and avatar upload}
 \end{figure}
 \subsubsection*{User Preferences}
+\indent\hspace*{1em}
 The Preferences tab allows users to shape how StepHabit feels and responds. Users can
 select visual themes (e.g., light or dark mode), configure the tone of AI interactions,
 and choose a preferred support style such as encouragement or celebration of wins.
@@ -1215,6 +1122,7 @@ and suggestions match the user’s motivational style.
 \caption{User preference controls for theme, AI tone, and support style}
 \end{figure}
 \subsubsection*{Notification Settings}
+\indent\hspace*{1em}
 Users can configure how and when they receive notifications. The system supports
 email and push-based reminders, with smart spacing to avoid notification fatigue.
 Notifications are context-aware and adapt based on habit type, importance, and user
@@ -1226,6 +1134,7 @@ habits generate lighter prompts closer to execution time.
 \caption{Notification preferences with smart reminder controls}
 \end{figure}
 \subsubsection*{Connected Applications}
+\indent\hspace*{1em}
 The Connected Apps section enables integration with external services such as calendar
 providers and fitness platforms. Calendar synchronization allows StepHabit to plan
 habits around real-world commitments, avoiding scheduling conflicts.
@@ -1238,6 +1147,8 @@ experience.
 \caption{Connected applications for calendar and fitness synchronization}
 \end{figure}
 \subsubsection*{Help and Support}
+\indent\hspace*{1em}
+
 The Help \& Support section provides users with access to documentation, FAQs, and
 direct communication channels with the development team. This ensures that users
 can resolve issues, learn system features, and provide feedback when needed.
@@ -1249,6 +1160,7 @@ maintain user trust.
 \caption{Help center and contact options within the profile module}
 \end{figure}
 \subsubsection*{Role of Profile Data in AI Personalization}
+\indent\hspace*{1em}
 Profile settings directly influence the behavior of AI-driven components such as
 HabitCoach and smart reminders. By combining explicit preferences with observed
 behavior, the system continuously refines scheduling suggestions, reminder timing,
@@ -1256,6 +1168,7 @@ and communication style.
 This feedback loop ensures that StepHabit adapts to the user over time while remaining
 transparent and user-controlled.
 \subsection{Notification Center and Smart Reminder Module}
+\indent\hspace*{1em}
 The Notification Center acts as the central hub for all system-generated and user-created
 alerts within StepHabit. It consolidates reminders, progress nudges, schedule alerts, and
 AI-driven notifications into a single, organized interface, allowing users to stay informed
@@ -1263,6 +1176,7 @@ without being overwhelmed.
 Notifications are categorized, prioritized, and timestamped, giving users full visibility
 into what requires attention, what is upcoming, and what has already been acknowledged.
 \subsubsection*{Notification Overview}
+\indent\hspace*{1em}
 At the top level, the Notification Center provides a real-time summary of notification
 activity, including total notifications, unread items, upcoming scheduled reminders, and
 the most recently opened alert. Users can filter notifications by status or category to
@@ -1276,239 +1190,167 @@ multiple habits, schedules, and reminders.
 \end{figure}
 \newpage
 
+\section{Challenges Encountered}
 
-\section{Challenges and Lessons Learned}
-Developing StepHabit as a full-stack, AI-assisted habit management platform introduced
-several technical and architectural challenges. Addressing these challenges required
-careful system design, iteration, and trade-off analysis, ultimately contributing to a
-deeper understanding of real-world software engineering practices.
+\indent\hspace*{1em}
+The evolution of StepHabit as a full-stack, AI-assisted habit management application
+introduced several technical and architectural challenges. These challenges primarily
+stemmed from the need to support real-time interaction, coordinate multiple system
+components, and deliver an interactive, user-centered experience.
+
 \subsection{Real-Time Communication and Event Handling}
-One of the main challenges was implementing real-time features that support instant
-feedback and synchronization across the application. StepHabit uses real-time
-communication mechanisms to support features such as notifications, HabitCoach
-responses, and dynamic UI updates.
-Managing user sessions in real time required handling edge cases such as unexpected
-disconnections, reconnections, and multiple active sessions. Ensuring consistent event
-delivery and avoiding duplicate or missed updates was particularly challenging when users
-navigated across different sections of the application.
-\textbf{Lesson learned:} This challenge strengthened my understanding of real-time
-client--server synchronization, event lifecycle management, and the importance of
-designing efficient and well-structured payloads for scalable communication.
+\indent\hspace*{1em}
+One of the most significant challenges was implementing real-time communication to enable
+notifications, AI-driven feedback, and dynamic interface updates. Managing user sessions
+in real time required handling disconnections, reconnections, and multiple concurrent
+sessions across different parts of the application. This challenge was addressed through
+the introduction of structured event-handling mechanisms and by ensuring reliable message
+delivery between the client and server.
+
 \subsection{Frontend and Backend Integration}
-Integrating the frontend and backend layers required maintaining strict consistency across
-data models, validation rules, and API contracts. Several issues emerged when frontend
-expectations did not fully align with backend responses, particularly during authentication,
-form validation, habit creation flows, and error handling.
-Ensuring predictable behavior required refining API response formats and improving
-validation feedback so that errors could be clearly communicated to the user interface.
-\textbf{Lesson learned:} Clearly documented APIs and a shared data contract between the
-frontend and backend are essential for reliable integration. Tools such as Swagger were
-critical in aligning expectations and accelerating development.
+\indent\hspace*{1em}
+Another major challenge involved achieving seamless integration between the frontend and
+backend layers. Inconsistencies between data models, validation logic, and API responses
+initially resulted in unexpected behavior during authentication, form submission, and
+habit creation processes. These issues were resolved by refining API response structures,
+enforcing shared validation rules, and using API documentation tools to maintain alignment
+between system components.
+
 \subsection{AI Integration and User Experience}
-Integrating the HabitCoach AI presented both technical and design challenges. The AI
-system needed access to user context, habits, schedules, and preferences while maintaining
-performance, safety, and responsiveness. Handling AI latency, fallback behavior, and usage
-limits required careful coordination between the backend logic and frontend experience.
-Additionally, AI-generated suggestions had to remain supportive, relevant, and trustworthy,
-which required balancing automation with user control and transparency.
-\textbf{Lesson learned:} AI integration extends beyond model outputs. It requires careful
-UX design, safety considerations, rate limiting, and graceful degradation to maintain user
-trust and system reliability.
+\indent\hspace*{1em}
+Integrating the HabitCoach AI required balancing system performance, contextual accuracy,
+and user trust. The AI system needed access to user habits, schedules, and preferences
+without introducing excessive latency or unpredictable behavior. This challenge was
+addressed by implementing controlled access to user data, fallback responses, and usage
+limits to ensure consistent and reliable AI assistance.
+
 \subsection{Scheduling Logic and Smart Notifications}
-Designing the scheduling and reminder system was another significant challenge. StepHabit
-supports both habit-based and event-based reminders, each requiring different timing,
-priority levels, and delivery logic. For example, scheduled classes may trigger reminders
-earlier, while habits require minimal but timely nudges.
-Preventing notification fatigue while still providing effective guidance required
-implementing priority-based logic and respecting user-defined notification preferences.
-\textbf{Lesson learned:} Effective reminder systems must balance automation with
-personalization. Smart defaults combined with user control significantly improve
-engagement and usability.
-\subsection{Overall Reflection}
-Developing StepHabit highlighted the importance of system thinking, clear contracts between
-components, and iterative refinement. Each challenge contributed to a deeper understanding
-of scalable architecture, AI-assisted systems, and user-centered software design.
-These experiences collectively reinforced the value of building robust, maintainable
-systems that balance technical complexity with real-world usability.
+\indent\hspace*{1em}
+Designing a scheduling system capable of supporting both habit-based and event-based
+reminders introduced additional complexity. Different activities required distinct timing
+rules and priority levels, while excessive notifications risked reducing user engagement.
+This challenge was managed by introducing priority-based notification logic and respecting
+user-defined preferences to balance guidance with user autonomy.
+
 \newpage
+\section{Future Tasks}
 
+\indent\hspace*{1em}
+Future development of StepHabit will focus on extending the platform beyond its current
+web-based implementation and improving its readiness for real-world use. One of the
+primary tasks is the development of a mobile application that enables users to interact
+with the system more naturally in their daily routines. A cross-platform mobile solution
+will allow real-time habit tracking, instant notifications, and closer integration with
+device-level features while maintaining consistency with the existing backend and
+authentication mechanisms.
 
-\section{Future Improvements}
+Another key task involves deploying StepHabit in a production-grade environment. Moving
+from a development setup to a cloud-based infrastructure will improve system reliability,
+availability, and scalability. This includes configuring environment-based deployments,
+introducing monitoring and logging mechanisms, and ensuring the system can support a
+growing number of users without performance degradation.
 
-While StepHabit already provides a comprehensive habit, scheduling, and AI-assisted
-coaching experience, several enhancements can further improve scalability, usability,
-and long-term impact.
+Improving notification intelligence is also an important future task. While the current
+system provides scheduled reminders, future versions will focus on making notifications
+more adaptive to user behavior. By adjusting reminder timing and frequency based on user
+engagement patterns, the system can provide support when needed while avoiding excessive
+interruptions.
 
-\subsection{Mobile Application Development}
-
-A natural next step for StepHabit is the development of native mobile applications for
-iOS and Android platforms. Mobile access would enable real-time habit logging, instant
-push notifications, and tighter integration with device features such as calendars,
-health data, and location-based reminders.
-
-\textbf{Planned improvement:} Develop a cross-platform mobile application (e.g., using
-Flutter or React Native) that shares the same backend and authentication system to
-ensure consistency across web and mobile experiences.
-
-\subsection{Production Deployment and Cloud Infrastructure}
-
-Currently, StepHabit is designed and tested in a development environment. Deploying the
-application to a production-grade cloud infrastructure would significantly improve
-reliability, availability, and performance for real users.
-
-\textbf{Planned improvement:} Host the backend on a cloud platform with scalable
-resources, configure environment-based deployments, and introduce monitoring and
-logging to track system health and usage patterns.
-
-\subsection{Advanced Personalization and Recommendation Engine}
-
-Although StepHabit already provides AI-driven guidance through HabitCoach, future
-iterations could introduce a dedicated recommendation engine that learns from user
-behavior over time. This system could suggest habits, optimal scheduling windows, and
-adjust reminder timing based on historical success rates and engagement patterns.
-
-\textbf{Planned improvement:} Implement a behavior-aware recommendation system that
-analyzes habit completion history, streak consistency, and time-of-day performance to
-deliver increasingly personalized suggestions.
-
-\subsection{Enhanced Notification Intelligence}
-
-While the current notification system supports smart reminders, future versions could
-introduce adaptive notification strategies that respond dynamically to user behavior.
-For example, the system could reduce reminder frequency when habits are consistently
-completed or increase support during periods of decline.
-
-\textbf{Planned improvement:} Introduce adaptive reminder logic that balances motivation
-with notification fatigue by learning optimal reminder timing and priority per user.
-
-\subsection{Expanded AI Capabilities}
-
-HabitCoach currently assists users with scheduling, reminders, and habit-related
-guidance. Future enhancements could enable deeper conversational memory, long-term
-behavior analysis, and proactive coaching strategies.
-
-\textbf{Planned improvement:} Extend HabitCoach with long-term context awareness,
-goal-based planning, and voice interaction support to create a more human-like and
-supportive coaching experience.
-
-\subsection{Scalability and Performance Optimization}
-
-As the user base grows, optimizing performance becomes increasingly important. Certain
-frequently accessed data—such as habit summaries, schedules, and insight metrics—can
-be optimized to reduce response time and backend load.
-
-\textbf{Planned improvement:} Introduce caching strategies and query optimization to
-ensure the system remains responsive under increased traffic.
-
-\subsection{Overall Vision}
-
-These future improvements aim to evolve StepHabit from a feature-rich academic project
-into a scalable, production-ready platform. By expanding to mobile, strengthening AI
-personalization, and improving system performance, StepHabit has the potential to become
-a long-term personal growth companion for users across different platforms.
+Finally, performance optimization will become increasingly important as usage scales.
+Future work will include optimizing database queries and introducing caching strategies
+for frequently accessed data such as habit summaries and schedules. These improvements
+will ensure that StepHabit remains responsive and efficient as the platform continues to
+evolve.
 
 \newpage
 
 \section{Conclusion}
 
-StepHabit represents a comprehensive and thoughtfully engineered solution for habit
-formation, productivity planning, and long-term personal growth. By combining habit
-tracking, task management, intelligent scheduling, and AI-powered coaching, the platform
-supports users in building sustainable routines while maintaining clarity, balance, and
-motivation in their daily lives. Features such as smart reminders, progress visualization,
-streak tracking, and adaptive insights encourage consistency, self-awareness, and
-accountability over time.
+\indent\hspace*{1em}
+StepHabit is a platform that brings together habit tracking, task management, scheduling,
+and AI-based coaching to help users build and maintain everyday routines. By combining
+planning tools with timely reminders and feedback, the system supports consistency and
+helps users stay aware of their progress over time.
 
-The system is built on a modular and scalable architecture that clearly separates concerns
-across its core components. The frontend interface provides a clean, calm, and intuitive
-user experience that enables users to plan schedules, manage tasks, track habits, and
-interact with the AI HabitCoach seamlessly. The backend layer handles authentication,
-business logic, data processing, and real-time operations securely and efficiently, ensuring
-reliable communication between system components.
+The system is structured with a clear separation between the frontend and backend. The
+frontend focuses on providing a simple and easy-to-use interface for managing habits,
+tasks, and schedules, while the backend handles authentication, data processing, and
+real-time communication in a reliable manner. This structure made the system easier to
+develop, test, and extend.
 
-A central aspect of StepHabit is the integration of AI-driven assistance through
-\textit{HabitCoach}. The AI assistant is capable of accessing user context, schedules,
-habits, tasks, and preferences to suggest routines, create schedules, set smart reminders,
-and provide personalized guidance. Unlike static reminder systems, HabitCoach adapts
-notification timing and priority based on context—for example, reminding users earlier for
-high-priority events such as classes, while using shorter reminders for habits. Over time,
-the assistant learns user behavior and preferences, enabling a more supportive and
-human-like coaching experience.
+The AI assistant, \textit{HabitCoach}, plays an important role by offering guidance that is
+based on user habits, schedules, and preferences. Instead of relying on fixed reminders,
+the assistant adjusts suggestions and notification timing based on context, making the
+support feel more relevant to daily routines.
 
-The platform also includes community-oriented features that enhance motivation through
-social accountability. Users can connect with friends, exchange messages, participate in
-group challenges, and share progress selectively. These features encourage collaboration,
-peer support, and healthy competition, reinforcing habit consistency beyond individual
-use.
+Overall, StepHabit shows how web technologies and AI can be used together to support habit
+formation in a practical way. The project reflects the value of building systems that are
+clear, flexible, and focused on real user needs.
 
-StepHabit leverages a modern technology stack designed for scalability and future growth.
-Secure authentication, real-time updates, structured APIs, and well-defined data models
-ensure system reliability and maintainability. The development workflow is supported by
-modern tooling and best practices, enabling efficient collaboration, debugging, and
-iteration throughout the project lifecycle.
-
-Looking ahead, StepHabit is well-positioned for further expansion. Planned improvements
-include deploying the system to a production-grade server environment, developing native
-mobile applications, enhancing AI personalization, and deepening integration with external
-services such as calendars and fitness platforms. These enhancements aim to transform
-StepHabit from a feature-rich academic project into a scalable, real-world productivity and
-habit-building platform.
-
-In conclusion, StepHabit demonstrates how modern web technologies, intelligent system
-design, and AI-driven personalization can be combined to support meaningful behavior
-change. By focusing on clarity, adaptability, and user-centered design, the platform
-illustrates the potential of digital tools to help users build better habits, stay consistent,
-and grow intentionally over time.
 \newpage
 
-\section{References}
+\begin{thebibliography}{99}
 
-\begin{enumerate}
-  \item Lally, P., van Jaarsveld, C. H. M., Potts, H. W. W., \& Wardle, J. (2010). 
-  How are habits formed: Modelling habit formation in the real world. 
-  \textit{European Journal of Social Psychology, 40}(6), 998--1009. 
-  https://doi.org/10.1002/ejsp.674
+\bibitem{lally2010}
+Lally, P., van Jaarsveld, C.~H.~M., Potts, H.~W.~W., \& Wardle, J. (2010).
+\textit{How are habits formed: Modelling habit formation in the real world}.
+European Journal of Social Psychology, 40(6), 998--1009.
+https://doi.org/10.1002/ejsp.674
 
-  \item Stawarz, K., Cox, A. L., \& Blandford, A. (2015). 
-  Beyond self-tracking and reminders: Designing smartphone apps that support habit formation. 
-  \textit{Proceedings of the 33rd Annual ACM Conference on Human Factors in Computing Systems}, 2653--2662. 
-  https://doi.org/10.1145/2702123.2702230
+\bibitem{stawarz2015}
+Stawarz, K., Cox, A.~L., \& Blandford, A. (2015).
+\textit{Beyond self-tracking and reminders: Designing smartphone apps that support habit formation}.
+Proceedings of the 33rd Annual ACM Conference on Human Factors in Computing Systems, 2653--2662.
+https://doi.org/10.1145/2702123.2702230
 
-  \item Streaks. (n.d.). 
-  \textit{Streaks: Habit tracking app}. 
-  https://streaksapp.com
+\bibitem{streaks}
+Streaks. (n.d.).
+\textit{Streaks: Habit tracking app}.
+https://streaksapp.com
 
-  \item Habitica. (n.d.). 
-  \textit{Habitica: Gamified habit-building and productivity app}. 
-  https://habitica.com
+\bibitem{habitica}
+Habitica. (n.d.).
+\textit{Habitica: Gamified habit-building and productivity app}.
+https://habitica.com
 
-  \item Habitify. (n.d.). 
-  \textit{Habitify: Habit tracker and routine planner}. 
-  https://habitify.me
+\bibitem{habitify}
+Habitify. (n.d.).
+\textit{Habitify: Habit tracker and routine planner}.
+https://habitify.me
 
-  \item Soron, A. (n.d.). 
-  \textit{Loop habit tracker} [Open-source software]. GitHub. 
-  https://github.com/iSoron/uhabits
+\bibitem{soron}
+Soron, A. (n.d.).
+\textit{Loop habit tracker} [Open-source software]. GitHub.
+https://github.com/iSoron/uhabits
 
-  \item Zapier. (2025). 
-  \textit{The best habit tracker apps}. 
-  https://zapier.com/blog/best-habit-tracker-app/
-  
-  \item CoreUI. (n.d.). 
-  \textit{CoreUI React admin template and UI components}. 
-  https://coreui.io/react
+\bibitem{zapier2025}
+Zapier. (2025).
+\textit{The best habit tracker apps}.
+https://zapier.com/blog/best-habit-tracker-app/
 
-  \item Node.js Foundation. (n.d.). 
-  \textit{Node.js documentation}. 
-  https://nodejs.org/en/docs
+\bibitem{coreui}
+CoreUI. (n.d.).
+\textit{CoreUI React admin template and UI components}.
+https://coreui.io/react
 
-  \item PostgreSQL Global Development Group. (n.d.). 
-  \textit{Why PostgreSQL? Advantages and features}. PostgreSQL Documentation. 
-  https://www.postgresql.org/about/
+\bibitem{nodejs}
+Node.js Foundation. (n.d.).
+\textit{Node.js documentation}.
+https://nodejs.org/en/docs
 
-  \item IBM. (n.d.). 
-  \textit{What is Claude AI and why it matters}. IBM Think. 
-  https://www.ibm.com/think/topics/claude-ai
+\bibitem{postgresql}
+PostgreSQL Global Development Group. (n.d.).
+\textit{Why PostgreSQL? Advantages and features}.
+PostgreSQL Documentation.
+https://www.postgresql.org/about/
 
-\end{enumerate}
+\bibitem{ibmclaude}
+IBM. (n.d.).
+\textit{What is Claude AI and why it matters}.
+IBM Think.
+https://www.ibm.com/think/topics/claude-ai
+
+\end{thebibliography}
+
+
 \end{document}
