@@ -1,8 +1,6 @@
 \documentclass[12pt]{article}
 
-% ===========================
-% Packages
-% ===========================
+
 \usepackage[margin=1in]{geometry}
 \usepackage{hyperref}
 \usepackage{graphicx}
@@ -14,9 +12,7 @@
 \usepackage{amsmath}
 \usepackage{float}
 
-% ===========================
-% Formatting
-% ===========================
+
 \titleformat{\section}{\large\bfseries}{\thesection}{0.75em}{}
 \titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.75em}{}
 \titleformat{\subsubsection}{\normalsize\itshape}{\thesubsubsection}{0.75em}{}
@@ -29,34 +25,25 @@
 
 \begin{document}
 
-% ===========================
-% Title Page
-% ===========================
 \begin{titlepage}
   \centering
 
-  % Logo (reduced size)
   \includegraphics[width=0.55\textwidth]{images/Aua_logo.png}\par
   \vspace{1cm}
 
-  % Course
   {\Large \textbf{CSE 296: Capstone Project}\par}
   \vspace{0.8cm}
 
-  % Project Name
   {\Huge \textbf{StepHabit}\par}
   \vspace{0.6cm}
 
-  % Subtitle
   {\large AI-Driven Intelligent Scheduling and Micro-Progression for\\
   Long-Term Habit Formation\par}
   \vspace{1cm}
 
-  % University
   {\Large American University of Armenia\par}
   \vspace{1.2cm}
 
-  % Supervisor and Program Chair
   \begin{flushleft}
     \centering
     \normalsize
@@ -67,7 +54,6 @@
 
   \vfill
 
-  % Location and Date
   {\normalsize Yerevan, Armenia\par}
   {\normalsize December 17, 2025\par}
 
@@ -87,9 +73,7 @@
 \tableofcontents
 \newpage
 
-% ===========================
-% Chapter 1
-% ===========================
+
 \section{Introduction}
 \subsection{System Overview}
 
@@ -214,9 +198,7 @@ behavioral change. This approach aligns with academic findings emphasizing the i
 contextual understanding and long-term engagement over reliance on repetitive notifications.
 
 \newpage
-% ===========================
-% Chapter 2
-% ===========================
+
 \section{System Architecture}
 \subsection{Overview of System Components}
 The StepHabit platform is designed using a modular system architecture, in which each
@@ -270,13 +252,13 @@ maintaining architectural clarity and long-term sustainability.
 \begin{itemize}[leftmargin=*]
   \item \textbf{React with Vite}: Builds responsive and interactive user interfaces while
   leveraging Vite for fast development cycles and optimized production bundles.
-  \item \textbf{CoreUI}: Provides component-based layouts, navigation structures,
+  \item \textbf{CoreUI\footnote{CoreUI. (n.d.). \textit{CoreUI React admin template and UI components}. https://coreui.io/react}}: Provides component-based layouts, navigation structures,
   dashboards, and visualization patterns used across the application.
 \end{itemize}
 
 \subsubsection{Backend}
 \begin{itemize}[leftmargin=*]
-  \item \textbf{Node.js with Express}: Supplies the runtime and HTTP framework used for
+  \item \textbf{Node.js\footnote{Node.js Foundation. (n.d.). \textit{Node.js documentation}. https://nodejs.org/en/docs} with Express}: Supplies the runtime and HTTP framework used for
   routing, middleware composition, and request handling.
   \item \textbf{Sequelize ORM}: Manages relational interactions with PostgreSQL through
   model definitions, associations, and schema synchronization.
@@ -289,14 +271,14 @@ maintaining architectural clarity and long-term sustainability.
 
 \subsubsection{Database}
 \begin{itemize}[leftmargin=*]
-  \item \textbf{PostgreSQL}: Stores structured data for profiles, habits, tasks,
+  \item \textbf{PostgreSQL\footnote{PostgreSQL Global Development Group. (n.d.). \textit{Why PostgreSQL? Advantages and features}. PostgreSQL Documentation. https://www.postgresql.org/about/}}: Stores structured data for profiles, habits, tasks,
   schedules, progress logs, achievements, notifications, and social relationships while
   preserving integrity for analytics and dashboard queries.
 \end{itemize}
 
 \subsubsection{AI Integration}
 \begin{itemize}[leftmargin=*]
-  \item \textbf{LangChain with Large Language Models (Anthropic)}: Powers AI-assisted
+  \item \textbf{LangChain with Large Language Models (Anthropic)\footnote{IBM. (n.d.). \textit{What is Claude AI and why it matters}. IBM Think. https://www.ibm.com/think/topics/ai}}: Powers AI-assisted
   habit coaching, plan generation, idea refinement, and contextual guidance through a
   flexible abstraction layer for prompt management and provider configuration.
 \end{itemize}
@@ -335,243 +317,343 @@ developer productivity throughout the project lifecycle.
 
 \newpage
 
-% ===========================
-% Chapter 3
-% ===========================
+
 \section{Database Design}
 \subsection{Database Choice}
 PostgreSQL was chosen for this project because of its excellent support for relational data,
 adherence to ACID principles, and support for TypeORM integration. PostgreSQL's support for
 complex querying and indexing provides an effective solution to managing the complex
 relationships between users, posts, and interactions (likes, comments).
-\subsection{Entity Relationship Diagram (ERD)}
-ERD 
 \subsection{Database Tables}
-\small
 
-\textbf{Users Table}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{USERS} \\ \hline
+\underline{id} \\ \hline
+name \\ \hline
+email \\ \hline
+password \\ \hline
+age \\ \hline
+gender \\ \hline
+bio \\ \hline
+created\_at \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{HABITS} \\ \hline
+\underline{id} \\ \hline
+user\_id \\ \hline
+title \\ \hline
+description \\ \hline
+category \\ \hline
+target\_reps \\ \hline
+is\_daily\_goal \\ \hline
+created\_at \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{SCHEDULES} \\ \hline
+\underline{id} \\ \hline
+habit\_id \\ \hline
+userid \\ \hline
+day \\ \hline
+starttime \\ \hline
+endtime \\ \hline
+enddate \\ \hline
+repeat \\ \hline
+customdays \\ \hline
+notes \\ \hline
+createdAt \\ \hline
+updatedAt \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{TASKS} \\ \hline
+\underline{id} \\ \hline
+user\_id \\ \hline
+name \\ \hline
+duration\_minutes \\ \hline
+min\_duration\_minutes \\ \hline
+max\_duration\_minutes \\ \hline
+split\_up \\ \hline
+hours\_label \\ \hline
+schedule\_after \\ \hline
+due\_date \\ \hline
+created\_at \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{BUSY\_SCHEDULES} \\ \hline
+\underline{id} \\ \hline
+userid \\ \hline
+title \\ \hline
+day \\ \hline
+starttime \\ \hline
+endtime \\ \hline
+enddate \\ \hline
+repeat \\ \hline
+customdays \\ \hline
+notes \\ \hline
+createdAt \\ \hline
+updatedAt \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{PROGRESS} \\ \hline
+\underline{id} \\ \hline
+user\_id \\ \hline
+habit\_id \\ \hline
+status \\ \hline
+progress\_date \\ \hline
+created\_at \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{ACHIEVEMENTS} \\ \hline
+\underline{id} \\ \hline
+title \\ \hline
+description \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{USER\_ACHIEVEMENTS} \\ \hline
+\underline{id} \\ \hline
+user\_id \\ \hline
+achievement\_id \\ \hline
+achieved\_at \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{FRIENDS} \\ \hline
+\underline{id} \\ \hline
+user\_id \\ \hline
+friend\_id \\ \hline
+status \\ \hline
+created\_at \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{GROUP\_CHALLENGES} \\ \hline
+\underline{id} \\ \hline
+title \\ \hline
+description \\ \hline
+start\_date \\ \hline
+end\_date \\ \hline
+created\_at \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{USER\_GROUP\_CHALLENGES} \\ \hline
+\underline{id} \\ \hline
+user\_id \\ \hline
+challenge\_id \\ \hline
+joined\_at \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{NOTIFICATIONS} \\ \hline
+\underline{id} \\ \hline
+user\_id \\ \hline
+message \\ \hline
+is\_read \\ \hline
+created\_at \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{ASSISTANT\_MEMORIES} \\ \hline
+\underline{id} \\ \hline
+user\_id \\ \hline
+role \\ \hline
+content \\ \hline
+keywords \\ \hline
+created\_at \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{CHAT\_MESSAGES} \\ \hline
+\underline{id} \\ \hline
+sender\_id \\ \hline
+receiver\_id \\ \hline
+content \\ \hline
+read\_at \\ \hline
+created\_at \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{CALENDAR\_INTEGRATIONS} \\ \hline
+\underline{id} \\ \hline
+user\_id \\ \hline
+provider \\ \hline
+label \\ \hline
+source\_type \\ \hline
+source\_url \\ \hline
+external\_id \\ \hline
+metadata \\ \hline
+last\_synced\_at \\ \hline
+created\_at \\ \hline
+updated\_at \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{CALENDAR\_EVENTS} \\ \hline
+\underline{id} \\ \hline
+user\_id \\ \hline
+integration\_id \\ \hline
+title \\ \hline
+description \\ \hline
+location \\ \hline
+start\_time \\ \hline
+end\_time \\ \hline
+timezone \\ \hline
+all\_day \\ \hline
+source \\ \hline
+external\_event\_id \\ \hline
+metadata \\ \hline
+created\_at \\ \hline
+updated\_at \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{GROUP\_CHALLENGE\_MESSAGES} \\ \hline
+\underline{id} \\ \hline
+challenge\_id \\ \hline
+sender\_id \\ \hline
+content \\ \hline
+created\_at \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{USER\_SETTINGS} \\ \hline
+\underline{id} \\ \hline
+user\_id \\ \hline
+timezone \\ \hline
+daily\_reminder\_time \\ \hline
+weekly\_summary\_day \\ \hline
+email\_notifications \\ \hline
+push\_notifications \\ \hline
+share\_activity \\ \hline
+theme \\ \hline
+ai\_tone \\ \hline
+support\_style \\ \hline
+email\_alerts \\ \hline
+push\_reminders \\ \hline
+google\_calendar \\ \hline
+apple\_calendar \\ \hline
+fitness\_sync \\ \hline
+created\_at \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{REGISTRATION\_VERIFICATIONS} \\ \hline
+\underline{id} \\ \hline
+email \\ \hline
+code\_hash \\ \hline
+payload \\ \hline
+expires\_at \\ \hline
+\end{longtable}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.6\textwidth}|}
+\hline
+\textbf{PASSWORD\_RESETS} \\ \hline
+\underline{id} \\ \hline
+email \\ \hline
+code\_hash \\ \hline
+expires\_at \\ \hline
+\end{longtable}
+
+\subsection{Database Relationships}
+
 \begin{itemize}
-  \item \textbf{Table Name:} users
-  \item \textbf{Fields:}
-  \begin{itemize}
-    \item id (SERIAL, Primary Key)
-    \item name (VARCHAR(100), Not Null)
-    \item email (VARCHAR(150), Unique, Not Null)
-    \item password (VARCHAR(200), Not Null)
-    \item age (INT, Nullable)
-    \item gender (VARCHAR(20), Nullable)
-    \item bio (TEXT, Nullable)
-    \item avatar (VARCHAR(255), Nullable)
-    \item primary\_goal (VARCHAR(150), Nullable)
-    \item focus\_area (VARCHAR(120), Nullable)
-    \item experience\_level (VARCHAR(60), Nullable)
-    \item daily\_commitment (VARCHAR(60), Nullable)
-    \item support\_preference (VARCHAR(120), Nullable)
-    \item motivation\_statement (TEXT, Nullable)
-    \item created\_at (TIMESTAMP, Default: CURRENT\_TIMESTAMP)
-  \end{itemize}
-  \item \textbf{Relationships:}
-  \begin{itemize}
-    \item One-to-one with user\_settings
-    \item One-to-many with habits, tasks, busy\_schedules, progress, notifications
-    \item One-to-many with assistant\_memories, calendar\_integrations, calendar\_events
-    \item Many-to-many with achievements (via user\_achievements)
-    \item Many-to-many with group\_challenges (via user\_group\_challenges)
-    \item Self-referential relationship via friends
-  \end{itemize}
+
+\item \textbf{Users–Habits:} One-to-Many (1:N).  
+A single user can create multiple habits, while each habit belongs to exactly one user.
+
+\item \textbf{Users–Schedules:} One-to-Many (1:N).  
+A user may have multiple schedules, but each schedule is associated with a single user.
+
+\item \textbf{Habits–Schedules:} One-to-Many (1:N).  
+Each habit can have multiple scheduled instances, whereas each schedule refers to one habit.
+
+\item \textbf{Users–Tasks:} One-to-Many (1:N).  
+A user may create multiple tasks, but each task is owned by a single user.
+
+\item \textbf{Users–Busy\_Schedules:} One-to-Many (1:N).  
+A user can define multiple busy time blocks, while each busy schedule belongs to one user.
+
+\item \textbf{Users–Progress:} One-to-Many (1:N).  
+A user may generate multiple progress records over time, each linked to that user.
+
+\item \textbf{Habits–Progress:} One-to-Many (1:N).  
+Each habit can have multiple progress entries, while each progress record refers to one habit.
+
+\item \textbf{Users–Achievements:} Many-to-Many (N:M) via \texttt{user\_achievements}.  
+A user may earn multiple achievements, and each achievement may be earned by multiple users.
+
+\item \textbf{Users–Friends:} Many-to-Many (N:M) self-referencing.  
+Users can establish friendships with multiple other users through the friends table.
+
+\item \textbf{Users–Group\_Challenges:} Many-to-Many (N:M) via \texttt{user\_group\_challenges}.  
+Users may participate in multiple group challenges, and each challenge can include many users.
+
+\item \textbf{Group\_Challenges–Group\_Challenge\_Messages:} One-to-Many (1:N).  
+A group challenge can contain multiple messages, while each message belongs to one challenge.
+
+\item \textbf{Users–Group\_Challenge\_Messages:} One-to-Many (1:N).  
+A user may send multiple messages within group challenges.
+
+\item \textbf{Users–Notifications:} One-to-Many (1:N).  
+A user can receive multiple notifications, while each notification is addressed to one user.
+
+\item \textbf{Users–Assistant\_Memories:} One-to-Many (1:N).  
+Each user may have multiple stored assistant memories associated with them.
+
+\item \textbf{Users–Chat\_Messages:} One-to-Many (1:N) for both sender and receiver roles.  
+A user can send and receive multiple chat messages.
+
+\item \textbf{Users–Calendar\_Integrations:} One-to-Many (1:N).  
+A user may link multiple calendar integrations, while each integration belongs to one user.
+
+\item \textbf{Calendar\_Integrations–Calendar\_Events:} One-to-Many (1:N).  
+Each calendar integration may generate multiple calendar events.
+
+\item \textbf{Users–Calendar\_Events:} One-to-Many (1:N).  
+A user can have multiple calendar events aggregated from integrations.
+
+\item \textbf{Users–User\_Settings:} One-to-One (1:1).  
+Each user has exactly one settings record, and each settings record belongs to one user.
+
+\item \textbf{Users–Registration\_Verifications:} One-to-One (1:1).  
+Each verification record corresponds to a single user email.
+
+\item \textbf{Users–Password\_Resets:} One-to-One (1:1).  
+Each password reset request is associated with a single user email.
+
 \end{itemize}
 
-\medskip
-\textbf{User Settings Table}
-\begin{itemize}
-  \item \textbf{Table Name:} user\_settings
-  \item \textbf{Fields:}
-  \begin{itemize}
-    \item id (SERIAL, Primary Key)
-    \item user\_id (INT, FK $\rightarrow$ users.id, Unique, Not Null)
-    \item timezone (VARCHAR(80), Default: UTC)
-    \item daily\_reminder\_time (VARCHAR(10), Nullable)
-    \item weekly\_summary\_day (VARCHAR(16), Default: Sunday)
-    \item email\_notifications (BOOLEAN, Default: TRUE)
-    \item push\_notifications (BOOLEAN, Default: FALSE)
-    \item share\_activity (BOOLEAN, Default: TRUE)
-    \item theme (VARCHAR(20), Default: light)
-    \item ai\_tone (VARCHAR(30), Default: balanced)
-    \item support\_style (VARCHAR(30), Default: celebrate)
-    \item google\_calendar (BOOLEAN, Default: FALSE)
-    \item apple\_calendar (BOOLEAN, Default: FALSE)
-    \item fitness\_sync (BOOLEAN, Default: FALSE)
-    \item created\_at (TIMESTAMP, Default: CURRENT\_TIMESTAMP)
-  \end{itemize}
-  \item \textbf{Relationships:}
-  \begin{itemize}
-    \item One-to-one with users
-  \end{itemize}
-\end{itemize}
 
-\medskip
-\textbf{Registration Verifications Table}
-\begin{itemize}
-  \item \textbf{Table Name:} registration\_verifications
-  \item \textbf{Fields:}
-  \begin{itemize}
-    \item id (SERIAL, Primary Key)
-    \item email (VARCHAR(150), Unique, Not Null)
-    \item code\_hash (VARCHAR(200), Not Null)
-    \item payload (JSONB, Not Null)
-    \item expires\_at (TIMESTAMP, Not Null)
-  \end{itemize}
-\end{itemize}
 
-\medskip
-\textbf{Password Resets Table}
-\begin{itemize}
-  \item \textbf{Table Name:} password\_resets
-  \item \textbf{Fields:}
-  \begin{itemize}
-    \item id (SERIAL, Primary Key)
-    \item email (VARCHAR(150), Unique, Not Null)
-    \item code\_hash (VARCHAR(200), Not Null)
-    \item expires\_at (TIMESTAMP, Not Null)
-  \end{itemize}
-\end{itemize}
 
-\medskip
-\textbf{Habits Table}
-\begin{itemize}
-  \item \textbf{Table Name:} habits
-  \item \textbf{Fields:}
-  \begin{itemize}
-    \item id (SERIAL, Primary Key)
-    \item user\_id (INT, FK $\rightarrow$ users.id, Not Null)
-    \item title (VARCHAR(100), Not Null)
-    \item description (TEXT, Nullable)
-    \item category (VARCHAR(50), Nullable)
-    \item target\_reps (INT, Nullable)
-    \item is\_daily\_goal (BOOLEAN, Default: FALSE)
-    \item created\_at (TIMESTAMP, Default: CURRENT\_TIMESTAMP)
-  \end{itemize}
-  \item \textbf{Relationships:}
-  \begin{itemize}
-    \item Many-to-one with users
-    \item One-to-many with schedules and progress
-  \end{itemize}
-\end{itemize}
-
-\medskip
-\textbf{Schedules Table}
-\begin{itemize}
-  \item \textbf{Table Name:} schedules
-  \item \textbf{Fields:}
-  \begin{itemize}
-    \item id (SERIAL, Primary Key)
-    \item habit\_id (INT, FK $\rightarrow$ habits.id, Not Null)
-    \item user\_id (INT, FK $\rightarrow$ users.id, Not Null)
-    \item day (DATE, Not Null)
-    \item starttime (TIME, Not Null)
-    \item endtime (TIME, Nullable)
-    \item enddate (DATE, Nullable)
-    \item repeat (VARCHAR(50), Default: daily)
-    \item customdays (VARCHAR(100), Nullable)
-    \item notes (TEXT, Nullable)
-    \item created\_at (TIMESTAMP)
-    \item updated\_at (TIMESTAMP)
-  \end{itemize}
-\end{itemize}
-
-\medskip
-\textbf{Tasks Table}
-\begin{itemize}
-  \item \textbf{Table Name:} tasks
-  \item \textbf{Fields:}
-  \begin{itemize}
-    \item id (SERIAL, Primary Key)
-    \item user\_id (INT, FK $\rightarrow$ users.id, Not Null)
-    \item name (VARCHAR(255), Not Null)
-    \item duration\_minutes (INT, Default: 60)
-    \item min\_duration\_minutes (INT, Nullable)
-    \item max\_duration\_minutes (INT, Nullable)
-    \item split\_up (BOOLEAN, Default: FALSE)
-    \item hours\_label (VARCHAR(120), Nullable)
-    \item schedule\_after (TIMESTAMP, Nullable)
-    \item due\_date (TIMESTAMP, Nullable)
-    \item color (VARCHAR(20), Nullable)
-    \item status (VARCHAR(20), Default: pending)
-    \item created\_at (TIMESTAMP, Default: CURRENT\_TIMESTAMP)
-  \end{itemize}
-\end{itemize}
-
-\medskip
-\textbf{Busy Schedules Table}
-\begin{itemize}
-  \item \textbf{Table Name:} busy\_schedules
-  \item \textbf{Fields:}
-  \begin{itemize}
-    \item id (SERIAL, Primary Key)
-    \item user\_id (INT, FK $\rightarrow$ users.id, Not Null)
-    \item title (VARCHAR(255), Not Null)
-    \item day (DATE, Not Null)
-    \item starttime (TIME, Not Null)
-    \item endtime (TIME, Nullable)
-    \item enddate (DATE, Nullable)
-    \item repeat (VARCHAR(50), Default: daily)
-    \item customdays (VARCHAR(100), Nullable)
-    \item notes (TEXT, Nullable)
-    \item created\_at (TIMESTAMP)
-    \item updated\_at (TIMESTAMP)
-  \end{itemize}
-\end{itemize}
-
-\medskip
-\textbf{Progress Table}
-\begin{itemize}
-  \item \textbf{Table Name:} progress
-  \item \textbf{Fields:}
-  \begin{itemize}
-    \item id (SERIAL, Primary Key)
-    \item user\_id (INT, FK $\rightarrow$ users.id, Not Null)
-    \item habit\_id (INT, FK $\rightarrow$ habits.id, Not Null)
-    \item status (VARCHAR(50), Not Null)
-    \item reflected\_reason (TEXT, Nullable)
-    \item progress\_date (DATE, Default: CURRENT\_DATE)
-    \item created\_at (TIMESTAMP)
-  \end{itemize}
-\end{itemize}
-
-\medskip
-\textbf{Achievements Table}
-\begin{itemize}
-  \item \textbf{Table Name:} achievements
-  \item \textbf{Fields:}
-  \begin{itemize}
-    \item id (SERIAL, Primary Key)
-    \item title (VARCHAR(100), Not Null)
-    \item description (TEXT, Not Null)
-    \item created\_at (TIMESTAMP)
-  \end{itemize}
-  \item \textbf{Relationships:}
-  \begin{itemize}
-    \item Many-to-many with users (via user\_achievements)
-  \end{itemize}
-\end{itemize}
-
-\medskip
-\textbf{User Achievements Table}
-\begin{itemize}
-  \item \textbf{Table Name:} user\_achievements
-  \item \textbf{Fields:}
-  \begin{itemize}
-    \item id (SERIAL, Primary Key)
-    \item user\_id (INT, FK $\rightarrow$ users.id, Not Null)
-    \item achievement\_id (INT, FK $\rightarrow$ achievements.id, Not Null)
-    \item achieved\_at (TIMESTAMP)
-  \end{itemize}
-  \item \textbf{Relationships:}
-  \begin{itemize}
-    \item Many-to-one with users
-    \item Many-to-one with achievements
-  \end{itemize}
-\end{itemize}
 \subsection{Data Security Measures}
 The StepHabit platform implements multiple layers of security to protect user data,
 ensure privacy, and maintain system integrity across authentication, authorization,
@@ -630,9 +712,7 @@ consistency.
 
 \newpage
 
-% ===========================
-% Chapter 4
-% ===========================
+
 \section{Backend Endpoints}
 \subsection{Habit Endpoints}
 \begin{longtable}{|p{3cm}|p{4cm}|p{6cm}|p{2.5cm}|}
@@ -664,6 +744,7 @@ GET & /progress & Retrieve habit progress logs & Yes \\ \hline
 POST & /progress & Log habit completion & Yes \\ \hline
 DELETE & /progress/:id & Delete a progress record & Yes \\ \hline
 \end{longtable}
+
 \subsection{User & Authentication Endpoints}
 \begin{longtable}{|p{3cm}|p{4cm}|p{6cm}|p{2.5cm}|}
 \hline
@@ -700,15 +781,6 @@ GET & /group-challenges & List group challenges & Yes \\ \hline
 POST & /group-challenges/:id/join & Join a challenge & Yes \\ \hline
 \end{longtable}
 
-\subsection{WebSocket Endpoint}
-\begin{longtable}{|p{5cm}|p{9cm}|}
-\hline
-\textbf{WebSocket URL} & ws://<HOST>:<PORT>/notification-message \\ \hline
-\textbf{Namespace} & /notification-message \\ \hline
-\textbf{Transport} & WebSocket \\ \hline
-\textbf{Authentication} & JWT (Authorization Header) \\ \hline
-\end{longtable}
-
 \subsection{API Tools and Documentation}
 
 To support development, testing, and long-term maintainability, the StepHabit platform
@@ -734,9 +806,6 @@ notifications, AI coaching, and social features. &
 
 \newpage
 
-% ===========================
-% Chapter 5
-% ===========================
 \section{Application and functionality}
 
 \subsection{User Registration Process}
@@ -1207,9 +1276,7 @@ multiple habits, schedules, and reminders.
 \end{figure}
 \newpage
 
-% ===========================
-% Chapter 6
-% ===========================
+
 \section{Challenges and Lessons Learned}
 Developing StepHabit as a full-stack, AI-assisted habit management platform introduced
 several technical and architectural challenges. Addressing these challenges required
@@ -1265,9 +1332,7 @@ These experiences collectively reinforced the value of building robust, maintain
 systems that balance technical complexity with real-world usability.
 \newpage
 
-% ===========================
-% Chapter 7
-% ===========================
+
 \section{Future Improvements}
 
 While StepHabit already provides a comprehensive habit, scheduling, and AI-assisted
@@ -1344,9 +1409,6 @@ a long-term personal growth companion for users across different platforms.
 
 \newpage
 
-% ===========================
-% Chapter 8
-% ===========================
 \section{Conclusion}
 
 StepHabit represents a comprehensive and thoughtfully engineered solution for habit
@@ -1399,7 +1461,7 @@ illustrates the potential of digital tools to help users build better habits, st
 and grow intentionally over time.
 \newpage
 
-\section*{References}
+\section{References}
 
 \begin{enumerate}
   \item Lally, P., van Jaarsveld, C. H. M., Potts, H. W. W., \& Wardle, J. (2010). 
@@ -1431,22 +1493,22 @@ and grow intentionally over time.
   \item Zapier. (2025). 
   \textit{The best habit tracker apps}. 
   https://zapier.com/blog/best-habit-tracker-app/
+  
+  \item CoreUI. (n.d.). 
+  \textit{CoreUI React admin template and UI components}. 
+  https://coreui.io/react
 
   \item Node.js Foundation. (n.d.). 
   \textit{Node.js documentation}. 
   https://nodejs.org/en/docs
 
-  \item IBM. (n.d.). 
-  \textit{What is Claude AI and why it matters}. IBM Think. 
-  https://www.ibm.com/think/topics/claude-ai
-
   \item PostgreSQL Global Development Group. (n.d.). 
   \textit{Why PostgreSQL? Advantages and features}. PostgreSQL Documentation. 
   https://www.postgresql.org/about/
 
-  \item CoreUI. (n.d.). 
-  \textit{CoreUI React admin template and UI components}. 
-  https://coreui.io/react
-\end{enumerate}
+  \item IBM. (n.d.). 
+  \textit{What is Claude AI and why it matters}. IBM Think. 
+  https://www.ibm.com/think/topics/claude-ai
 
+\end{enumerate}
 \end{document}
