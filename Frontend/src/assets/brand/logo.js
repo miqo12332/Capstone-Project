@@ -7,7 +7,7 @@ export const logo = [
       <path d="M14 22l6 6 12-14" stroke="#F8FAFC" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
     </g>
     <text x="70" y="38" font-family="Inter, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="28" font-weight="700" fill="#E2E8F0" letter-spacing="0.2">
-      HabitCoach
+      StepHabit
     </text>
   </g>`
 ]
